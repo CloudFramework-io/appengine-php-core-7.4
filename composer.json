@@ -6,9 +6,7 @@
   "license": "MIT",
   "require": {
     "google/cloud-datastore": "^1.10",
-    "google/cloud-storage": "^1.16",
-    "grpc/grpc": "^v1.1.0",
-    "google/protobuf": "^v3.3.0"
+    "google/cloud-storage": "^1.16"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
