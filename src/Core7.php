@@ -70,7 +70,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = '20191221';
+        var $_version = '20200113';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -108,6 +108,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //setup google cloud projectId
             $this->gc_project_id = getenv('PROJECT_ID');
+
+            //evaluate development DATASTORE fix
+            if($DATASTORE_EMULATOR_HOST = getenv('DATASTORE_EMULATOR_HOST')) {
+                if(strpos($DATASTORE_EMULATOR_HOST,'::1')===0) {
+                    $DATASTORE_EMULATOR_HOST = str_replace('::1','localhost',$DATASTORE_EMULATOR_HOST);
+                    putenv("DATASTORE_EMULATOR_HOST={$DATASTORE_EMULATOR_HOST}");
+                }
+            }
 
             // Local configuration
             if ($this->is->development() && is_file($this->system->root_path . '/local_config.json'))

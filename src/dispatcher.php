@@ -1,13 +1,14 @@
 <?php
 // Autoload libraries
-require_once __DIR__ . '/../../../../vendor/autoload.php';
-
-use Google\Cloud\Datastore\DatastoreClient;
-$datastore = new DatastoreClient(['transport'=>'grpc']);
+require_once  'vendor/autoload.php';
 
 // Load Core class
 include_once(__DIR__ . "/Core7.php"); //
 $core = new Core7();
+
+// Load DataStoreClient to optimize calls
+use Google\Cloud\Datastore\DatastoreClient;
+$datastore = new DatastoreClient(['transport'=>'grpc']);
 
 // Run Dispatch
 $core->dispatch();
