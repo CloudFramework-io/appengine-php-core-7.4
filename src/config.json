@@ -1,0 +1,4 @@
+{
+  "core.api.urls":["/api"],
+  "include:":"{{rootPath}}/config.json"
+}
