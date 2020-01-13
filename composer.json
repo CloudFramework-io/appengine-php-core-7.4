@@ -4,6 +4,10 @@
   "description": "Framework to develop API and Web applications optimized for Google Appengine PHP 7.3",
   "minimum-stability": "dev",
   "license": "MIT",
+  "require": {
+    "google/cloud-datastore": "^1.10",
+    "google/cloud-storage": "^1.16"
+  },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
     { "name": "Fran Herrera", "email": "fran@cloudframework.io"},
