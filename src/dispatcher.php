@@ -1,6 +1,6 @@
 <?php
 // Autoload libraries
-require_once  'vendor/autoload.php';
+require_once  __DIR__.'/../../../autoload.php';
 
 // Load Core class
 include_once(__DIR__ . "/Core7.php"); //
