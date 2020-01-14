@@ -8,7 +8,14 @@ $core = new Core7();
 
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
-$datastore = new DatastoreClient(['transport'=>'grpc']);
+$datastore = null;
+if($core->config->get('core.datastore.on')) {
+    if($core->is->development()) {
+        $datastore = new DatastoreClient(['transport'=>'rest']);
+    } else {
+        $datastore = new DatastoreClient(['transport'=>'grpc']);
+    }
+}
 
 // Run Dispatch
 $core->dispatch();
