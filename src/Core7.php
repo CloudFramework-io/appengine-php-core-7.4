@@ -492,7 +492,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if (!empty($id)) session_id($id);
 
             // Session start
-            session_start();
+            @session_start();
 
             // Let's keep the session id
             $this->id = session_id();
@@ -2119,7 +2119,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $data mixed
          * @return mixed|string
          */
-        private function convertTags($data)
+        public function convertTags($data)
         {
             $_array = is_array($data);
 
