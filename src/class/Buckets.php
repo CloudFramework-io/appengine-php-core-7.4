@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @author Héctor López <hlopez@cloudframework.io>
+ * @version 2020 - php7
+ */
+
 // CloudSQL Class v10
 if (!defined ("_Buckets_CLASS_") ) {
     define ("_Buckets_CLASS_", TRUE);
@@ -316,15 +321,19 @@ if (!defined ("_Buckets_CLASS_") ) {
 
         /**
          * Returns the URL to upload a file
+         * https://stackoverflow.com/questions/53346083/create-google-cloud-storage-upload-urls-for-php7-2/53833015
          * @param string $returnUrl is the url the system has to call once the file has been uploaded
          * @return mixed
          */
         function getUploadUrl($returnUrl=null) {
+            return($returnUrl);
+            /*
             if(!$returnUrl) $returnUrl = $this->vars['retUploadUrl'];
             else $this->vars['retUploadUrl'] = $returnUrl;
             $options = array( 'gs_bucket_name' => str_replace('gs://','',$this->bucket) );
             $upload_url = CloudStorageTools::createUploadUrl($returnUrl, $options);
             return($upload_url);
+            */
         }
 
         /**

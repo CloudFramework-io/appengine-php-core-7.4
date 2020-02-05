@@ -2,7 +2,7 @@
 
 /**
  * @author Héctor López <hlopez@cloudframework.io>
- * @version 2019
+ * @version 2020
  */
 
 
@@ -483,16 +483,35 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function __construct()
         {
+            if(session_status() == PHP_SESSION_ACTIVE) {
+                $this->id = session_id();
+                $this->start = true;
+            }
+
         }
 
         function init($id = '')
         {
 
             // If they pass a session id I will use it.
-            if (!empty($id)) session_id($id);
+            if (!empty($id)) {
+                $this->id = '';
+                $this->start = false;
+
+                if(session_status() == PHP_SESSION_ACTIVE) {
+                    if(session_id() != $id )  {
+                        session_abort();
+                        session_id($id);
+                    }
+                } else {
+                    session_id($id);
+                }
+            }
 
             // Session start
-            @session_start();
+            if(session_status() != PHP_SESSION_ACTIVE) {
+                session_start();
+            }
 
             // Let's keep the session id
             $this->id = session_id();
@@ -2120,6 +2139,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @return mixed|string
          */
         public function convertTags($data)
+
+
         {
             $_array = is_array($data);
 
