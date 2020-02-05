@@ -158,8 +158,10 @@ if (!defined ("_Buckets_CLASS_") ) {
 
                                 if(move_uploaded_file($value['tmp_name'],$dest)) {
                                     $this->uploadedFiles[$key][$i]['movedTo'] = $dest;
-                                    if($public)
-                                        $this->uploadedFiles[$key][$i]['publicUrl'] = $this->getPublicUrl($dest,$ssl);
+                                    if($public) {
+                                        //$this->uploadedFiles[$key][$i]['publicUrl'] = $this->getPublicUrl($dest,$ssl);
+                                        $this->uploadedFiles[$key][$i]['publicUrl'] = $dest;
+                                    }
                                 } else {
                                     $this->addError(error_get_last());
                                     $this->uploadedFiles[$key][$i]['error'] = $this->errorMsg;
@@ -197,7 +199,8 @@ if (!defined ("_Buckets_CLASS_") ) {
                 $ret  = $this->core->system->url['host_base_url'].str_replace($_SERVER['DOCUMENT_ROOT'], '',$file);
             }
             else {
-                $ret = CloudStorageTools::getPublicUrl($file, $ssl);
+                //$ret = CloudStorageTools::getPublicUrl($file, $ssl);
+                $ret = $file;
             }
             return $ret;
 
@@ -388,3 +391,4 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
     }
 }
+
