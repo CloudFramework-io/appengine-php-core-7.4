@@ -1,6 +1,4 @@
 <?php
-require_once 'google/appengine/api/cloud_storage/CloudStorageTools.php';
-use google\appengine\api\cloud_storage\CloudStorageTools;
 
 // CloudSQL Class v10
 if (!defined ("_Buckets_CLASS_") ) {
