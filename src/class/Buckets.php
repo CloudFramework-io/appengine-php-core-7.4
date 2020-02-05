@@ -2,7 +2,7 @@
 
 /**
  * @author Héctor López <hlopez@cloudframework.io>
- * @version 2020 - php7
+ * @version 202001051309 - php7
  */
 
 // CloudSQL Class v10
@@ -20,6 +20,7 @@ if (!defined ("_Buckets_CLASS_") ) {
         var $uploadedFiles = array();
         var $isUploaded = false;
         var $vars = [];
+        var $gs_bucket = null;
 
 
         Function __construct (Core7 &$core,$bucket='') {
@@ -28,7 +29,17 @@ if (!defined ("_Buckets_CLASS_") ) {
             if(strlen($bucket)) $this->bucket = $bucket;
             else $this->bucket = $this->core->config->get('bucketUploadPath');
             if(!$this->bucket) return($this->addError('Missing bucketUploadPath config var or $bucket in the constructor'));
-            if(!is_dir($this->bucket)) return($this->addError('I can not find bucket: '.$this->bucket));
+
+            if(strpos($this->bucket,'gs://')===0) {
+                try {
+                    $this->gs_bucket = $this->core->gc_datastorage_client->bucket(str_replace('gs://','',$this->bucket));
+                    if(!$this->gs_bucket->exists()) return($this->addError('I can not find bucket: '.$this->bucket));
+                } catch (Exception $e) {
+                    return($this->addError($e->getMessage()));
+                }
+            } else {
+                if(!is_dir($this->bucket)) return($this->addError('I can not find bucket: '.$this->bucket));
+            }
 
             $this->vars['upload_max_filesize'] = ini_get('upload_max_filesize');
             $this->vars['max_file_uploads'] = ini_get('max_file_uploads');
@@ -69,6 +80,7 @@ if (!defined ("_Buckets_CLASS_") ) {
             $apply_hash_to_filenames = ($options['apply_hash_to_filenames'])?true:false;
             $allowed_extensions = ($options['allowed_extensions'])?explode(',',strtolower($options['allowed_extensions'])):[];
             $allowed_content_types = ($options['allowed_content_types'])?explode(',',strtolower($options['allowed_content_types'])):[];
+
 
             // Calculate base_dir
             $base_dir = '';
@@ -155,12 +167,16 @@ if (!defined ("_Buckets_CLASS_") ) {
                                     $context['gs']['acl'] = 'public-read';
                                 }
                                 stream_context_set_default($context);
-
                                 if(move_uploaded_file($value['tmp_name'],$dest)) {
                                     $this->uploadedFiles[$key][$i]['movedTo'] = $dest;
-                                    if($public) {
-                                        //$this->uploadedFiles[$key][$i]['publicUrl'] = $this->getPublicUrl($dest,$ssl);
-                                        $this->uploadedFiles[$key][$i]['publicUrl'] = $dest;
+                                    $this->uploadedFiles[$key][$i]['publicUrl'] = '';
+                                    if(is_object($this->gs_bucket)) {
+                                        if($public) {
+                                            $file = str_replace($this->bucket . '/', '', $dest);
+                                            $object = $this->gs_bucket->object($file);
+                                            $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
+                                            $this->uploadedFiles[$key][$i]['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$file;
+                                        }
                                     }
                                 } else {
                                     $this->addError(error_get_last());
@@ -199,7 +215,7 @@ if (!defined ("_Buckets_CLASS_") ) {
                 $ret  = $this->core->system->url['host_base_url'].str_replace($_SERVER['DOCUMENT_ROOT'], '',$file);
             }
             else {
-                //$ret = CloudStorageTools::getPublicUrl($file, $ssl);
+                $file = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$file;
                 $ret = $file;
             }
             return $ret;
@@ -391,4 +407,5 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
     }
 }
+
 
