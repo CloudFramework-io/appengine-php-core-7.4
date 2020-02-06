@@ -6,7 +6,7 @@
   "dist": {
         "url": "https://github.com/CloudFramework-io/appengine-php-core-7.3.git",
         "type": "git"
-    }
+    },
   "license": "MIT",
   "require": {
     "google/cloud-datastore": "^1.10",
