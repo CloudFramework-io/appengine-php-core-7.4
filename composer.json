@@ -3,10 +3,6 @@
   "keywords": ["appengine", "google", "framework", "sql", "cloud datastore", "nosql","gae","cloudframwork"],
   "description": "Framework to develop API and Web applications optimized for Google Appengine PHP 7.3",
   "minimum-stability": "stable",
-  "dist": {
-        "url": "https://github.com/CloudFramework-io/appengine-php-core-7.3.git",
-        "type": "git"
-    },
   "license": "MIT",
   "require": {
     "google/cloud-datastore": "^1.10",
