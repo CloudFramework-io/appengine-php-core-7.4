@@ -1,6 +1,7 @@
 <?php
+$_root_path = (strlen($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : $_SERVER['PWD'];
 // Autoload libraries
-require_once  __DIR__.'/../../../autoload.php';
+require_once  $_root_path.'/vendor/autoload.php';
 
 // Load Core class
 include_once(__DIR__ . "/Core7.php"); //

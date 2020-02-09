@@ -730,12 +730,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $ret['user_agent'] = (isset($_SERVER['HTTP_USER_AGENT']))?$_SERVER['HTTP_USER_AGENT']:'unknown';
             $ret['host'] = (isset($_SERVER['HTTP_HOST']))?$_SERVER['HTTP_HOST']:null;
             $ret['software'] = $_SERVER['SERVER_SOFTWARE'];
+
             if ($extra == 'geodata') {
                 $ret['geoData'] = $this->core->getGeoData();
                 unset($ret['geoData']['source_ip']);
                 unset($ret['geoData']['credit']);
             }
             $ret['hash'] = sha1(implode(",", $ret));
+
             $ret['ip'] = $this->ip;
             $ret['http_referer'] = (array_key_exists('HTTP_REFERER',$_SERVER))?$_SERVER['HTTP_REFERER']:'unknown';
             $ret['time'] = date('Ymdhis');
@@ -2487,6 +2489,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             $this->core->__p->add('getDSToken', $prefixStarts, 'note');
             $ret = null;
+
 
             // Check if token starts with $prefix
             if (strlen($prefixStarts) && strpos($token, $prefixStarts) !== 0) {
