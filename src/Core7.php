@@ -3401,7 +3401,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $route = $this->getServiceUrl($route);
             $this->responseHeaders = null;
 
-            syslog(LOG_INFO,"request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+            $this->core->logs->sendToSysLog("request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+            //syslog(LOG_INFO,"request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
             $this->core->__p->add("Request->{$verb}: ", "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             // Performance for connections
@@ -3514,7 +3515,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->addError($e->getMessage());
             }
 
-            syslog(($this->error)?LOG_DEBUG:LOG_INFO,"end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+            $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'),(($this->error)?'debug':'info'));
+            //syslog(($this->error)?LOG_DEBUG:LOG_INFO,"end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
             $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
             return ($ret);
