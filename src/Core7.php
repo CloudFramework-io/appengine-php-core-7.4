@@ -9,6 +9,7 @@
 use Google\Cloud\Storage\StorageClient;
 
 
+
 if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     define("_CLOUDFRAMEWORK_CORE_CLASSES_", TRUE);
 
@@ -765,15 +766,26 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
     /**
      * Class to manage Logs & Errors
+     * https://cloud.google.com/logging/docs/setup/php
+     * $logger->info('This will show up as log level INFO');
+     * $logger->warning('This will show up as log level WARNING');
+     * $logger->error('This will show up as log level ERROR');
      * @package Core
      */
     class CoreLog
     {
         var $lines = 0;
         var $data = [];
-        var $syslog_type = LOG_DEBUG;
+        var $syslog_type = 'info';  //error, info, warning, notice, debug, critical, alert, emergency
+        /** @var \Google\Cloud\Logging\Logger|\Google\Cloud\Logging\PsrLogger  */
+        var $logger = null;
 
-        /**
+        function __construct()
+        {
+            global $logger;
+            $this->logger= &$logger;
+        }
+            /**
          * Reset the log and add an entry in the log.. if syslog_title is passed, also insert a LOG_DEBUG
          * @param $data
          * @param string $syslog_title
@@ -789,22 +801,21 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * Add an entry in the log.. if syslog_title is passed, also insert a LOG_DEBUG
          * @param $data
          * @param string $syslog_title
+         * @param $syslog_type string|null values: error, info, warning, notice, debug, critical, alert, emergency
          */
         function add($data, $syslog_title=null, $syslog_type=null)
         {
             // Evaluate to write in syslog
             if(null !==  $syslog_title) {
-
                 if(null==$syslog_type) $syslog_type = $this->syslog_type;
-                syslog($syslog_type, $syslog_title.': '. json_encode($data,JSON_FORCE_OBJECT));
-
+                $this->sendToSysLog($syslog_title.': '. json_encode($data,JSON_FORCE_OBJECT),$syslog_type);
+                //syslog($syslog_type, $syslog_title.': '. json_encode($data,JSON_FORCE_OBJECT));
                 // Change the data sent to say that the info has been sent to syslog
                 if(is_string($data))
-                    $data = 'SYSLOG '.$syslog_title.': '.$data;
+                    $data = 'SYSLOG ['.$syslog_type.'] '.$syslog_title.': '.$data;
                 else
-                    $data = ['SYSLOG '.$syslog_title=>$data];
+                    $data = ['SYSLOG ['.$syslog_type.'] '.$syslog_title=>$data];
             }
-
             // Store in local var.
             $this->data[] = $data;
             $this->lines++;
@@ -819,11 +830,40 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * store all the data inside a syslog
-         * @param $title
+         *
+         * @param $data
+         * @param $syslog_type string|null values: error, info, warning, notice, debug, critical, alert, emergency
          */
-        function sendToSysLog($title,$syslog_type=null) {
+        function sendToSysLog($data, $syslog_type=null) {
+            if(!is_string($data)) $data = json_encode($data,JSON_FORCE_OBJECT);
             if(null==$syslog_type) $syslog_type = $this->syslog_type;
-            syslog($syslog_type, $title. json_encode($this->data,JSON_FORCE_OBJECT));
+            switch ($syslog_type) {
+                case "error":
+                    $this->logger->error($data);
+                    break;
+                    break;
+                case "warning":
+                    $this->logger->warning($data);
+                    break;
+                case "notice":
+                    $this->logger->notice($data);
+                    break;
+                case "debug":
+                    $this->logger->debug($data);
+                    break;
+                case "critical":
+                    $this->logger->critical($data);
+                    break;
+                case "alert":
+                    $this->logger->alert($data);
+                    break;
+                case "emergency":
+                    $this->logger->emergency($data);
+                    break;
+                default:
+                    $this->logger->info($data);
+                    break;
+            }
         }
 
         /**
@@ -2665,7 +2705,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @return boolean
          */
         function isCron() {
-            if($this->core->is->development() && array_key_exists('HTTP_AUTHORIZATION',$_SERVER) && $_SERVER['HTTP_AUTHORIZATION']=='cron' ) return true;
             return(!empty($this->getHeader('X-Appengine-Cron')));
         }
 
