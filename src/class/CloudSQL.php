@@ -1035,7 +1035,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     , 'Schema' => $tmp['SCHEMA']
                     , 'explain' => $tmp['explain']
                     , 'indexes' => $tmp['index']
-                    , 'SQL' => $tmp['SQL']['Create Table']
+                    , 'SQL' => (isset($tmp['SQL']['Create Table']))?$tmp['SQL']['Create Table']:null
                     , 'TRIGGERS' => (isset($tmp['TRIGGERS']))?$tmp['TRIGGERS']:null
                     //, 'indexes' => $tmp['index']
                 ]);
@@ -1081,9 +1081,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     ,'fields'=>[]
                     ,'filters'=>[]
                     ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'sort'=>null,'server_limit'=>1000,'fields'=>[]]]
+                    ,'delete_fields'=>null
                     ,'insert_fields'=>null
                     ,'update_fields'=>null
                     ,'display_fields'=>null
+                    ,'copy_fields'=>null
                 ]
             ];
 

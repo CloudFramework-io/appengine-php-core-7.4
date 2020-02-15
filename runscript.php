@@ -1,9 +1,24 @@
 <?php
-require_once __DIR__ . '/../../../vendor/autoload.php';
-
 $rootPath = exec('pwd');
+// Autoload libraries
+require_once  $rootPath.'/vendor/autoload.php';
+
 include_once __DIR__.'/src/Core7.php';
 $core = new Core7($rootPath);
+
+// Load DataStoreClient to optimize calls
+use Google\Cloud\Datastore\DatastoreClient;
+$datastore = null;
+if($core->config->get('core.datastore.on')) {
+    if($core->is->development()) {
+        $datastore = new DatastoreClient(['transport'=>'rest']);
+    } else {
+        $datastore = new DatastoreClient(['transport'=>'grpc']);
+    }
+}
+
+use Google\Cloud\Logging\LoggingClient;
+$logger = LoggingClient::psrBatchLogger('app');
 
 // Check test exist
 if(true) {
@@ -18,7 +33,8 @@ if(true) {
             $params = '';
         }
         $script = explode('/', $script);
-        $path = ($script[0][0] == '_') ? __DIR__ : $core->system->app_path;
+        $path = ($script[0][0] == '_') ? __DIR__ : $core->system->app_path.'/scripts';
+        if($core->config->get('core.scripts.path')) $path=$core->config->get('core.scripts.path');
     }
 
     echo "CloudFramwork Script v1.0\nroot_path: {$rootPath}\napp_path: {$path}\n";
@@ -44,8 +60,8 @@ if(true) {
     // Evaluate options
     $options = ['performance'=>in_array('--p',$argv)];
 
-    if(!is_file($path.'/scripts/'.$script[0].'.php')) die("Script not found. Create it with:\n-------\n<?php\nclass Script extends Scripts {\n\tfunction main() { }\n}\n-------\n\n");
-    include_once $path.'/scripts/'.$script[0].'.php';
+    if(!is_file($path.'/'.$script[0].'.php')) die("Script not found. Create it with:\n-------\n<?php\nclass Script extends Scripts {\n\tfunction main() { }\n}\n-------\n\n");
+    include_once $path.'/'.$script[0].'.php';
     if(!class_exists('Script')) die('The script does not include a "Class Script'."\nUse:\n-------\n<?php\nclass Script extends Scripts {\n\tfunction main() { }\n}\n-------\n\n");
     /** @var Script $script */
 

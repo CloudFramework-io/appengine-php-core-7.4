@@ -841,7 +841,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 case "error":
                     $this->logger->error($data);
                     break;
-                    break;
                 case "warning":
                     $this->logger->warning($data);
                     break;
