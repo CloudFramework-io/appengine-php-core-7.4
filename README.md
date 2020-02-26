@@ -14,3 +14,10 @@ https://packagist.org/packages/cloudframework-io/appengine-php-core-7.3
 
 ### TAG
 https://git-scm.com/book/en/v2/Git-Basics-Tagging
+
+#### Delete Tag
+https://stackoverflow.com/questions/5480258/how-to-delete-a-remote-tag
+```
+git push --delete origin tagname
+git tag --delete tagname
+```
