@@ -31,8 +31,10 @@ if (!defined ("_Buckets_CLASS_") ) {
             if(!$this->bucket) return($this->addError('Missing bucketUploadPath config var or $bucket in the constructor'));
 
             if(strpos($this->bucket,'gs://')===0) {
+                // take the bucket name: ex: gs://cloudframework/adnbp/.. -> cloudframework
+                $bucket_root = preg_replace('/\/.*/','',str_replace('gs://','',$this->bucket));
                 try {
-                    $this->gs_bucket = $this->core->gc_datastorage_client->bucket(str_replace('gs://','',$this->bucket));
+                    $this->gs_bucket = $this->core->gc_datastorage_client->bucket($bucket_root);
                     if(!$this->gs_bucket->exists()) return($this->addError('I can not find bucket: '.$this->bucket));
                 } catch (Exception $e) {
                     return($this->addError($e->getMessage()));
