@@ -6,9 +6,9 @@
   "minimum-stability": "stable",
   "license": "MIT",
   "require": {
-    "google/cloud-datastore": "^1.10",
-    "google/cloud-storage": "^1.16",
-    "google/cloud-logging": "^1.18"
+    "google/cloud-datastore": "^1.11",
+    "google/cloud-storage": "^1.18",
+    "google/cloud-logging": "^1.19"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
