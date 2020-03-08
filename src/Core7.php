@@ -46,6 +46,29 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         else echo "</pre>";
     }
 
+    function __fatal_handler() {
+        global $core;
+        $errfile = "unknown file";
+        $errstr  = "shutdown";
+        $errno   = E_CORE_ERROR;
+        $errline = 0;
+
+        $error = error_get_last();
+
+        if( $error !== NULL) {
+            $errno   = $error["type"];
+            $errfile = $error["file"];
+            $errline = $error["line"];
+            $errstr  = $error["message"];
+
+            $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
+            if($core->is->development() && !$core->is->terminal())
+                _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
+        }
+    }
+
+    register_shutdown_function( "__fatal_handler" );
+
     /**
      * Print a group of mixed vars passed as arguments
      */
@@ -62,6 +85,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         __print(array_merge(func_get_args(), array('exit')));
     }
 
+    //_printe($_SERVER);
+    //_printe(php_sapi_name());
+
     //endregion
 
     /**
@@ -71,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.03071';
+        var $_version = 'v73.03081';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1050,7 +1076,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->cache = new Memcache;
                 } else {
                     $this->cache = false;
-                    $this->log->add("init(). Failed because MemCache does not exist",'CoreCache');
+                    $this->log->add("init(). Failed because MemCache does not exist",'CoreCache','warning');
                 }
             } elseif($this->type=='DataStore') {
                 $this->cache = new CoreCacheDataStore($this->core,$this->spacename);
