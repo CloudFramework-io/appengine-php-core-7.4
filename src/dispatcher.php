@@ -18,8 +18,12 @@ if($core->config->get('core.datastore.on')) {
     }
 }
 
+// https://cloud.google.com/logging/docs/setup/php
 use Google\Cloud\Logging\LoggingClient;
-$logger = LoggingClient::psrBatchLogger('app');
+$logger = null;
+if($core->is->production()) {
+    $logger = LoggingClient::psrBatchLogger('app');
+}
 
 // Run Dispatch
 $core->dispatch();

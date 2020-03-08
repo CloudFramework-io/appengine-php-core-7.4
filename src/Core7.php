@@ -62,6 +62,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $errstr  = $error["message"];
 
             $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
+
             if($core->is->development() && !$core->is->terminal())
                 _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
         }
@@ -97,7 +98,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.03081';
+        var $_version = 'v73.03082';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -121,12 +122,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->logs = new CoreLog();
             $this->errors = new CoreLog();
             $this->is = new CoreIs();
-            $this->cache = new CoreCache();
+            $this->__p->add('Construct Class with objects (__p,session[started=' . (($this->session->start) ? 'true' : 'false') . '],system,logs,errors,is):' . __CLASS__, __FILE__);
 
-
-            $this->__p->add('Construct Class with objects (__p,session[started=' . (($this->session->start) ? 'true' : 'false') . '],system,logs,errors,is,cache):' . __CLASS__, __FILE__);
             $this->security = new CoreSecurity($this);
-
+            $this->cache = new CoreCache($this);
             $this->user = new CoreUser($this);
             $this->config = new CoreConfig($this, __DIR__ . '/config.json');
             $this->request = new CoreRequest($this);
@@ -805,6 +804,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $syslog_type = 'info';  //error, info, warning, notice, debug, critical, alert, emergency
         /** @var \Google\Cloud\Logging\Logger|\Google\Cloud\Logging\PsrLogger  */
         var $logger = null;
+        var $is_development;
 
         function __construct()
         {
@@ -863,32 +863,64 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function sendToSysLog($data, $syslog_type=null) {
             if(!is_string($data)) $data = json_encode($data,JSON_FORCE_OBJECT);
             if(null==$syslog_type) $syslog_type = $this->syslog_type;
-            switch ($syslog_type) {
-                case "error":
-                    $this->logger->error($data);
-                    break;
-                case "warning":
-                    $this->logger->warning($data);
-                    break;
-                case "notice":
-                    $this->logger->notice($data);
-                    break;
-                case "debug":
-                    $this->logger->debug($data);
-                    break;
-                case "critical":
-                    $this->logger->critical($data);
-                    break;
-                case "alert":
-                    $this->logger->alert($data);
-                    break;
-                case "emergency":
-                    $this->logger->emergency($data);
-                    break;
-                default:
-                    $this->logger->info($data);
-                    break;
+            // In development write the logs in a different way
+            if(is_object($this->logger)) {
+                switch ($syslog_type) {
+                    case "error":
+                        $this->logger->error($data);
+                        break;
+                    case "warning":
+                        $this->logger->warning($data);
+                        break;
+                    case "notice":
+                        $this->logger->notice($data);
+                        break;
+                    case "debug":
+                        $this->logger->debug($data);
+                        break;
+                    case "critical":
+                        $this->logger->critical($data);
+                        break;
+                    case "alert":
+                        $this->logger->alert($data);
+                        break;
+                    case "emergency":
+                        $this->logger->emergency($data);
+                        break;
+                    default:
+                        $this->logger->info($data);
+                        break;
+                }
+            } else {
+                switch ($syslog_type) {
+                    case "error":
+                        syslog(LOG_ERR,$data);
+                        break;
+                    case "warning":
+                        syslog(LOG_WARNING,$data);
+                        break;
+                    case "notice":
+                        syslog(LOG_NOTICE,$data);
+                        break;
+                    case "debug":
+                        syslog(LOG_DEBUG,$data);
+                        break;
+                    case "critical":
+                        syslog(LOG_CRIT,$data);
+                        break;
+                    case "alert":
+                        syslog(LOG_ALERT,$data);
+                        break;
+                    case "emergency":
+                        syslog(LOG_EMERG,$data);
+                        break;
+                    default:
+                        syslog(LOG_INFO,$data);
+                        break;
+                }
+                file_put_contents("php://stderr", $syslog_type.': '.$data."\n");
             }
+
         }
 
         /**
@@ -961,6 +993,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
     /**
      * Class to manage Cache
+     * https://cloud.google.com/appengine/docs/standard/php7/using-memorystore#setup_redis_db
      * @package Core
      */
     class CoreCache
@@ -984,8 +1017,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $spacename
          * @param string $path if != null the it assumes the cache will be store in files
          */
-        function __construct($spacename = '',  $path=null, $debug = null)
+        function __construct(Core7 &$core, $spacename = '',  $path=null, $debug = null)
         {
+            $this->core = $core;
+
             // Asign a CoreLog Class to log
             $this->log = new CoreLog();
 
@@ -993,11 +1028,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if (!strlen(trim($spacename))) $spacename = (isset($_SERVER['HTTP_HOST'])) ? $_SERVER['HTTP_HOST'] : $_SERVER['PWD'];
             $this->setSpaceName($spacename);
 
-            // Activate debug based on $debug or if I am in development
+            // Activate debug based on $debug or if I am in development (local environgmnet)
             if(null !== $debug)
                 $this->debug = true === $debug;
+            // If we are in localhost then activate
             else
-                if(array_key_exists('SERVER_SOFTWARE',$_SERVER) && stripos($_SERVER['SERVER_SOFTWARE'], 'Development') !== false) $this->debug = true;
+                if($this->core->is->development()) $this->debug = true;
 
             // Activate CacheInDirectory
             if (null !== $path) {
@@ -1049,9 +1085,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $spacename spacename where to store objecs
          * @return bool
          */
-        function activateDataStore(Core7 &$core, $spacename = '')
+        function activateDataStore( $spacename = '')
         {
-            $this->core = $core;
             $this->type = 'DataStore';
             if($spacename) $this->spacename = $spacename;
             $this->cache = null;
@@ -1062,6 +1097,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Initialiated Cache Memory object.. If previously it has been called it just returns true.. if there is an error it returns false..
+         * https://cloud.google.com/appengine/docs/standard/php7/php-differences
+         * App Engine Memcache support is not provided. Instead, use Memorystore for Redis.
+         * https://cloud.google.com/appengine/docs/standard/php7/using-memorystore
          * @return bool
          */
         function init()
@@ -1072,21 +1110,39 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->log->add("init(). type: {$this->type} spacename: {$this->spacename}",'CoreCache');
 
             if ($this->type == 'memory') {
-                if (class_exists('MemCache')) {
-                    $this->cache = new Memcache;
+                if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
+                    $this->log->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
+                    //$this->type='DataStore';
+
                 } else {
-                    $this->cache = false;
-                    $this->log->add("init(). Failed because MemCache does not exist",'CoreCache','warning');
+                    $host = getenv('REDIS_HOST');
+                    $port = getenv('REDIS_PORT');
+                    try {
+                        $this->cache = new Redis();
+                        $this->cache->connect($host, $port);
+                    } catch (Exception $e) {
+                        $this->log->add("init(). REDIS connection failed, we change to DataStore. Failed because: ". $e->getMessage(),'CoreCache','warning');
+                        unset($this->cache);
+                        $this->cache=-1;
+                        return;
+                        //$this->type='DataStore';
+                    }
+
                 }
-            } elseif($this->type=='DataStore') {
+            }
+
+            if($this->type=='DataStore') {
                 $this->cache = new CoreCacheDataStore($this->core,$this->spacename);
                 if($this->cache->error) $this->addError(['CoreCacheDataStore'=>$this->cache->errorMsg]);
-            }  else {
+            }
+
+            if($this->type=='CacheInDirectory' && $this->dir) {
                 $this->cache = new CoreCacheFile($this->dir);
             }
 
             return(is_object($this->cache));
         }
+
 
         /**
          * Set a $spacename to set/get $objects
@@ -1101,52 +1157,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Set an object on cache based on $key
-         * @param $key
-         * @param mixed $object
-         * @param string $hash Allow to set the info based in a hash to determine if it is valid when read it.
-         * @return bool
-         */
-        function set($key, $object, $hash=null)
-        {
-            if(!$this->init() || !strlen(trim($key))) return null;
-
-            $info['_microtime_'] = microtime(true);
-            $info['_hash_'] = $hash;
-            $info['_data_'] = gzcompress(serialize($object));
-            $this->cache->set($this->spacename . '-' . $key, serialize($info));
-            // If exists a property error in the class checkit
-            if(isset($this->cache->error) && $this->cache->error) {
-                $this->error = true;
-                $this->errorMsg = $this->cache->errorMsg;
-            }
-
-            if($this->debug)
-                $this->log->add("set({$key}). token: ".$this->spacename . '-' . $key.(($hash)?' with hash: '.$hash:''),'CoreCache');
-
-            unset($info);
-            return ($this->error)?false:true;
-        }
-
-        /**
-         * delete a $key from cache
-         * @param $key
-         * @return true|null
-         */
-        function delete($key)
-        {
-            if(!$this->init() || !strlen(trim($key))) return null;
-
-            if (!strlen(trim($key))) return false;
-            $this->cache->delete($this->spacename . '-' . $key);
-
-            if($this->debug)
-                $this->log->add("delete(). token: ".$this->spacename . '-' . $key,'CoreCache');
-
-            return true;
-        }
-
-        /**
          * Return an object from Cache.
          * @param $key
          * @param int $expireTime The default value es -1. If you want to expire, you can use a value in seconds.
@@ -1156,6 +1166,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function get($key, $expireTime = -1, $hash = '')
         {
             if(!$this->init() || !strlen(trim($key))) return null;
+            $this->core->__p->add('CoreCache.get', $key, 'note');
 
             if (!strlen($expireTime)) $expireTime = -1;
 
@@ -1171,6 +1182,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->cache->delete($this->spacename . '-' . $key);
                     if($this->debug)
                         $this->log->add("get('$key',$expireTime,'$hash') failed (beacause expiration) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' secs.]','CoreCache');
+
+                    $this->core->__p->add('CoreCache.get', '', 'endnote');
                     return null;
                 }
                 // Hash Cache
@@ -1178,19 +1191,77 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->cache->delete($this->spacename . '-' . $key);
                     if($this->debug)
                         $this->log->add("get('$key',$expireTime,'$hash') failed (beacause hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' secs.]','CoreCache');
+
+                    $this->core->__p->add('CoreCache.get', '', 'endnote');
                     return null;
                 }
                 // Normal return
 
                 if($this->debug)
                     $this->log->add("get('$key',$expireTime,'$hash'). successful returned token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' secs.]','CoreCache');
+
+
+                $this->core->__p->add('CoreCache.get', '', 'endnote');
                 return (unserialize(gzuncompress($info['_data_'])));
 
             } else {
                 if($this->debug) $this->log->add("get($key,$expireTime,$hash) failed (beacause it does not exist) token: ".$this->spacename . '-' . $key,'CoreCache');
+
+                $this->core->__p->add('CoreCache.get', '', 'endnote');
                 return null;
             }
         }
+
+        /**
+         * Set an object on cache based on $key
+         * @param $key
+         * @param mixed $object
+         * @param string $hash Allow to set the info based in a hash to determine if it is valid when read it.
+         * @return bool
+         */
+        function set($key, $object, $hash=null)
+        {
+            if(!$this->init() || !strlen(trim($key))) return null;
+            $this->core->__p->add('CoreCache.set', $key, 'note');
+
+            $info['_microtime_'] = microtime(true);
+            $info['_hash_'] = $hash;
+            $info['_data_'] = gzcompress(serialize($object));
+            $this->cache->set($this->spacename . '-' . $key, serialize($info));
+            // If exists a property error in the class checkit
+            if(isset($this->cache->error) && $this->cache->error) {
+                $this->error = true;
+                $this->errorMsg = $this->cache->errorMsg;
+            }
+
+            if($this->debug)
+                $this->log->add("set({$key}). token: ".$this->spacename . '-' . $key.(($hash)?' with hash: '.$hash:''),'CoreCache');
+
+            unset($info);
+            $this->core->__p->add('CoreCache.set', $key, 'endnote');
+            return ($this->error)?false:true;
+        }
+
+        /**
+         * delete a $key from cache
+         * @param $key
+         * @return true|null
+         */
+        function delete($key)
+        {
+            if(!$this->init() || !strlen(trim($key))) return null;
+
+            if (!strlen(trim($key))) return false;
+            if($this->type=='memory')
+                $this->cache->del($this->spacename . '-' . $key);
+            else
+                $this->cache->delete($this->spacename . '-' . $key);
+            if($this->debug)
+                $this->log->add("delete(). token: ".$this->spacename . '-' . $key,'CoreCache');
+
+            return true;
+        }
+
 
         /**
          * Return a cache based in a hash previously assigned in set
@@ -1353,7 +1424,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /** @var DataStore  */
         var $ds = null;
-        /** @var Core */
+        /** @var Core7 */
         var $core;
         var $error = false;
         var $errorMsg = [];

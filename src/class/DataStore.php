@@ -660,7 +660,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function initCache()
         {
-            if ($this->cache === null) $this->cache = new CoreCache('CF_DATASTORE');
+            if ($this->cache === null) $this->cache = new CoreCache($this->core,'CF_DATASTORE');
             $this->cache_data = $this->cache->get($this->entity_name . '_' . $this->namespace);
             if (!is_array($this->cache_data)) $this->cache_data = [];
         }
