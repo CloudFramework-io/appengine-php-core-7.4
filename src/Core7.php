@@ -98,7 +98,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.03083';
+        var $_version = 'v73.03084';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -755,7 +755,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $ret['user_agent'] = (isset($_SERVER['HTTP_USER_AGENT']))?$_SERVER['HTTP_USER_AGENT']:'unknown';
             $ret['host'] = (isset($_SERVER['HTTP_HOST']))?$_SERVER['HTTP_HOST']:null;
-            $ret['software'] = $_SERVER['SERVER_SOFTWARE'];
+            $ret['software'] = (isset($_SERVER['GAE_RUNTIME']))?('GAE_RUN_TIME:'.$_SERVER['GAE_RUNTIME'].'/'.$_SERVER['GAE_VERSION']):((isset($_SERVER['SERVER_SOFTWARE']))?$_SERVER['SERVER_SOFTWARE']:'Unknown');
 
             if ($extra == 'geodata') {
                 $ret['geoData'] = $this->core->getGeoData();
@@ -1112,7 +1112,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if ($this->type == 'memory') {
                 if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
                     $this->log->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
-                    //$this->type='DataStore';
+                    $this->cache=-1;
+                    return;
 
                 } else {
                     $host = getenv('REDIS_HOST');
@@ -1125,7 +1126,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         unset($this->cache);
                         $this->cache=-1;
                         return;
-                        //$this->type='DataStore';
                     }
 
                 }
