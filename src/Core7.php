@@ -98,7 +98,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.03084';
+        var $_version = 'v73.03101';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -124,10 +124,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->is = new CoreIs();
             $this->__p->add('Construct Class with objects (__p,session[started=' . (($this->session->start) ? 'true' : 'false') . '],system,logs,errors,is):' . __CLASS__, __FILE__);
 
+            $this->config = new CoreConfig($this, __DIR__ . '/config.json');
             $this->security = new CoreSecurity($this);
             $this->cache = new CoreCache($this);
-            $this->user = new CoreUser($this);
-            $this->config = new CoreConfig($this, __DIR__ . '/config.json');
             $this->request = new CoreRequest($this);
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
@@ -1000,7 +999,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     {
         var $cache = null;
         var $spacename = 'CloudFrameWork';
-        var $type = 'memory';
+        var $type = 'memory'; // memory, redis, datastore, directory,
         var $dir = '';
         var $error = false;
         var $errorMsg = [];
@@ -1048,6 +1047,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function activateMemory()
         {
             $this->cache = null;
+            $this->type = 'memory';
             $this->init();
             return true;
         }
@@ -1061,7 +1061,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function activateCacheFile($path, $spacename = '')
         {
             if ((isset($_SESSION) && $_SESSION['Core_CacheFile_' . $path]) || is_dir($path) || @mkdir($path)) {
-                $this->type = 'CacheInDirectory';
+                $this->type = 'directory';
                 $this->dir = $path;
                 if (strlen($spacename)) $spacename = '_' . $spacename;
                 $this->setSpaceName(basename($path) . $spacename);
@@ -1087,7 +1087,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function activateDataStore( $spacename = '')
         {
-            $this->type = 'DataStore';
+            $this->type = 'datastore';
             if($spacename) $this->spacename = $spacename;
             $this->cache = null;
             $this->init();
@@ -1114,7 +1114,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->log->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
                     $this->cache=-1;
                     return;
-
                 } else {
                     $host = getenv('REDIS_HOST');
                     $port = getenv('REDIS_PORT');
@@ -1122,21 +1121,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $this->cache = new Redis();
                         $this->cache->connect($host, $port);
                     } catch (Exception $e) {
-                        $this->log->add("init(). REDIS connection failed, we change to DataStore. Failed because: ". $e->getMessage(),'CoreCache','warning');
+                        $this->log->add("init(). REDIS connection failed because: ". $e->getMessage(),'CoreCache','warning');
                         unset($this->cache);
                         $this->cache=-1;
                         return;
                     }
 
                 }
-            }
-
-            if($this->type=='DataStore') {
+            } elseif($this->type=='datastore') {
                 $this->cache = new CoreCacheDataStore($this->core,$this->spacename);
                 if($this->cache->error) $this->addError(['CoreCacheDataStore'=>$this->cache->errorMsg]);
-            }
-
-            if($this->type=='CacheInDirectory' && $this->dir) {
+            } elseif($this->type=='directory' && $this->dir) {
                 $this->cache = new CoreCacheFile($this->dir);
             }
 
@@ -1179,18 +1174,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                 // Expire Caché
                 if ($expireTime >= 0 && microtime(true) - $info['_microtime_'] >= $expireTime) {
-                    $this->cache->delete($this->spacename . '-' . $key);
+                    $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('$key',$expireTime,'$hash') failed (beacause expiration) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' secs.]','CoreCache');
+                        $this->log->add("get('$key',$expireTime,'$hash') failed (beacause expiration) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
                     $this->core->__p->add('CoreCache.get', '', 'endnote');
                     return null;
                 }
                 // Hash Cache
                 if ('' != $hash && $hash != $info['_hash_']) {
-                    $this->cache->delete($this->spacename . '-' . $key);
+                    $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('$key',$expireTime,'$hash') failed (beacause hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' secs.]','CoreCache');
+                        $this->log->add("get('$key',$expireTime,'$hash') failed (beacause hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
                     $this->core->__p->add('CoreCache.get', '', 'endnote');
                     return null;
@@ -1198,7 +1193,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 // Normal return
 
                 if($this->debug)
-                    $this->log->add("get('$key',$expireTime,'$hash'). successful returned token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' secs.]','CoreCache');
+                    $this->log->add("get('$key',$expireTime,'$hash'). successful returned token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
 
                 $this->core->__p->add('CoreCache.get', '', 'endnote');
@@ -1279,95 +1274,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @return bool|mixed|null
          */
         public function getByExpireTime($str, $seconds) { return $this->get($str,$seconds); }
-
-        /**
-         * Initialiated Atom Memory object.. If previously it has been called it just returns true.. if there is an error it returns false..
-         * @return bool
-         */
-        public function initAtom() {
-            if(null !== $this->atom) return(is_object($this->atom));
-
-            if($this->debug)
-                $this->log->add("initAtom(). spacename: {$this->spacename}_ATOM_Cache",'CoreCache');
-
-            if (class_exists('MemCache')) {
-                $this->atom = new Memcache;
-            } else {
-                $this->atom = false;
-                $this->log->add("initAtom(). Failed because MemCache does not exist",'CoreCache');
-            }
-
-            return(is_object($this->atom));
-
-        }
-
-        /**
-         * get Atom Id based in $key.. If not found return false
-         * @param string $key
-         * @param init $expireTime
-         * @return null|false|string
-         */
-        public function getAtom($key,$expireTime) {
-            // Check initAtom has been called at least once with no errors
-            if(!$this->initAtom() || !strlen(trim($key))) return null;
-            $spacename = $this->spacename.'_ATOM_Cache';
-            $microtime = $this->atom->get($spacename . '-' . $key);
-
-            if($microtime)  {
-                if(microtime(true) - $microtime >= $expireTime) {
-                    $microtime = null;
-                    $this->atom->delete($spacename . '-' . $key);
-                    if($this->debug)
-                        $this->log->add("getAtom('{$key}',{$expireTime}). deleted because expiration. running since ".(round(microtime(true) - $microtime,2))." secs. ".$spacename . '-' . $key,'CoreCache');
-                } else {
-                    $this->log->add("getAtom('{$key}',{$expireTime}) running since ".(round(microtime(true) - $microtime,2)).' secs. '.$spacename . '-' . $key,'CoreCache');
-                }
-            } else {
-                if($this->debug)
-                    $this->log->add("getAtom('{$key}',{$expireTime}) not found. ".$spacename . '-' . $key,'CoreCache');
-            }
-
-            if(!$microtime) return false;
-            else return($spacename . '-' . $key.': '.$microtime);
-        }
-
-        /**
-         * Set an ATOM key content.. Return the String generated of null if $this->atom is not initiated.
-         * @param $key
-         * @return string|null
-         */
-        public function setAtom($key) {
-            // Check initAtom has been called at least once with no errors
-            if(!$this->initAtom() || !strlen(trim($key))) return null;
-            $spacename = $this->spacename.'_ATOM_Cache';
-
-            $microtime = microtime(true);
-            $this->atom->set($spacename . '-' . $key, $microtime);
-
-            if($this->debug)
-                $this->log->add("setAtom('{$key}'). microtime: {$microtime}".$spacename . '-' . $key,'CoreCache');
-
-            return($spacename . '-' . $key.': '.$microtime);
-        }
-
-        /**
-         * delete an ATOM key. If the $key does not exist it returns true too.
-         * @param $key
-         * @return true|null
-         */
-        public function deleteAtom($key) {
-            // Check initAtom has been called at least once with no errors
-            if(!$this->initAtom() || !strlen(trim($key))) return null;
-            $spacename = $this->spacename.'_ATOM_Cache';
-
-            $this->atom->delete($spacename . '-' . $key);
-
-            if($this->debug)
-                $this->log->add("deleteAtom('{$key}'). ".$spacename . '-' . $key,'CoreCache');
-
-            return true;
-
-        }
 
         /**
          * Set error in the class
