@@ -98,7 +98,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.03101';
+        var $_version = 'v73.03111';
 
         /**
          * @var array $loadedClasses control the classes loaded
