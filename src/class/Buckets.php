@@ -1,10 +1,8 @@
 <?php
-
 /**
  * @author Héctor López <hlopez@cloudframework.io>
- * @version 202001051309 - php7
+ * @version 202003270757 - php7
  */
-
 // CloudSQL Class v10
 if (!defined ("_Buckets_CLASS_") ) {
     define ("_Buckets_CLASS_", TRUE);
@@ -174,8 +172,11 @@ if (!defined ("_Buckets_CLASS_") ) {
                                     $this->uploadedFiles[$key][$i]['publicUrl'] = '';
                                     if(is_object($this->gs_bucket)) {
                                         if($public) {
-                                            $file = str_replace($this->bucket . '/', '', $dest);
+                                            // Delete gs://*/ from $dest to aim the $object in the bucket
+                                            $file = preg_replace('/gs:\/\/[^\/]*\//','',$dest);
                                             $object = $this->gs_bucket->object($file);
+
+                                            // Make public file into the internet
                                             $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
                                             $this->uploadedFiles[$key][$i]['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$file;
                                         }
@@ -186,6 +187,7 @@ if (!defined ("_Buckets_CLASS_") ) {
                                 }
 
                             }catch(Exception $e) {
+                                die('bbb');
                                 $this->addError($e->getMessage());
                                 $this->addError(error_get_last());
                                 $this->uploadedFiles[$key][$i]['error'] = $this->errorMsg;
@@ -409,5 +411,3 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
     }
 }
-
-

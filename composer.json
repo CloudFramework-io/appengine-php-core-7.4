@@ -8,7 +8,8 @@
   "require": {
     "google/cloud-datastore": "^1.11",
     "google/cloud-storage": "^1.18",
-    "google/cloud-logging": "^1.19"
+    "google/cloud-logging": "^1.19",
+    "google/apiclient": "^2.4"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
