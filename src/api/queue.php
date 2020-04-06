@@ -26,9 +26,6 @@ class API extends RESTful
             // In interactive we use CloudService Class to send and receive data with http...
             $_url = str_replace('/queue/', '/', urldecode($this->core->system->url['host_url_uri']));
 
-            // Temporal
-            $_url = str_replace('http://localhost:9999','https://api.cloudframework.io',$_url);
-
             // Requires to create a complete URL
             $value['url_queued'] = $_url;
             $value['interative'] = true;
