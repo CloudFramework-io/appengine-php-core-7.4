@@ -663,7 +663,6 @@ if (!defined("_RESTfull_CLASS_")) {
 
             if ($this->core->logs->lines) {
                 $ret['logs'] = $this->core->logs->data;
-                syslog(LOG_INFO, 'CloudFramework RESTFul: '. json_encode($this->core->logs->data,JSON_FORCE_OBJECT));
 
                 //Restrict output
                 if($this->core->config->get('core_api_logs_allowed_ips') || $this->core->config->get('restful.logs.allowed_ips')) {
@@ -728,12 +727,18 @@ if (!defined("_RESTfull_CLASS_")) {
             }
 
 
+            // Task control inputs:
+            if(isset($_SERVER['HTTP_X_APPENGINE_TASKNAME'])) {
+                $this->formParams['HTTP_X_APPENGINE_TASKNAME'] = $_SERVER['HTTP_X_APPENGINE_TASKNAME'];
+                $this->formParams['HTTP_X_APPENGINE_QUEUENAME'] = $_SERVER['HTTP_X_APPENGINE_QUEUENAME'];
+            }
+
             // IF THE CALL comes from a queue then LOG the result to facilitate the debug
             if(($this->core->security->isCron() || array_key_exists('cloudframework_queued',$this->formParams)) && !strpos($this->core->system->url['url'],'/queue/')) {
                 $title = (isset($this->formParams['cloudframework_queued']) && $this->formParams['cloudframework_queued'])?'RESULT FROM QUEUE ':'';
                 if($this->core->security->isCron())
                     $title .= 'USING CRON';
-                $this->core->logs->add($title, $ret, LOG_DEBUG);
+                $this->core->logs->add($title, $ret, 'debug');
             }
 
             // ending script
@@ -764,7 +769,7 @@ if (!defined("_RESTfull_CLASS_")) {
         {
             $ret = array();
             foreach ($_SERVER as $key => $value) if (strpos($key, 'HTTP_X_') === 0) {
-                $ret[str_replace('HTTP_', '', $key)] = $value;
+                $ret[str_replace('_','-',str_replace('HTTP_', '', $key))] = $value;
             }
             return ($ret);
         }

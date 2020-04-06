@@ -9,7 +9,8 @@
     "google/cloud-datastore": "^1.11",
     "google/cloud-storage": "^1.18",
     "google/cloud-logging": "^1.19",
-    "google/apiclient": "^2.4"
+    "google/apiclient": "^2.4",
+    "google/cloud-tasks": "^1.6"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
