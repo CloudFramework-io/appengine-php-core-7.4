@@ -98,7 +98,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.04062';
+        var $_version = 'v73.04071';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -223,7 +223,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                             } else {
                                 $api->main();
                             }
-                            $this->__p->add("Executed RESTfull->main()", "/api/{$apifile}.php");
                             $api->send();
 
                         } else {
@@ -406,6 +405,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     class CorePerformance
     {
         var $data = [];
+        var $deep = 0;
+        var $spaces = "";
+        var $lastnote = "";
 
         function __construct()
         {
@@ -426,27 +428,42 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $file = str_replace($_SERVER['DOCUMENT_ROOT'], '', $file);
 
 
-            if ($type == 'note') $line = "[$type";
+            if ($type == 'note') {
+                for($this->spaces  = "",$i=0;$i<($this->deep);$i++) $this->spaces.="  ";
+                $this->deep++;
+                $line = "{$this->spaces}[$type";
+                $this->lastnote = 'note';
+            }
             else $line = $this->data['lastIndex'] . ' [';
 
             if (strlen($file)) $file = " ($file)";
 
-            $_mem = memory_get_usage() / (1024 * 1024) - $this->data['lastMemory'];
-            if ($type == 'all' || $type == 'endnote' || $type == 'memory' || (isset($_GET['data']) && $_GET['data'] == $this->data['lastIndex'])) {
-                $line .= number_format(round($_mem, 3), 3) . ' Mb';
-                $this->data['lastMemory'] = memory_get_usage() / (1024 * 1024);
-            }
-
             $_time = microtime(TRUE) - $this->data['lastMicrotime'];
             if ($type == 'all' || $type == 'endnote' || $type == 'time' || (isset($_GET['data']) && $_GET['data'] == $this->data['lastIndex'])) {
-                $line .= (($line == '[') ? '' : ', ') . (round($_time, 3)) . ' secs';
+                $line .=  (round($_time, 3)) . ' secs';
                 $this->data['lastMicrotime'] = microtime(TRUE);
             }
+
+            $_mem = memory_get_usage() / (1024 * 1024) - $this->data['lastMemory'];
+            if ($type == 'all' || $type == 'endnote' || $type == 'memory' || (isset($_GET['data']) && $_GET['data'] == $this->data['lastIndex'])) {
+                $line .= (($line == '[') ? '' : ', ') . number_format(round($_mem, 3), 3) . ' Mb';
+                $this->data['lastMemory'] = memory_get_usage() / (1024 * 1024);
+            }
             $line .= '] ' . $title;
-            $line = (($type != 'note') ? '[' . number_format(round(memory_get_usage() / (1024 * 1024), 3), 3) . ' Mb, '
-                    . (round(microtime(TRUE) - $this->data['initMicrotime'], 3))
-                    . ' secs] / ' : '') . $line . $file;
-            if ($type == 'endnote') $line = "[$type] " . $line;
+
+            $line = (($type != 'note') ? '['
+                    . (round(microtime(TRUE) - $this->data['initMicrotime'], 3)) . ' secs, '
+                    . number_format(round(memory_get_usage() / (1024 * 1024), 3), 3) . ' Mb] / '
+                    : '') . $line . $file;
+
+            if ($type == 'endnote') {
+                if($this->lastnote=='note') $line = "{$this->spaces}[$type] " . $line;
+                $this->deep--;
+                for($this->spaces = "",$i=0;$i<($this->deep);$i++) $this->spaces.="  ";
+                if($this->lastnote=='endnote') $line = "{$this->spaces}[$type] " . $line;
+                $this->lastnote = 'endnote';
+            }
+
             $this->data['info'][] = $line;
 
             if ($title) {
@@ -1161,7 +1178,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function get($key, $expireTime = -1, $hash = '')
         {
             if(!$this->init() || !strlen(trim($key))) return null;
-            $this->core->__p->add('CoreCache.get', $key, 'note');
+            $this->core->__p->add("CoreCache.get [{$this->type}]", $key, 'note');
 
             if (!strlen($expireTime)) $expireTime = -1;
 
@@ -1178,7 +1195,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if($this->debug)
                         $this->log->add("get('$key',$expireTime,'$hash') failed (beacause expiration) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
-                    $this->core->__p->add('CoreCache.get', '', 'endnote');
+                    $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
                     return null;
                 }
                 // Hash Cache
@@ -1187,7 +1204,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if($this->debug)
                         $this->log->add("get('$key',$expireTime,'$hash') failed (beacause hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
-                    $this->core->__p->add('CoreCache.get', '', 'endnote');
+                    $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
                     return null;
                 }
                 // Normal return
@@ -1196,13 +1213,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->log->add("get('$key',$expireTime,'$hash'). successful returned token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
 
-                $this->core->__p->add('CoreCache.get', '', 'endnote');
+                $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
                 return (unserialize(gzuncompress($info['_data_'])));
 
             } else {
                 if($this->debug) $this->log->add("get($key,$expireTime,$hash) failed (beacause it does not exist) token: ".$this->spacename . '-' . $key,'CoreCache');
 
-                $this->core->__p->add('CoreCache.get', '', 'endnote');
+                $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
                 return null;
             }
         }
@@ -1217,7 +1234,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function set($key, $object, $hash=null)
         {
             if(!$this->init() || !strlen(trim($key))) return null;
-            $this->core->__p->add('CoreCache.set', $key, 'note');
+            $this->core->__p->add("CoreCache.set [{$this->type}]", $key, 'note');
 
             $info['_microtime_'] = microtime(true);
             $info['_hash_'] = $hash;
@@ -1233,7 +1250,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->log->add("set({$key}). token: ".$this->spacename . '-' . $key.(($hash)?' with hash: '.$hash:''),'CoreCache');
 
             unset($info);
-            $this->core->__p->add('CoreCache.set', $key, 'endnote');
+            $this->core->__p->add("CoreCache.set [{$this->type}]", $key, 'endnote');
             return ($this->error)?false:true;
         }
 
