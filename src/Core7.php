@@ -55,7 +55,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         $error = error_get_last();
 
-        if( $error !== NULL) {
+        // avoid E_USER_DEPRECATED errors
+        if( $error !== NULL && $error["type"]!=E_USER_DEPRECATED) {
             $errno   = $error["type"];
             $errfile = $error["file"];
             $errline = $error["line"];
