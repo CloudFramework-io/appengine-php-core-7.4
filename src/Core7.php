@@ -98,7 +98,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.04071';
+        var $_version = 'v73.04081';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -386,7 +386,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     echo('export PROJECT_ID={YOUR-PROJECT-ID}'."\n");
                     exit;
                 }else  {
-                    echo('add in app.yamm'."\nenv_variables:\n   PROJECT_ID: \"{YOUR-PROJECT-ID}\"");
+                    echo('add in app.yaml'."\nenv_variables:\n   PROJECT_ID: \"{YOUR-PROJECT-ID}\"");
                     exit;
                 }
                 $this->logs->add('Missing PROJECT_ID ENVIRONMENT VARIABLE TO REGISTER STREAM WRAPPER');
@@ -395,6 +395,26 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             $this->gc_datastorage_client = new StorageClient(['projectId' => $this->gc_project_id]);
             $this->gc_datastorage_client->registerStreamWrapper();
+        }
+
+        /**
+         * json_encode function to fix the issue with json_encode started on Apr-2020
+         * @param $data
+         * @param null $options
+         * @return string|null returns null if error in json_encode function
+         */
+        public function json_encode($data, $options=null) {
+            if($options) return(json_encode($data, JSON_UNESCAPED_UNICODE | $options));
+            else return(json_encode($data, JSON_UNESCAPED_UNICODE ));
+        }
+        /**
+         * json_decode function avoid future problems
+         * @param $data
+         * @param boolean $ret_array
+         * @return array|null returns null if error in json_decode function
+         */
+        public function json_decode($data, $ret_array=false) {
+            return(json_decode($data, $ret_array ));
         }
     }
 
