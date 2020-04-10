@@ -399,23 +399,53 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * json_encode function to fix the issue with json_encode started on Apr-2020
-         * @param $data
+         * json_encode an $input with JSON_UNESCAPED_UNICODE options by default. if any error iadd it
+         * @param $input
          * @param null $options
-         * @return string|null returns null if error in json_encode function
+         * @return false|string
          */
-        public function json_encode($data, $options=null) {
-            if($options) return(json_encode($data, JSON_UNESCAPED_UNICODE | $options));
-            else return(json_encode($data, JSON_UNESCAPED_UNICODE ));
+        public function jsonEncode($input, $options=null)
+        {
+            if($options) $json = json_encode($input, JSON_UNESCAPED_UNICODE | $options);
+            else $json = json_encode($input, JSON_UNESCAPED_UNICODE );
+
+            if (function_exists('json_last_error') && $errno = json_last_error()) {
+                $this->errors->add(['json_encode error',$errno],'jsonEncode');
+            } elseif ($json === 'null' && $input !== null) {
+                $this->errors->add('Null result with non-null input','jsonEncode');
+            }
+            return $json;
         }
+
         /**
-         * json_decode function avoid future problems
-         * @param $data
-         * @param boolean $ret_array
-         * @return array|null returns null if error in json_decode function
+         * json_decode a
+         * @param $input
+         * @return mixed
          */
-        public function json_decode($data, $ret_array=false) {
-            return(json_decode($data, $ret_array ));
+        public function jsonDecode($input)
+        {
+            if (version_compare(PHP_VERSION, '5.4.0', '>=') && !(defined('JSON_C_VERSION') && PHP_INT_SIZE > 4)) {
+                /** In PHP >=5.4.0, json_decode() accepts an options parameter, that allows you
+                 * to specify that large ints (like Steam Transaction IDs) should be treated as
+                 * strings, rather than the PHP default behaviour of converting them to floats.
+                 */
+                $arr = json_decode($input, true, 512, JSON_BIGINT_AS_STRING);
+            } else {
+                /** Not all servers will support that, however, so for older versions we must
+                 * manually detect large ints in the JSON string and quote them (thus converting
+                 *them to strings) before decoding, hence the preg_replace() call.
+                 */
+                $max_int_length = strlen((string) PHP_INT_MAX) - 1;
+                $json_without_bigints = preg_replace('/:\s*(-?\d{'.$max_int_length.',})/', ': "$1"', $input);
+                $arr = json_decode($json_without_bigints,true);
+            }
+
+            if (function_exists('json_last_error') && $errno = json_last_error()) {
+                $this->errors->add(['json_encode error',$errno],'jsonDecode');
+            } elseif ($arr === null && $input !== 'null') {
+                $this->errors->add('Null result with non-null input','jsonDecode');
+            }
+            return $arr;
         }
     }
 
@@ -2779,8 +2809,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region create $signing_input
             $segments = array();
-            $segments[] = $this->urlsafeB64Encode($this->jsonEncode($header));
-            $segments[] = $this->urlsafeB64Encode($this->jsonEncode($payload));
+            $segments[] = $this->urlsafeB64Encode($this->core->jsonEncode($header));
+            $segments[] = $this->urlsafeB64Encode($this->core->jsonEncode($payload));
             $signing_input = implode('.', $segments);
             if($this->error) return;
             //endregion
@@ -2817,10 +2847,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             list($headb64, $bodyb64, $cryptob64) = $tks;
 
-            if (null === ($header = $this->jsonDecode($this->urlsafeB64Decode($headb64)))) {
+            if (null === ($header = $this->core->jsonDecode($this->urlsafeB64Decode($headb64)))) {
                 return($this->addError('Invalid header encoding'));
             }
-            if (null === $payload = $this->jsonDecode($this->urlsafeB64Decode($bodyb64))) {
+            if (null === $payload = $this->core->jsonDecode($this->urlsafeB64Decode($bodyb64))) {
                 return($this->addError('Invalid claims encoding'));
             }
             if (false === ($sig = $this->urlsafeB64Decode($cryptob64))) {
@@ -2856,42 +2886,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return base64_decode(strtr($input, '-_', '+/'));
         }
 
-        public function jsonEncode($input)
-        {
-            $json = json_encode($input);
-            if (function_exists('json_last_error') && $errno = json_last_error()) {
-                $this->addError(['json_encode error',$errno]);
-            } elseif ($json === 'null' && $input !== null) {
-                $this->addError('Null result with non-null input');
-            }
-            return $json;
-        }
 
-        public function jsonDecode($input)
-        {
-            if (version_compare(PHP_VERSION, '5.4.0', '>=') && !(defined('JSON_C_VERSION') && PHP_INT_SIZE > 4)) {
-                /** In PHP >=5.4.0, json_decode() accepts an options parameter, that allows you
-                 * to specify that large ints (like Steam Transaction IDs) should be treated as
-                 * strings, rather than the PHP default behaviour of converting them to floats.
-                 */
-                $arr = json_decode($input, true, 512, JSON_BIGINT_AS_STRING);
-            } else {
-                /** Not all servers will support that, however, so for older versions we must
-                 * manually detect large ints in the JSON string and quote them (thus converting
-                 *them to strings) before decoding, hence the preg_replace() call.
-                 */
-                $max_int_length = strlen((string) PHP_INT_MAX) - 1;
-                $json_without_bigints = preg_replace('/:\s*(-?\d{'.$max_int_length.',})/', ': "$1"', $input);
-                $arr = json_decode($json_without_bigints,true);
-            }
-
-            if (function_exists('json_last_error') && $errno = json_last_error()) {
-                $this->addError(['json_encode error',$errno]);
-            } elseif ($arr === null && $input !== 'null') {
-                $this->addError('Null result with non-null input');
-            }
-            return $arr;
-        }
 
         function addError($value)
         {
@@ -4110,7 +4105,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
      * Normally your file has to be stored in the `logic/` directory and extend this class.
      * @package Core
      */
-    Class CoreLogic
+    Class CoreLogic2020
     {
         /** @var Core7 $core pointer to the Core class. `$this->core->...` */
         protected $core;
@@ -4230,7 +4225,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
     }
 
-    class Scripts extends CoreLogic
+    class Scripts2020 extends CoreLogic2020
     {
         /** @var array $argv Keep the arguments passed to the logic if it runs as a script  */
         public $argv = null;
