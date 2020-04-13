@@ -3863,12 +3863,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $model does not exist",404));
 
                         // Rewrite model if it is defined
-                        if(isset($this->models[$model]['data']['model'])) {
+                        if(isset($this->models[$model]['data']['model']) && $this->models[$model]['data']['model']) {
                             $this->models[$model_extended]['data']['model'] =  $this->models[$model]['data']['model'];
                         }
 
                         //Merge variables with the extended object.
-                        if(isset($this->models[$model]['data']['interface'])) foreach ($this->models[$model]['data']['interface'] as $object=>$data) {
+                        if(isset($this->models[$model]['data']['interface']) && $this->models[$model]['data']['interface']) foreach ($this->models[$model]['data']['interface'] as $object=>$data) {
                             $this->models[$model_extended]['data']['interface'][$object] = $data;
                         }
                         $this->models[$model]['data'] = array_merge(['extended_from'=>$table],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$model]['data'],$this->models[$model_extended]['data'])));
