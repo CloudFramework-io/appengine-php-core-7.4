@@ -517,6 +517,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function fetchByKeys($keys)
         {
+            $this->core->__p->add('ds:fetchByKeys: ',  ' keys:' . json_encode($keys),'note');
             if(!$keys) return;
             $ret = [];
             if (!is_array($keys)) $keys = explode(',', $keys);
@@ -531,12 +532,14 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $ret = $this->transformResult($result['found']);
 
                 } else {
+                    $this->core->__p->add('ds:fetchByKeys: ',  '','endnote');
                     return([]);
                 }
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('query');
             }
+            $this->core->__p->add('ds:fetchByKeys: ',  '','endnote');
             return $ret;
         }
 
@@ -548,20 +551,26 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         function fetchOneByKey($key)
         {
             if(!$key) return;
+            $this->core->__p->add('ds:fetchOneByKey: ',  ' key:' . $key,'note');
             try {
                 $key_entity = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
                 $result = $this->datastore->lookup($key_entity);
                 // $result['found'] is an array of entities.
                 if ($result) {
                     $result = [$result];
-                    return($this->transformResult($result)[0]);
+                    $result = $this->transformResult($result)[0];
+                    $this->core->__p->add('ds:fetchOneByKey: ',  '','endnote');
+                    return($result);
                 } else {
+                    $this->core->__p->add('ds:fetchOneByKey: ',  '','endnote');
                     return([]);
                 }
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('query');
             }
+            $this->core->__p->add('ds:fetchOneByKey: ',  '','endnote');
+
         }
 
         /**
