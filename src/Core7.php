@@ -4213,6 +4213,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
+        /*
+         * Return the Value from $this->formParams
+         * @params $var string var for $this->formParams
+         * @return mixed|null returns $this->formParams[$var]
+         */
+        public function getFormParams($var) {
+            return (isset($this->formParams[$var]))?$this->formParams[$var]:null;
+        }
+
+        /*
+         * Return the Value from $this->params
+         * @params $index string var for $this->params
+         * @return mixed|null returns $this->params[$index]
+         */
+        public function getParams($index) {
+            return (isset($this->params[$index]))?$this->params[$index]:null;
+        }
+
         /**
          * Add an error in the class
          * @param $value
