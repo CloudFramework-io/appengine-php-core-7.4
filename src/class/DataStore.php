@@ -3,6 +3,7 @@
 # https://cloud.google.com/datastore/docs/concepts/entities
 # https://cloud.google.com/datastore/docs/concepts/queries#datastore-datastore-limit-gql
 # https://googleapis.github.io/google-cloud-php/#/docs/google-cloud/v0.121.0/datastore/datastoreclient
+# https://github.com/GoogleCloudPlatform/php-docs-samples/blob/master/datastore/api/src/functions/concepts.php
 use Google\Cloud\Datastore\DatastoreClient;
 use Google\Cloud\Datastore\Transaction;
 
@@ -431,9 +432,6 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             if (!is_string($fields) || !strlen($fields)) $fields = '*';
             if (!strlen($limit)) $limit = $this->limit;
             if ($type=='one') $limit = 1;
-
-            // FIX when you work on a local environment
-            if ($this->core->is->development() && $fields != '*') $fields = '*';
 
             $bindings=[];
             $_q = 'SELECT ' . $fields . ' FROM ' . $this->entity_name;
