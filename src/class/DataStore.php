@@ -133,7 +133,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                     $value = '{}';
                                 } else {
                                     json_decode($value); // Let's see if we receive a valid JSON
-                                    if (json_last_error() !== JSON_ERROR_NONE) $value = json_encode($value, JSON_PRETTY_PRINT);
+                                    if (json_last_error() !== JSON_ERROR_NONE) $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
                                 }
                             } elseif ($this->schema['props'][$i][1] == 'zip') {
 
@@ -142,7 +142,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         } else {
                             if ($this->schema['props'][$i][1] == 'json') {
                                 if (is_array($value) || is_object($value)) {
-                                    $value = json_encode($value, JSON_PRETTY_PRINT);
+                                    $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
                                 } elseif (!strlen($value)) {
                                     $value = '{}';
                                 }
@@ -427,7 +427,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         function fetch($type = 'one', $fields = '*', $where = null, $order = null, $limit = null)
         {
             if ($this->error) return false;
-            $this->core->__p->add('fetch: ', $type . ' fields:' . $fields . ' where:' . json_encode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
+            $this->core->__p->add('fetch: ', $type . ' fields:' . $fields . ' where:' . $this->core->jsonEncode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
             $ret = [];
             if (!is_string($fields) || !strlen($fields)) $fields = '*';
             if (!strlen($limit)) $limit = $this->limit;
@@ -495,7 +495,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $_q .= " OFFSET @offset";
                 $bindings['offset'] = $this->datastore->cursor(base64_decode($this->cursor)); // cursor has had to be previously encoded
             }
-            $this->lastQuery = $_q . ' /  bindings=' .  json_encode($bindings) . ' / taking where=' . ((is_array($where)) ? ' ' . json_encode($where) : '') ;
+            $this->lastQuery = $_q . ' /  bindings=' .  $this->core->jsonEncode($bindings) . ' / taking where=' . ((is_array($where)) ? ' ' . $this->core->jsonEncode($where) : '') ;
             try {
                 $query = $this->datastore->gqlQuery($_q,['allowLiterals'=>true,'bindings'=>$bindings]);
                 $result = $this->datastore->runQuery($query,['namespaceId'=>$this->namespace]);
@@ -515,7 +515,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function fetchByKeys($keys)
         {
-            $this->core->__p->add('ds:fetchByKeys: ',  ' keys:' . json_encode($keys),'note');
+            $this->core->__p->add('ds:fetchByKeys: ',  ' keys:' . $this->core->jsonEncode($keys),'note');
             if(!$keys) return;
             $ret = [];
             if (!is_array($keys)) $keys = explode(',', $keys);
@@ -681,7 +681,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function fetchCount($where = null, $distinct = '__key__')
         {
-            $hash = sha1(json_encode($where) . $distinct);
+            $hash = sha1($this->core->jsonEncode($where) . $distinct);
             $total = $this->getCache('total_' . $hash);
             if ($total === null) {
                 $data = $this->fetchAll($distinct, $where);
@@ -740,7 +740,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         function query($_q, $bindings=[])
         {
             $ret = [];
-            $this->lastQuery = $_q . ' /  bindings=' .  json_encode($bindings)  ;
+            $this->lastQuery = $_q . ' /  bindings=' .  $this->core->jsonEncode($bindings)  ;
             try {
                 $query = $this->datastore->gqlQuery($_q,['allowLiterals'=>true,'bindings'=>$bindings]);
                 $result = $this->datastore->runQuery($query,['namespaceId'=>$this->namespace]);

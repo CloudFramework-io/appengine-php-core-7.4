@@ -150,6 +150,70 @@ class GoogleVision extends Google
 
     }
 
+    function analyze_pdf($gcsurl) {
+
+        if($this->error) return;
+
+        $optParams = [];
+        $this->client->setScopes([Google_Service_Vision::CLOUD_PLATFORM]);
+
+        $service = new Google_Service_Vision($this->client);
+        //$body = new Google_Service_Vision_BatchAnnotateImagesRequest();
+        $body = new Google_Service_Vision_BatchAnnotateFilesRequest();
+
+        // Feature of the OCR
+        $features = [];
+        $feature = new Google_Service_Vision_Feature();
+        $feature->setType('DOCUMENT_TEXT_DETECTION');
+        //$feature->setMaxResults(200);
+        $features[] = $feature;
+
+        //$src = new Google_Service_Vision_ImageSource();
+        // $src->setGcsImageUri($gcsurl);
+        //$image = new Google_Service_Vision_Image();
+        //$image->setSource($src);
+
+        //$payload = new Google_Service_Vision_AnnotateImageRequest();
+        //$payload->setFeatures($features);
+        //$payload->setImage($image);
+
+        $gcsSource = new Google_Service_Vision_GcsSource();
+        $gcsSource->setUri($gcsurl);
+
+        $inputConfig = new Google_Service_Vision_InputConfig();
+        $inputConfig->setGcsSource($gcsSource);
+        $inputConfig->setMimeType('application/pdf');
+
+        $payload = new Google_Service_Vision_AnnotateFileRequest();
+        $payload->setFeatures($features);
+        $payload->setInputConfig($inputConfig);
+        $body->setRequests([$payload]);
+
+
+        /** $res Google_Service_Vision_BatchAnnotateFilesResponse */
+        try {
+            $res = $service->files->annotate($body,$optParams);
+        } catch (Exception $e) {
+            _printe($e->getMessage());
+            return($this->addError('Excepción capturada: ',  $e->getMessage()));
+        }
+
+        /** @var $itemFile Google_Service_Vision_AnnotateFileResponse $item */
+        foreach ($res->getResponses() as $itemFile) {
+            if(null !== $itemFile->getError()) {
+                return($this->addError($itemFile->getError()->message));
+            }
+
+            /** @var $item Google_Service_Vision_AnnotateImageResponse $item */
+            foreach ($itemFile->getResponses() as $item) {
+                $ret['textAnnotations'][] = ['description'=>$item->getFullTextAnnotation()->getText()];
+            }
+        }
+        return $ret;
+
+    }
+
+
     function check($image='gs://cloudframework-public/api-vision/face.jpg') {
 
         return($this->analyze($image));
