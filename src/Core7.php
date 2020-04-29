@@ -99,7 +99,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.04281';
+        var $_version = 'v73.04291';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2731,43 +2731,51 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return gzuncompress(base64_decode($data));
         }
 
+        /**
+         * method to encrypt a plain text string
+         * initialization vector(IV) has to be the same when encrypting and decrypting
+         * based on: https://gist.github.com/joashp/a1ae9cb30fa533f4ad94
+         *
+         * @param string $text: string to encrypt
+         *
+         * @return string in base64
+         */
         function encrypt($text) {
-            $key = ($this->core->config->get('EncryptPassword'))?:'XWER$T;(6tg';
-            $iv = mcrypt_create_iv(
-                mcrypt_get_iv_size(MCRYPT_RIJNDAEL_128, MCRYPT_MODE_CBC),
-                MCRYPT_DEV_URANDOM
-            );
 
-            return  base64_encode(
-                $iv .
-                mcrypt_encrypt(
-                    MCRYPT_RIJNDAEL_128,
-                    hash('sha256', $key, true),
-                    $text,
-                    MCRYPT_MODE_CBC,
-                    $iv
-                )
-            );
+            if(!$text) return $text;
+
+            $encrypt_method = "AES-256-CBC";
+            $secret_key = ($this->core->config->get('EncryptKey'))?:'XWER$T;(6tg';
+            $secret_iv = ($this->core->config->get('EncryptSecret'))?:'sadf&$sad_dkuYWER$T__6ttre';
+
+            // hash
+            $key = hash('sha256', $secret_key);
+
+            // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
+            $iv = substr(hash('sha256', $secret_iv), 0, 16);
+
+            return openssl_encrypt($text, $encrypt_method, $key, 0, $iv);
+
         }
 
-        function decrypt($text) {
+        /*
+         * Decrypt Encrypted Text
+         */
+        function decrypt($encrypted_text) {
 
-            if(strlen($text)<22) return null;
+            if(!$encrypted_text) return $encrypted_text;
 
-            $key = ($this->core->config->get('EncryptPassword'))?:'XWER$T;(6tg';
-            $data = base64_decode($text);
-            $iv = substr($data, 0, mcrypt_get_iv_size(MCRYPT_RIJNDAEL_128, MCRYPT_MODE_CBC));
+            $encrypt_method = "AES-256-CBC";
+            $secret_key = ($this->core->config->get('EncryptKey'))?:'XWER$T;(6tg';
+            $secret_iv = ($this->core->config->get('EncryptSecret'))?:'sadf&$sad_dkuYWER$T__6ttre';
 
-            return rtrim(
-                mcrypt_decrypt(
-                    MCRYPT_RIJNDAEL_128,
-                    hash('sha256', $key, true),
-                    substr($data, mcrypt_get_iv_size(MCRYPT_RIJNDAEL_128, MCRYPT_MODE_CBC)),
-                    MCRYPT_MODE_CBC,
-                    $iv
-                ),
-                "\0"
-            );
+            // hash
+            $key = hash('sha256', $secret_key);
+
+            // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
+            $iv = substr(hash('sha256', $secret_iv), 0, 16);
+
+            return openssl_decrypt($encrypted_text, $encrypt_method, $key, 0, $iv);
         }
 
         /**
