@@ -1058,8 +1058,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $fields['model'][$field][0] = $values['type'];
                 $fields['model'][$field][1] = (preg_match('/(varchar|varbinary|char|json)/',$values['type']))?'string':((preg_match('/(timestamp|datetime)/',$values['type']))?'datetime':((preg_match('/(date)/',$values['type']))?'date':'integer'));
 
-                if($values['key']) $fields['model'][$field][1].='|isKey';
-                if($values['null']===false) $fields['model'][$field][1].='|mandatory';
+                if(isset($values['key']) && $values['key']) $fields['model'][$field][1].='|isKey';
+                if(isset($values['null']) && $values['null']===false) $fields['model'][$field][1].='|mandatory';
                 else $fields['model'][$field][1].='|allowNull';
 
                 if(strpos($values['type'],'varchar')!==false)
@@ -1068,7 +1068,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     $fields['model'][$field][1].='|maxlength='.preg_replace('/[^0-9]/','',explode('varbinary',$values['type'],2)[1]);
 
                 if(isset($values['index']) && $values['index']) $fields['model'][$field][1].='|isIndex';
-                if(strlen($values['default'])) $fields['model'][$field][1].='|defaultvalue='.$values['default'];
+                if(isset($values['default']) && strlen($values['default'])) $fields['model'][$field][1].='|defaultvalue='.$values['default'];
                 $fields['model'][$field][1].='|description='.$values['description'];
 
                 // Mapping
@@ -1087,7 +1087,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     ,'security'=>null
                     ,'fields'=>[]
                     ,'filters'=>[]
-                    ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'sort'=>null,'server_limit'=>1000,'fields'=>[]]]
+                    ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'server_fields'=>null,'server_sort'=>null,'server_limit'=>1000,'fields'=>[]]]
                     ,'delete_fields'=>null
                     ,'insert_fields'=>null
                     ,'update_fields'=>null
@@ -1123,7 +1123,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                 // Mapping
                 $fields['interface']['fields'][$field] = ['name'=>$field];
-                $fields['interface']['views']['default']['fields'][] = ['field'=>$field];
+                $fields['interface']['views']['default']['fields'][$field] = ['field'=>$field];
 
             }
             //endregion

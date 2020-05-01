@@ -31,6 +31,7 @@ if (!defined("_RESTfull_CLASS_")) {
         var $serviceParam = '';
         var $org_id = '';
         var $rewrite = [];
+        /** @var Core7|null  */
         var $core = null;
 
         function __construct(Core7 &$core, $apiUrl = '/h/api')
