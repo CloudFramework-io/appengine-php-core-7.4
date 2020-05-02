@@ -776,6 +776,26 @@ if (!defined("_RESTfull_CLASS_")) {
         }
 
         /**
+         * Return the value of  $this->formParams[$var]. Return null if $var does not exist
+         * @param string $var
+         * @retun null|mixed
+         */
+        public function getFormParamater($var) {
+            if(!isset($this->formParams[$var])) return null;
+            return $this->formParams[$var];
+        }
+
+        /**
+         * Return the value of  $this->params[$var]. Return null if $var does not exist
+         * @param string $var
+         * @retun null|mixed
+         */
+        public function getUrlPathParamater($var) {
+            if(!isset($this->formParams[$var])) return null;
+            return $this->formParams[$var];
+        }
+
+        /**
          * Execute a method if $method is defined.
          * @param string $method name of the method
          * @return bool
