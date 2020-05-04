@@ -787,12 +787,12 @@ if (!defined("_RESTfull_CLASS_")) {
 
         /**
          * Return the value of  $this->params[$var]. Return null if $var does not exist
-         * @param string $var
+         * @param integer $var
          * @retun null|mixed
          */
         public function getUrlPathParamater($var) {
-            if(!isset($this->formParams[$var])) return null;
-            return $this->formParams[$var];
+            if(!isset($this->params[$var])) return null;
+            return $this->params[$var];
         }
 
         /**

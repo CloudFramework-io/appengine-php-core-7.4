@@ -99,7 +99,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.05021';
+        var $_version = 'v73.05041';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -720,6 +720,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->geo['REGION'] = $server_var['HTTP_X_APPENGINE_REGION'];
             $this->geo['COORDINATES'] = $server_var['HTTP_X_APPENGINE_CITYLATLONG'];
 
+        }
+
+        function setTimeZone($timezone) {
+            date_default_timezone_set($timezone);
+            $this->time_zone = array(date_default_timezone_get(), date('Y-m-d h:i:s'), date("P"), time());
         }
 
 
