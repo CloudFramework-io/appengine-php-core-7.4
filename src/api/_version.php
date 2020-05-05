@@ -10,7 +10,7 @@ class API extends RESTful
         }
         if(!$this->error) {
             $this->setReturnData(array('_version'=>$this->core->_version));
-            $this->addReturnData(array('time_zone_name'=>date_default_timezone_get();));
+            $this->addReturnData(array('time_zone_name'=>date_default_timezone_get()));
             $this->addReturnData(array('time_zone'=>$this->core->system->time_zone));
             $this->addReturnData(array('output_format'=>$this->core->system->format));
 
