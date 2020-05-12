@@ -199,7 +199,7 @@ if (!defined ("_DATAVALIDATION_CLASS_") ) {
                 case "datetime": return $this->validateDateTime($data);
                 case "datetimeiso": return $this->validateDateTimeISO($data);
                 case "currency": return is_numeric($data);
-                case "boolean": if(!is_bool($data) && ($data=='true' || $data=='false')) $data = ($data == 'true');return is_bool($data);
+                case "boolean": if(!is_bool($data) && ($data=='1' || $data=='0')) $data = ($data == '1'); if(!is_bool($data) && ($data=='true' || $data=='false')) $data = ($data == 'true');return is_bool($data);
                 case "array": return is_array($data);
                 case "list": return is_array($data);
                 case "array_to_string": if(is_array($data)) $data=implode(",",$data);return is_string($data);
