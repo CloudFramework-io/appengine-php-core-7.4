@@ -99,7 +99,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.05121';
+        var $_version = 'v73.05131';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3400,6 +3400,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function put_json_decode($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             $this->rawResult = $this->put($route, $data, $extra_headers, $send_in_json);
+            $ret = json_decode($this->rawResult, true);
+            if (JSON_ERROR_NONE === json_last_error()) $this->rawResult = '';
+            else {
+                $ret = ['error'=>$this->rawResult];
+            }
+            return $ret;
+        }
+
+
+        function patch_json_decode($route, $data = null, $extra_headers = null, $send_in_json = false)
+        {
+            $this->rawResult = $this->patch($route, $data, $extra_headers, $send_in_json);
             $ret = json_decode($this->rawResult, true);
             if (JSON_ERROR_NONE === json_last_error()) $this->rawResult = '';
             else {
