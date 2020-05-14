@@ -12,7 +12,7 @@ if (!defined("_Tests_CLASS_")) {
         }
         return true;
     }
-    
+
     class Tests extends RESTful
     {
         var $tests;
@@ -72,8 +72,7 @@ if (!defined("_Tests_CLASS_")) {
             if(!$this->server) $this->addsError('Missing server. User $this->connects($server) first.');
             echo "   ** Test gets info from ".$this->server.$url."\n";
             $this->response = $this->core->request->get($this->server.$url,$data,$this->headers,$raw);
-            if(!$this->response )
-                if($this->core->errors->lines) $this->addsError("Error connecting  [{$this->core->errors->data[0]}]");
+            if($this->core->request->error ) $this->addsError('Error in GET: '.$this->server.$url);
 
             $this->response_headers = $this->core->request->responseHeaders;
             return(!$this->errors);
@@ -85,8 +84,7 @@ if (!defined("_Tests_CLASS_")) {
             if(!$this->server) $this->addsError('Missing server. User $this->connects($server) first.');
             echo "   ** Test posts info into ".$this->server.$url."\n";
             $this->response = $this->core->request->post($this->server.$url,$data,$this->headers,$raw);
-            if(!$this->response )
-                if($this->core->errors->lines) $this->addsError("Error connecting  [{$this->core->errors->data[0]}]");
+            if($this->core->request->error ) $this->addsError('Error in POST: '.$this->server.$url);
 
             $this->response_headers = $this->core->request->responseHeaders;
             return(!$this->errors);
@@ -98,8 +96,8 @@ if (!defined("_Tests_CLASS_")) {
             if(!$this->server) $this->addsError('Missing server. User $this->connects($server) first.');
             echo "   ** Test posts info into ".$this->server.$url."\n";
             $this->response = $this->core->request->put($this->server.$url,$data,$this->headers,$raw);
-            if(!$this->response )
-                if($this->core->errors->lines) $this->addsError("Error connecting  [{$this->core->errors->data[0]}]");
+            if($this->core->request->error ) $this->addsError('Error in PUT: '.$this->server.$url);
+
 
             $this->response_headers = $this->core->request->responseHeaders;
             return(!$this->errors);
@@ -153,8 +151,8 @@ if (!defined("_Tests_CLASS_")) {
         function addsHeaders($headers) {
             $i=0;
             foreach ($headers as $key=>$header) {
-                    echo ($i++)?", {$key}":"   [Adding header {$key} and value {$header}]";
-                    $this->headers[$key] = $header;
+                echo ($i++)?", {$key}":"   [Adding header {$key} and value {$header}]";
+                $this->headers[$key] = $header;
             }
             echo "\n";
 
