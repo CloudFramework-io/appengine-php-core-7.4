@@ -329,6 +329,9 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
             $joins = array();
             foreach ($values as $key => $value) {
+                if(strpos($value,'\\')) {
+                    $value = str_replace('\\','\\\\',$value);
+                }
                 $joins[] = $this->_db->real_escape_string($value);
             }
 
