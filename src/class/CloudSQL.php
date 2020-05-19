@@ -1090,6 +1090,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     ,'security'=>null
                     ,'fields'=>[]
                     ,'filters'=>[]
+                    ,'buttons'=>[['title'=>"Insert {$table}",'type'=>'api-insert'],['title'=>"Bulk {$table}",'type'=>'api-bulk']]
                     ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'server_fields'=>null,'server_sort'=>null,'server_limit'=>1000,'fields'=>[]]]
                     ,'delete_fields'=>null
                     ,'insert_fields'=>null
@@ -1104,6 +1105,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
             //region assign $fields['model'] taking MYSQL field types from $table
             if(isset($table['model']['fields'])) foreach ($table['model']['fields'] as $field=>$values) {
+
+                $is_key=false;
                 $fields['model'][$field][0] = $values['type'];
                 $fields['model'][$field][1] = (preg_match('/(varchar|varbinary|char|json)/',$values['type']))?'string':
                     ((preg_match('/(timestamp|datetime)/',$values['type']))?'datetime':
@@ -1111,7 +1114,10 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                             ((preg_match('/(decimal)/',$values['type']))?'float':
                                 'integer')));
 
-                if(isset($values['key']) && $values['key']) $fields['model'][$field][1].='|isKey';
+                if(isset($values['key']) && $values['key']) {
+                    $is_key = true;
+                    $fields['model'][$field][1].='|isKey';
+                }
                 if(isset($values['null']) && $values['null']===false) $fields['model'][$field][1].='|mandatory';
                 else $fields['model'][$field][1].='|allowNull';
 
@@ -1126,7 +1132,36 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                 // Mapping
                 $fields['interface']['fields'][$field] = ['name'=>$field];
+                if($fields['model'][$field][0]=='date') {
+                    $fields['interface']['fields'][$field]['type'] = 'date';
+                    $fields['interface']['filters'][] = [
+                        'field'=>$field,
+                        'field_name'=>$field,
+                        'type'=>'date',
+                        'placeholder'=>"{$field} date or range: 2020-01/2020-03"
+                    ];
+                }
+                if($fields['model'][$field][0]=='datetime') {
+                    $fields['interface']['fields'][$field]['type'] = 'datetime';
+                    $fields['interface']['filters'][] = [
+                        'field'=>$field,
+                        'field_name'=>$field,
+                        'type'=>'datetime',
+                        'placeholder'=>"{$field} date or range: 2020-01/2020-03"
+                    ];
+                }
+
                 $fields['interface']['views']['default']['fields'][$field] = ['field'=>$field];
+                $fields['interface']['insert_fields'][$field] = ['field'=>$field];
+                $fields['interface']['display_fields'][$field] = ['field'=>$field];
+                $fields['interface']['update_fields'][$field] = ['field'=>$field];
+
+                if($is_key) {
+                    $fields['interface']['views']['default']['fields'][$field]['update_cfo']=true;
+                    $fields['interface']['display_fields'][$field]['read_only'] = true;
+                    $fields['interface']['update_fields'][$field]['read_only'] = true;
+                    $fields['interface']['delete_fields'][$field]= ['field'=>$field];
+                }
 
             }
             //endregion
