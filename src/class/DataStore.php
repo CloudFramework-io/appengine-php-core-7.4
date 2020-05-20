@@ -464,13 +464,65 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $fieldname = $key;
 
                     // In the WHERE Conditions we have to transform date formats into date objects.
+                    // SELECT * FROM PremiumContracts WHERE PremiumStartDate >= DATETIME("2020-03-01T00:00:00z") AND PremiumStartDate <= DATETIME("2020-03-01T23:59:59z")
                     if (array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['date', 'datetime', 'datetimeiso'])) {
-                        $transformDate = new DateTime($value);
-                        $where[$key . $idkey] = $transformDate;
+
+                        // Allow Smart date ranges where comp = '='
+                        if($comp=='=') {
+                            //apply filters
+                            if(strpos($value,'/')===false) {
+                                $from = $value;
+                                $to = $value;
+                            } else {
+                                list($from,$to) = explode("/",$value,2);
+                            }
+
+                            if(strlen($from) == 4) {
+                                $from.='-01-01 00:00:00';
+                            } elseif(strlen($from) == 7) {
+                                $from.='-01 00:00:00';
+                            } elseif(strlen($from) == 10) {
+                                $from.=' 00:00:00';
+                            }
+
+                            if(strlen($to) == 4) {
+                                $to.='-12-31 23:59:59';
+                            } elseif(strlen($to) == 7) {
+                                list($year,$month) = explode("-",$to,2);
+                                if(!in_array($month,['04','06','09','11'])) {
+                                    $to.='-30 23:59:59';
+                                }elseif($month=='02') {
+                                    //TODO Años bisiestos.
+                                    $to.='-28 23:59:59';
+                                } else {
+                                    $to.='-31 23:59:59';
+                                }
+
+                            } elseif(strlen($to) == 10) {
+                                $to.=' 23:59:59';
+                            }
+
+                            $bindings[$key.'_from']=new DateTime($from);
+                            $where[$key] = new DateTime($to);
+
+                            if ($i == 0) $_q .= " WHERE $fieldname >= @{$key}_from AND $fieldname <= @{$key}";
+                            else $_q .= " AND $fieldname >= @{$key}_from AND $fieldname <= @{$key}";
+
+                            //assign $order to avoid conflicts
+                            $order="{$fieldname} DESC";
+                            $order="{$fieldname} DESC";
+
+                        } else {
+                            $where[$key] = new DateTime($value);
+                            if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
+                            else $_q .= " AND $fieldname {$comp} @{$key}";
+                        }
+                    } else {
+                        $key = $key . $idkey;
+                        if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
+                        else $_q .= " AND $fieldname {$comp} @{$key}";
                     }
-                    $key = $key . $idkey;
-                    if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
-                    else $_q .= " AND $fieldname {$comp} @{$key}";
+
                     $i++;
                     $bindings[$key]=$where[$key];
                 }
