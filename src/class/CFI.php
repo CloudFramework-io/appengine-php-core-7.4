@@ -170,6 +170,42 @@ class CFIField {
      * @return CFIField $this
      */
     public function select() { $this->cfi->json_object['fields'][$this->field]['type'] = 'select'; return $this;}
+
+    /**
+     * Set if the field to type iframe
+     * @param $height integer optinal iframe height: default 400
+     * @return CFIField $this
+     */
+    public function iframe($height=400) {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'iframe';
+        $this->cfi->json_object['fields'][$this->field]['iframe_height'] = $height;
+        return $this;}
+
+    /**
+     * Set if the url for certain types like iframe
+     * @param $value
+     * @return CFIField $this
+     */
+    public function url($value) {
+        if($this->cfi->json_object['fields'][$this->field]['type'] = 'iframe') {
+            $this->cfi->json_object['fields'][$this->field]['iframe_url'] =$value;
+        } else {
+            $this->cfi->json_object['fields'][$this->field]['url'] =$value;
+        }
+        return $this;
+    }
+
+    /**
+     * Set if the url for certain types like iframe
+     * @param $value string content to be included in the iframe.Normally a HTML
+     * @return CFIField $this
+     */
+    public function content($value) {
+        if($this->cfi->json_object['fields'][$this->field]['type'] = 'iframe') {
+            $this->cfi->json_object['fields'][$this->field]['iframe_content'] =$value;
+        }
+        return $this;
+    }
 }
 /*
  * Class to handle buttons in CFI
