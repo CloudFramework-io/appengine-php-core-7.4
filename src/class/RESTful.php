@@ -688,7 +688,13 @@ if (!defined("_RESTfull_CLASS_")) {
                 syslog(LOG_ERR, 'CloudFramework RESTFul: '. json_encode($this->core->errors->data,JSON_FORCE_OBJECT));
             }
 
+            // Send response headers
             $this->sendHeaders();
+
+            // If response is 204 (no content) just return
+            if($ret['status']==204) return;
+
+            // else continue adding extra info.
             $this->core->__p->add("RESTFull: ", '', 'endnote');
             switch ($this->contentTypeReturn) {
                 case 'JSON':
