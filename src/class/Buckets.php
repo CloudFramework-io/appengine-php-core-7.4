@@ -4,6 +4,8 @@
  * @version 202003270757 - php7
  */
 // CloudSQL Class v10
+use Google\Cloud\Storage\StorageObject;
+
 if (!defined ("_Buckets_CLASS_") ) {
     define ("_Buckets_CLASS_", TRUE);
 
@@ -201,7 +203,7 @@ if (!defined ("_Buckets_CLASS_") ) {
             return($this->uploadedFiles);
         }
 
-        function getPublicUrl($file,$ssl=true) {
+        function getPublicUrlOld($file,$ssl=true) {
 
             // Check $file
             $ret = 'file missing';
@@ -357,6 +359,126 @@ if (!defined ("_Buckets_CLASS_") ) {
             $upload_url = CloudStorageTools::createUploadUrl($returnUrl, $options);
             return($upload_url);
             */
+        }
+
+        /**
+         * Returns the URL to upload a file
+         * https://stackoverflow.com/questions/53346083/create-google-cloud-storage-upload-urls-for-php7-2/53833015
+         * https://github.com/googleapis/google-cloud-php/blob/v0.122.0/Storage/src/StorageObject.php#L962
+         * https://github.com/googleapis/google-cloud-php/issues/1056
+         * https://github.com/GoogleCloudPlatform/php-docs-samples/tree/master/storage/src
+         * @param string $returnUrl is the url the system has to call once the file has been uploaded
+         * @return mixed
+         */
+        function getSignedUploadUrl($file) {
+
+            $object = $this->gs_bucket->object($file);
+
+            /*
+            $url = $object->signedUploadUrl(new \DateTime('tomorrow'), [
+           'version' => 'v4'
+             ]);
+
+            _printe($url);
+            */
+            if(false) {
+                $url = $object->beginSignedUploadSession( [
+                    'version' => 'v4'
+                ]);
+            }
+
+            if(true) {
+                $signed_upload_url = $object->signedUploadUrl(new \DateTime('15 min'), [
+                    'version' => 'v4',
+                    'predefinedAcl' => 'publicRead',
+                    'saveAsName' => 'test2.txt',
+
+                ]);
+
+                $headers = [
+                    'Content-Length' => 0,
+                    'x-goog-resumable' => 'start',
+                    'Origin' => '*'
+                ];
+
+                // step 2 - beginSignedUploadSession (POST)
+                $response = $this->core->request->post($signed_upload_url, null, $headers);
+
+
+                if (in_array($this->core->request->getLastResponseCode(), [200, 201])) {
+                    $url = $this->core->request->getResponseHeader('Location');
+                } else {
+                    die('error');
+                }
+            }
+
+            // This is to upload  but it requires a Google Signature
+            if(false) {
+                $url = $object->signedUrl(
+                # This URL is valid for 15 minutes
+                    new \DateTime('15 min'),
+                    [
+                        'method' => 'PUT',
+                        'contentType' => 'application/octet-stream',
+                        'version' => 'v4',
+                    ]
+                );
+            }
+
+            return($url);
+            /*
+            if(!$returnUrl) $returnUrl = $this->vars['retUploadUrl'];
+            else $this->vars['retUploadUrl'] = $returnUrl;
+            $options = array( 'gs_bucket_name' => str_replace('gs://','',$this->bucket) );
+            $upload_url = CloudStorageTools::createUploadUrl($returnUrl, $options);
+            return($upload_url);
+            */
+        }
+
+        function getSignedDownloadUrl($file) {
+
+            $object = $this->gs_bucket->object($file);
+            $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
+            $url = $object->signedUrl(
+            # This URL is valid for 15 minutes
+                new \DateTime('15 min'),
+                [
+                    'version' => 'v4',
+                ]
+            );
+            return $url;
+
+        }
+
+
+        /*
+         * Make the file public access
+         */
+        function getPublicUrl($file,$content_type=null,$name=null) {
+
+            /** @var StorageObject $object */
+            $object = $this->gs_bucket->object($file);
+            $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
+
+            $updates = [];
+            if($content_type) $updates['contentType'] = $content_type;
+            if($updates) $object->update($updates);
+
+            $url = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$file;
+            return $url;
+
+        }
+
+        /*
+         * Make the file public access
+         */
+        function getInfo($file) {
+
+            /** @var StorageObject $object */
+            $object = $this->gs_bucket->object($file);
+
+            return $object->info();
+
         }
 
         /**

@@ -46,6 +46,38 @@ class API extends RESTful
         $this->addReturnData(['UploadInfo'=>$ret]);
     }
 
+    /**
+     * get uploadUrl to send files
+     */
+    public function ENDPOINT_uploadUrlV2() {
+
+        $url = $this->buckets->getSignedUploadUrl('upload/file.txt');
+
+        $this->addReturnData(['UploadInfo'=>['url'=>$url]]);
+
+    }
+    /**
+     * get uploadUrl to send files
+     */
+    public function ENDPOINT_downloadUrlV2() {
+
+        $url = $this->buckets->getSignedDownloadUrl('upload/file.txt');
+
+        $this->addReturnData(['DownloadInfo'=>['url'=>$url]]);
+
+    }
+
+    /**
+     * get uploadUrl to send files
+     */
+    public function ENDPOINT_info() {
+
+        $publicUrl = $this->buckets->getPublicUrl('upload/file.txt','application/pdf');
+        $info = $this->buckets->getInfo('upload/file.txt');
+        $this->addReturnData(['FileInfo'=>['publicUrl'=>$publicUrl,'info'=>$info]]);
+
+    }
+
 
     /**
      * Process File Uploads
