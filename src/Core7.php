@@ -62,9 +62,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $errline = $error["line"];
             $errstr  = $error["message"];
 
-            $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
+            if($core)
+                $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
 
-            if($core->is->development() && !$core->is->terminal())
+            if(!$core || ($core->is->development() && !$core->is->terminal()))
                 _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
         }
     }
@@ -378,7 +379,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         protected function initDataStorage() {
 
             if(is_object($this->gc_datastorage_client)) return;
-            if(!$this->gc_project_id) {
+
+            if(!$this->gc_project_id && $this->config->get('core.datastorage.on')) {
                 echo('Missing PROJECT_ID ENVIRONMENT VARIABLE TO REGISTER STREAM WRAPPER'."\n");
                 if($this->is->terminal()) {
                     echo('export PROJECT_ID={YOUR-PROJECT-ID}'."\n");
