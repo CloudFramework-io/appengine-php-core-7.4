@@ -356,12 +356,12 @@ if (!defined("_RESTfull_CLASS_")) {
             return (!$this->error);
         }
 
-        function setError($value, $key = 400,$code=null,$message='')
+        function setError($error, $returnStatus = 400, $returnCode=null, $message='')
         {
-            $this->error = $key;
-            $this->errorMsg[] = $value;
-            $this->core->errors->add($value);
-            $this->code = (null !== $code)? $code:$key;
+            $this->error = $returnStatus;
+            $this->errorMsg = $error;
+            $this->core->errors->add($error);
+            $this->code = (null !== $returnCode)? $returnCode:$returnStatus;
             $this->message = ($message)?$message:$this->code;
         }
 
