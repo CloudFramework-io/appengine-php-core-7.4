@@ -3,8 +3,9 @@ class API extends RESTful
 {
     function main()
     {
-
+        $this->sendCorsHeaders('GET,POST');
         $this->addReturnData([
+            '$this->core->_version'=> $this->core->_version,
             '$this->core->_version'=> $this->core->_version,
             '$this->core->is->development()'=> $this->core->is->development(),
             '$this->core->is->production()'=> $this->core->is->production(),
