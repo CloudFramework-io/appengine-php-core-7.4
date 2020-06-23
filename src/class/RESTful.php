@@ -685,7 +685,7 @@ if (!defined("_RESTfull_CLASS_")) {
                 }
             } elseif ($this->core->errors->lines) {
                 $ret['errors'] = $this->core->errors->data;
-                syslog(LOG_ERR, 'CloudFramework RESTFul: '. json_encode($this->core->errors->data,JSON_FORCE_OBJECT));
+                $this->core->errors->sendToSysLog('CloudFramework RESTFul: '. json_encode($this->core->errors->data,JSON_FORCE_OBJECT),'error');
             }
 
             // Send response headers
