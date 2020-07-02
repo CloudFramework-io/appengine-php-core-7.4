@@ -51,7 +51,7 @@ class API extends RESTful
      */
     public function ENDPOINT_uploadUrlV2() {
 
-        $url = $this->buckets->getSignedUploadUrl('upload/file.txt');
+        $url = $this->buckets->getSignedUploadUrl('upload/file.pdf');
 
         $this->addReturnData(['UploadInfo'=>['url'=>$url]]);
 
@@ -61,8 +61,9 @@ class API extends RESTful
      */
     public function ENDPOINT_downloadUrlV2() {
 
-        $url = $this->buckets->getSignedDownloadUrl('upload/file.txt');
 
+        $url = $this->buckets->getSignedDownloadUrl('upload/file.txt',['saveAsName'=>'test2.pdf','responseType'=>'application/pdf','responseDisposition'=>'inline']);
+        $url = $this->buckets->getSignedDownloadUrl('upload/file.txt',['saveAsName'=>'test2.pdf','responseDisposition'=>'inline']);
         $this->addReturnData(['DownloadInfo'=>['url'=>$url]]);
 
     }

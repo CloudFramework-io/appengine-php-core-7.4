@@ -108,7 +108,6 @@ if (!defined ("_Buckets_CLASS_") ) {
                 return($this->addError('the path to write the files does not exist: '.$base_dir));
             }
 
-
             if($this->isUploaded)  {
                 foreach ($this->uploadedFiles as $key => $files) {
                     for($i=0,$tr=count($files);$i<$tr;$i++) {
@@ -364,6 +363,7 @@ if (!defined ("_Buckets_CLASS_") ) {
         /**
          * Returns the URL to upload a file
          * https://stackoverflow.com/questions/53346083/create-google-cloud-storage-upload-urls-for-php7-2/53833015
+         * https://www.reddit.com/r/googlecloud/comments/8gchqh/google_cloud_storage_api_php_upload_large_files/dybb9wl/
          * https://github.com/googleapis/google-cloud-php/blob/v0.122.0/Storage/src/StorageObject.php#L962
          * https://github.com/googleapis/google-cloud-php/issues/1056
          * https://github.com/GoogleCloudPlatform/php-docs-samples/tree/master/storage/src
@@ -392,7 +392,6 @@ if (!defined ("_Buckets_CLASS_") ) {
                     'version' => 'v4',
                     'predefinedAcl' => 'publicRead',
                     'saveAsName' => 'test2.txt',
-
                 ]);
 
                 $headers = [
@@ -403,7 +402,6 @@ if (!defined ("_Buckets_CLASS_") ) {
 
                 // step 2 - beginSignedUploadSession (POST)
                 $response = $this->core->request->post($signed_upload_url, null, $headers);
-
 
                 if (in_array($this->core->request->getLastResponseCode(), [200, 201])) {
                     $url = $this->core->request->getResponseHeader('Location');
@@ -435,16 +433,33 @@ if (!defined ("_Buckets_CLASS_") ) {
             */
         }
 
-        function getSignedDownloadUrl($file) {
+
+        /*
+         * Generate a temporal url to download a bucketfile
+         * @param $file string bucket file do not starting with '/'
+         * @param array $options {
+         *     Configuration Options.
+         *     @type string $saveAsName The filename to prompt the user to save the
+         *           file as when the signed url is accessed. This is ignored if
+         *           `$options.responseDisposition` is set.
+         *     @type string $responseType The `response-content-type` parameter of the
+         *           signed url. When the server contentType is `null`, this option
+         *           may be used to control the content type of the response.
+         *     @type string $responseDisposition The
+         *           [`response-content-disposition`](http://www.iana.org/assignments/cont-disp/cont-disp.xhtml)
+         *           parameter of the signed url.
+         *           by default is 'attachment' but other common values are: inline
+         * }
+         */
+        function getSignedDownloadUrl($file,$options=[],$time='1 min') {
 
             $object = $this->gs_bucket->object($file);
-            $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
+            $options+=[
+                'version' => 'v4',
+            ];
             $url = $object->signedUrl(
             # This URL is valid for 15 minutes
-                new \DateTime('15 min'),
-                [
-                    'version' => 'v4',
-                ]
+                new \DateTime('1 min'),$options
             );
             return $url;
 
