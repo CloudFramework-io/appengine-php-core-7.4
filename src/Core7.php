@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07021';
+        var $_version = 'v73.07121';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2282,7 +2282,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manage the access security
+     * Class to manage the security access and dynamic getenv variables
      * @package Core
      */
     class CoreSecurity
@@ -2300,8 +2300,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
-        /*
-         * BASIC AUTH
+        /**
+         * Check if exists a Basic Authorizatino header
+         * @return boolean tellong
          */
         function existBasicAuth()
         {
@@ -2310,6 +2311,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             );
         }
 
+        /**
+         * Return an array with [user,password] from PHP_AUTH_USER, PHP_AUTH_PW or if they don't exist HTTP_AUTHORIZATION header
+         * @return
+         */
         function getBasicAuth()
         {
             $username = null;
@@ -2322,11 +2327,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
                 if (strpos(strtolower($_SERVER['HTTP_AUTHORIZATION']), 'basic') === 0)
                     list($username, $password) = explode(':', base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)));
-                _printe(base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)));
             }
             return ([$username, $password]);
         }
 
+        /**
+         * Verify user,password with Basic Authorization Header from  $this->getBasicAuth()
+         */
         function checkBasicAuth($user, $passw)
         {
             list($username, $password) = $this->getBasicAuth();
@@ -2461,7 +2468,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
         /**
-         * @param array|string $allows string to compre with the current IP
+         * @param array|string $allows string to compare with the current IP
          * @return bool
          */
         private function checkIPs($allows)
@@ -3810,6 +3817,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $errorCode = null;
         /** @var CloudSQL $db  */
         var $db = null;
+        /** @var DataMongo $db  */
+        var $mongo = null;
 
         protected $core;
         var $models = null;
@@ -3948,10 +3957,28 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             else return [];
         }
 
+        /**
+         * Init a Mongo connection
+         * @return bool
+         */
+        public function mongoInit($uri='') {
+
+            if(null === $this->mongo) {
+                $this->mongo = $this->core->loadClass('DataMongo',$uri);
+                if(!$this->mongo->connect()) $this->addError($this->mongo->errorMsg);
+
+            }
+            return !$this->mongo->error;
+        }
+
+        /**
+         * Init a DB connection
+         * @return bool
+         */
         public function dbInit() {
 
             if(null === $this->db) {
-                $this->core->model->db = $this->core->loadClass('CloudSQL');
+                $this->db = $this->core->loadClass('CloudSQL');
                 if(!$this->db->connect()) $this->addError($this->db->getError());
             }
             return !$this->db->error();

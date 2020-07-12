@@ -3,13 +3,25 @@ class API extends RESTful
 {
     function main()
     {
-// CORS Control from a potential Cross-Reference.
-        $db_keys = [$this->formParams['test_assign_web_key'], $this->formParams['test_assign_web_referers_allowed']];
+
+        if(!$this->checkMethod('GET,POST')) return;
+
+        //Call internal ENDPOINT_{$this->params[2]}
+        $end_point = str_replace('-','_',isset($this->params[0])?$this->params[0]:'default');
+        if(!$this->useFunction('ENDPOINT_'.$end_point)) {
+            return($this->setErrorFromCodelib('params-error',"/{$end_point} is not implemented"));
+        }
+    }
+
+    public function ENDPOINT_default () {
+
+
+        // CORS Control from a potential Cross-Reference.
+        $db_keys = [(isset($this->formParams['test_assign_web_key']))?$this->formParams['test_assign_web_key']:null, (isset($this->formParams['test_assign_web_referrers_allowed']))?$this->formParams['test_assign_web_referrers_allowed']:null];
         if ($this->core->security->checkWebKey($db_keys)) {
             $this->sendCorsHeaders('GET');
         }
 
-        $this->checkMethod('GET');
         $data = ['vars.for.testing' => [
             'test_assign_basic_user' => 'User to send in a basic Auth',
             'test_assign_basic_password' => 'password to send in a basic Auth. Can be empty',
@@ -18,22 +30,22 @@ class API extends RESTful
             'test_assign_server_key_id' => 'key_id to require a X-CLOUDFRAMEWORK-SECURITY header'
 
         ]];
-        if ($this->params[0] == 'test') {
+        if ($this->method =='POST' && isset($this->params[0]) && $this->params[0] == 'test') {
 
-            if (strlen($this->formParams['test_assign_basic_user'])) {
+            if (isset($this->formParams['test_assign_basic_user'])) {
                 $data['Basic.Auth'] = ['method' => '$passed =  $this->core->security->checkBasicAuth(\'' . $this->formParams['test_assign_basic_user'] . '\',\'' . $this->formParams['test_assign_basic_password'] . '\')'];
                 $data['Basic.Auth']['notes'] = 'you have also: (bool)$this->core->security->existBasicAuth() and (array)$this->core->security->getBasicAuth()';
                 $data['Basic.Auth']['passed'] = $this->core->security->checkBasicAuth($this->formParams['test_assign_basic_user'], $this->formParams['test_assign_basic_password']);
                 if (!$data['Basic.Auth']['passed']) $data['Basic.Auth']['message'] = "Error. Send Basic Auth with the following info: user={$this->formParams['test_assign_basic_user']} and password={$this->formParams['test_assign_basic_password']}";
             }
 
-            if (strlen($this->formParams['test_assign_basic_user'])) {
+            if (isset($this->formParams['test_assign_basic_user'])) {
                 $data['Basic.AuthWithConfig'] = ['method' => '$passed = (false !==  $this->core->security->checkBasicAuthWithConfig())'];
                 $data['Basic.AuthWithConfig']['passed'] = false !== $this->core->security->checkBasicAuthWithConfig($this->formParams['test_assign_basic_user'], $this->formParams['test_assign_basic_password']);
                 if (!$data['Basic.AuthWithConfig']['passed']) $data['Basic.AuthWithConfig']['message'] = 'Error. It requires "authorization" config params: "athorizations": { "user": {"password":"a password","ips":"valid ips or *","extravars":"extravalues"},... }';
             }
 
-            if (strlen($this->formParams['test_assign_web_key'])) {
+            if (isset($this->formParams['test_assign_web_key'])) {
                 $data['Web.Client.Auth'] = ['method' => '$passed = $this->core->security->checkWebKey([\'' . $this->formParams["test_assign_web_key"] . '\',\'' . $this->formParams["test_assign_web_referers_allowed"] . '\')]'];
                 $data['Web.Client.Auth']['notes'] = 'you have also: (bool)$this->core->security->existWebKey() and (array)$this->core->security->getWebKey()';
                 $data['Web.Client.Auth']['HTTP_REFERER'] = $_SERVER['HTTP_REFERER'];
@@ -47,7 +59,7 @@ class API extends RESTful
 
             }
 
-            if (strlen($this->formParams['test_assign_server_key'])) {
+            if (isset($this->formParams['test_assign_server_key'])) {
                 $data['Web.Server.Auth'] = ['method' => '$passed = $this->core->security->checkServerKey([\'' . $this->formParams["test_assign_server_key"] . '\',\'' . $this->formParams["test_assign_ips_allowed"] . '\')]'];
                 $data['Web.Server.Auth']['notes'] = 'you have also: (bool)$this->core->security->existServerKey() and (array)$this->core->security->getServerKey()';
                 $data['Web.Server.Auth']['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'];
@@ -62,7 +74,7 @@ class API extends RESTful
             }
 
 
-            if (strlen($this->formParams['test_assign_security_token_id'])) {
+            if (isset($this->formParams['test_assign_security_token_id'])) {
                 $secret = 'WerErty';
                 $data['SecurityToken.Auth'] = ['method' => '$passed = $this->core->security->checkCloudFrameWorkSecurity(3600,\'' . $this->formParams["test_assign_security_token_id"] . '\',$secret)]'];
                 $data['SecurityToken.Auth']['notes'] = 'The key can be generated using: $this->core->security->generateCloudFrameWorkSecurityString($this->formParams[\'test_assign_security_token_id\'],[\'\'|{current_time}],$secret)';
@@ -76,4 +88,11 @@ class API extends RESTful
         }
         $this->addReturnData($data);
     }
+
+    public function ENDPOINT_env_vars () {
+        if($this->core->is->production()) return($this->setErrorFromCodelib('not-allowed','you can not show env_vars in production'));
+        $this->addReturnData(getenv());
+    }
+
+
 }

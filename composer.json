@@ -1,7 +1,7 @@
 {
   "name": "cloudframework-io/appengine-php-core-7.3",
-  "keywords": ["appengine", "google", "framework", "sql", "cloud datastore", "nosql","gae","cloudframwork"],
-  "description": "Framework to develop API and Web applications optimized for Google Appengine PHP 7.3",
+  "keywords": ["appengine", "google", "framework", "sql", "cloud datastore", "nosql","mysql","mongo","gcp","bigquery","gae","cloudframwork"],
+  "description": "Framework to develop APIs and web applications optimized for Google Appengine PHP 7.3",
   "type":"library",
   "minimum-stability": "stable",
   "license": "MIT",
@@ -10,7 +10,8 @@
     "google/cloud-storage": "^1.18",
     "google/cloud-logging": "^1.19",
     "google/apiclient": "^2.4",
-    "google/cloud-tasks": "^1.6"
+    "google/cloud-tasks": "^1.6",
+    "google/cloud-bigquery": "dev-master"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
