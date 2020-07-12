@@ -3,7 +3,8 @@
  *  CloudFramwork Mongo Class
  * https://github.com/mongodb/mongo-php-library
  * https://www.php.net/manual/en/mongodb.installation.homebrew.php
- * composer require mongodb/mongodb:^1.6
+ * only compatible with 1.4.3 version
+ * composer require mongodb/mongodb:1.4.3
  * https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-find/
  * https://docs.mongodb.com/manual/tutorial/project-fields-from-query-results/
  */
