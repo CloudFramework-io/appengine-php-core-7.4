@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07123';
+        var $_version = 'v73.07141';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -230,7 +230,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         } else {
                             $api = new RESTful($this);
                             if(is_file($pathfile)) {
-                                $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul with method ->main(): ", 404);
+                                $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
                             } else {
                                 $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
 
@@ -238,12 +238,21 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                             $api->send();
                         }
                     } catch (Exception $e) {
-                        $api = new RESTful($this);
-                        if(is_file($pathfile)) {
-                            $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul with method ->main(): ", 404);
-                        } else {
-                            $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
+                        // ERROR CONTROL WHERE $api is not an object
+                        if(!is_object($api)) {
+                            $api = new RESTful($this);
+                            if(is_file($pathfile)) {
+                                $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
+                            } else {
+                                $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
+                            }
                         }
+                        // If $api is an object then an exception has been captured
+                        else {
+                            $api->setError("the code in '{$apifile}' has produced an exception ", 503);
+
+                        }
+
                         $this->errors->add(error_get_last());
                         $this->errors->add($e->getMessage());
                         $api->send();

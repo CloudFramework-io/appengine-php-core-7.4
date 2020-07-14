@@ -11,7 +11,8 @@
     "google/cloud-logging": "^1.19",
     "google/apiclient": "^2.4",
     "google/cloud-tasks": "^1.6",
-    "google/cloud-bigquery": "^1.16"
+    "google/cloud-bigquery": "^1.16",
+    "google/cloud-secret-manager": "^1.0"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
