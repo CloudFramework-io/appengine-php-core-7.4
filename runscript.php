@@ -6,10 +6,11 @@ require_once  $rootPath.'/vendor/autoload.php';
 include_once __DIR__.'/src/Core7.php';
 $core = new Core7($rootPath);
 
+
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
-if($core->config->get('core.datastore.on')) {
+if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
     if($core->is->development()) {
         $datastore = new DatastoreClient(['transport'=>'rest']);
     } else {
@@ -18,12 +19,18 @@ if($core->config->get('core.datastore.on')) {
 }
 
 use Google\Cloud\Logging\LoggingClient;
-$logger = LoggingClient::psrBatchLogger('app');
+$logger = null;
+if(getenv('PROJECT_ID') && $core->is->production()) {
+    $logger = LoggingClient::psrBatchLogger('app');
+}
+
+
 
 // Check test exist
 if(true) {
-    system('clear');
+
     $script = [];
+
 
     if(count($argv)>1) {
         if(strpos($argv[1],'?'))

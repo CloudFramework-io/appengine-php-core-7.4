@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07141';
+        var $_version = 'v73.07161';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -387,8 +387,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         protected function initDataStorage() {
 
+            //avoid to create several times
             if(is_object($this->gc_datastorage_client)) return;
 
+            // if $this->config->get('core.datastorage.on') but !$this->gc_project_id then error
             if(!$this->gc_project_id && $this->config->get('core.datastorage.on')) {
                 echo('Missing PROJECT_ID ENVIRONMENT VARIABLE TO REGISTER STREAM WRAPPER'."\n");
                 if($this->is->terminal()) {
@@ -405,8 +407,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->logs->add('export PROJECT_ID={YOUR-PROJECT-ID}');
                 return;
             }
-            $this->gc_datastorage_client = new StorageClient(['projectId' => $this->gc_project_id]);
-            $this->gc_datastorage_client->registerStreamWrapper();
+
+            // only setup datastorage if gc_project_id
+            if($this->gc_project_id) {
+                $this->gc_datastorage_client = new StorageClient(['projectId' => $this->gc_project_id]);
+                $this->gc_datastorage_client->registerStreamWrapper();
+            }
         }
 
         /**
@@ -4342,6 +4348,20 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function setErrorFromCodelib($code,$msg) {
             $this->sendTerminal([$code=>$msg]);
+        }
+
+        /**
+         * Execute a method if $method is defined.
+         * @param string $method name of the method
+         * @return bool
+         */
+        function useFunction($method) {
+            if(method_exists($this,$method)) {
+                $this->$method();
+                return true;
+            } else {
+                return false;
+            }
         }
 
     }

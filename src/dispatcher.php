@@ -10,7 +10,7 @@ $core = new Core7();
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
-if($core->config->get('core.datastore.on')) {
+if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
     if($core->is->development()) {
         $datastore = new DatastoreClient(['transport'=>'rest']);
     } else {
@@ -21,7 +21,7 @@ if($core->config->get('core.datastore.on')) {
 // https://cloud.google.com/logging/docs/setup/php
 use Google\Cloud\Logging\LoggingClient;
 $logger = null;
-if($core->is->production()) {
+if(getenv('PROJECT_ID') && $core->is->production()) {
     $logger = LoggingClient::psrBatchLogger('app');
 }
 

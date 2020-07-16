@@ -8,7 +8,6 @@ class API extends RESTful
      */
     function main()
     {
-        // $this->core->config->set('mongo.uri', "mongodb+srv://test:test@cluster-1-crije.mongodb.net/users_stage?retryWrites=true&w=majority");
 
         if(!$this->core->config->get('test.mongo.uri')) return ($this->setErrorFromCodelib('not-allowed', 'missing config-var: core.uri'));
         if (!$this->core->model->mongoInit($this->core->config->get('test.mongo.uri'))) return ($this->setErrorFromCodelib('system-error', $this->core->model->errorMsg));
