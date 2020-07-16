@@ -148,7 +148,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->config->data['env_vars'] = array_merge($this->config->data['env_vars'],getenv());
 
             //region setup core.gcp.secrets.env_vars
-            if($this->gc_project_id && $this->config->get('core.gcp.secrets.env_vars') && $this->gc_project_id) {
+            if($this->gc_project_id && $this->config->get('core.gcp.secrets.env_vars') && $this->gc_project_service) {
 
                 // Evaluate the cache method
                 if($this->config->get('core.gcp.secrets.cache_path') ) {
