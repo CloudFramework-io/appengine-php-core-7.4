@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07161';
+        var $_version = 'v73.07171';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -133,8 +133,54 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
 
-            //setup google cloud projectId
+            //setup GCP basic vars
+            if($this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
             $this->gc_project_id = getenv('PROJECT_ID');
+            if($this->gc_project_id && !getenv('DATASTORE_DATASET'))  putenv('DATASTORE_DATASET='.$this->gc_project_id);
+
+            //region setup core.gcp.secrets.env_vars
+            if($this->config->get('core.gcp.secrets.env_vars')) {
+
+                // Evaluate the cache method
+                if($this->config->get('core.gcp.secrets.cache_path') ) {
+                    $this->cache->activateCacheFile($this->config->get('core.gcp.secrets.cache_path'));
+                }
+
+                // read data from cache
+                $env_vars = $this->cache->get('core.gcp.secrets.env_vars');
+                if(!$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
+                    /** @var GoogleSecrets $gs */
+                    $gs = $this->loadClass('GoogleSecrets');
+
+                    if($gs->error) $this->errors->add($gs->errorMsg);
+                    else {
+                        $secrets = $gs->getSecret($this->config->get('core.gcp.secrets.env_vars'));
+                        if($gs->errorMsg)  $this->errors->add($gs->errorMsg);
+                        else {
+                            if(!$secrets) $this->errors->add('core.gcp.secrets.env_vars does not have data');
+                            else {
+                                $env_vars = json_decode($secrets,true);
+                                if(!$env_vars) $this->errors->add('core.gcp.secrets.env_vars is not a valid array');
+                                else {
+                                    if(!isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) $this->errors->add('core.gcp.secrets.env_vars does not have env_vars index in array');
+                                    else {
+                                        $this->logs->add('core.gcp.secrets.env_vars loaded: '.$this->config->get('core.gcp.secrets.env_vars'));
+                                        $this->cache->set('core.gcp.secrets.env_vars',$env_vars);
+
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if($env_vars && isset($env_vars['env_vars:']) && $env_vars['env_vars:']) {
+                    $this->config->data['env_vars'] = array_merge($this->config->data['env_vars'],$env_vars['env_vars:']);
+                }
+
+                $this->cache->activateMemory();
+            }
+            //endregion
 
             //evaluate development DATASTORE fix
             if($DATASTORE_EMULATOR_HOST = getenv('DATASTORE_EMULATOR_HOST')) {
@@ -151,6 +197,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Config objects based in config
             $this->cache->setSpaceName($this->config->get('cacheSpacename'));
+
+            // Evaluate core.google.secrets.env_vars
+            if($this->config->get('core.google.secrets.env_vars')) {
+
+            }
 
             // If the $this->system->app_path ends in / delete the char.
             $this->system->app_path = preg_replace('/\/$/','',$this->system->app_path);
@@ -1778,9 +1829,16 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $menu = [];
         protected $lang = 'en';
 
+
         function __construct(Core7 &$core, $path)
         {
             $this->core = $core;
+
+            // Adding env_vars in config
+            $this->data['env_vars'] = getenv();
+
+
+            // Read first json file
             $this->readConfigJSONFile($path);
 
             // Set lang for the system
@@ -2192,12 +2250,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         private function isAssignationTag($tag)
         {
-            $tags = ["webapp", "set", "include", "redirect", "menu","coreversion"];
+            $tags = ["webapp", "set", "include", "redirect", "menu","coreversion","env_vars"];
             return in_array(strtolower($tag), $tags);
         }
 
         /**
-         * Execure an assigantion based on the tagcode
+         * Execute an assignation based on the tagcode
          * @param $tagcode string
          * @param $tagvalue string
          * @return bool
@@ -2260,6 +2318,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if($this->core->_version!= $vars) {
                         die("config var 'CoreVersion' is '{$vars}' and the current cloudframework version is {$this->core->_version}. Please update the framework. composer.phar update");
                     }
+                    break;
+                case "env_vars":
+                    if(!is_array($vars))  die("config var 'env_vars:' has to be an array");
+                    $this->data['env_vars'] = array_merge($this->data['env_vars'],$vars);
                     break;
                 default:
                     $this->core->errors->add('unknown tag: |' . $tagcode . '|');
