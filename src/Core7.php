@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07173';
+        var $_version = 'v73.07174';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -141,55 +141,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // DATASTORE_DATASET
             if($this->gc_project_id && !getenv('DATASTORE_DATASET'))  putenv('DATASTORE_DATASET='.$this->gc_project_id);
-
-
-            // $this->config->data['env_vars']
-            if(!isset($this->config->data['env_vars']) || !is_array($this->config->data['env_vars'])) $this->config->data['env_vars'] = [];
-            $this->config->data['env_vars'] = array_merge($this->config->data['env_vars'],getenv());
-
-            //region setup core.gcp.secrets.env_vars
-            if($this->gc_project_id && $this->config->get('core.gcp.secrets.env_vars') && $this->gc_project_service) {
-
-                // Evaluate the cache method
-                if($this->config->get('core.gcp.secrets.cache_path') ) {
-                    $this->cache->activateCacheFile($this->config->get('core.gcp.secrets.cache_path'));
-                }
-
-                // read data from cache
-                $env_vars = $this->cache->get("{$this->gc_project_id}_{$this->gc_project_service}_core.gcp.secrets.env_vars");
-                if(!$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
-                    /** @var GoogleSecrets $gs */
-                    $gs = $this->loadClass('GoogleSecrets');
-
-                    if($gs->error) $this->errors->add($gs->errorMsg);
-                    else {
-                        $secrets = $gs->getSecret($this->config->get('core.gcp.secrets.env_vars'));
-                        if($gs->errorMsg)  $this->errors->add($gs->errorMsg);
-                        else {
-                            if(!$secrets) $this->errors->add('core.gcp.secrets.env_vars does not have data');
-                            else {
-                                $env_vars = json_decode($secrets,true);
-                                if(!$env_vars) $this->errors->add('core.gcp.secrets.env_vars is not a valid array');
-                                else {
-                                    if(!isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) $this->errors->add('core.gcp.secrets.env_vars does not have env_vars index in array');
-                                    else {
-                                        $this->logs->add('core.gcp.secrets.env_vars loaded: '.$this->config->get('core.gcp.secrets.env_vars'));
-                                        $this->cache->set("{$this->gc_project_id}_{$this->gc_project_service}_core.gcp.secrets.env_vars",$env_vars);
-
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if($env_vars && isset($env_vars['env_vars:']) && $env_vars['env_vars:']) {
-                    $this->config->data['env_vars'] = array_merge($this->config->data['env_vars'],$env_vars['env_vars:']);
-                }
-
-                $this->cache->activateMemory();
-            }
-            //endregion
 
             //evaluate development DATASTORE fix
             if($DATASTORE_EMULATOR_HOST = getenv('DATASTORE_EMULATOR_HOST')) {
@@ -2360,6 +2311,91 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if ($_array) $data = json_decode($data, true);
             return $data;
         }
+
+        /**
+         * Allow to read config env_vars taking it from GCP secrets.
+         * The secret has to have a JSON structure like { "env_vars:" {"key1":"value1","key2":"value2"}}
+         * the result is stored in $this->data['env_vars'].
+         *
+         * The result is cached.
+         * The config variables needed are:
+         *   - core.gcp.secrets.env_vars: name of the secret in GCP
+         *   - core.gcp.secrets.cache_path: If the cache is not in memory specify the directory to store the secrets
+         *
+         * @param $secret_id string if empty it will take it from core.gcp.secrets.env_vars config var
+         * @param $reload boolean false by default. if true, force to read it from secrets
+         */
+        function readEnvVarsFromGCPSecrets($secret_id='',$reload=false) {
+
+            if(!$secret_id) $secret_id = $this->get('core.gcp.secrets.env_vars');
+
+            if(!isset($this->data['env_vars']) || !is_array($this->data['env_vars']))
+                $this->data['env_vars'] = [];
+
+            if(!$secret_id) {
+                $this->core->logs->add('Missing $secret_id and core.gcp.secrets.env_vars config var','error_readEnvVarsFromGCPSecrets');
+                return false;
+            }
+
+            if(!$this->core->gc_project_id) {
+                $this->core->logs->add('Missing $this->core->gc_project_id','error_readEnvVarsFromGCPSecrets');
+                return false;
+            }
+
+            if(!$this->core->gc_project_service) {
+                $this->core->logs->add('Missing $this->core->gc_project_service','error_readEnvVarsFromGCPSecrets');
+                return false;
+            }
+
+
+            // Evaluate the cache method
+            if($this->get('core.gcp.secrets.cache_path') ) {
+                $this->core->cache->activateCacheFile($this->get('core.gcp.secrets.cache_path'));
+            }
+
+            // read data from cache
+            $env_vars = $this->core->cache->get("{$this->core->gc_project_id}_{$this->core->gc_project_service}_core.gcp.secrets.env_vars");
+
+            // if the cache is empty
+            if($reload || !$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
+                $gs = $this->core->loadClass('GoogleSecrets');
+                if($gs->error) {
+                    $this->core->logs->add($gs->errorMsg,'error_readEnvVarsFromGCPSecrets');
+                    return false;
+                }
+
+                $secrets = $gs->getSecret($this->get('core.gcp.secrets.env_vars'));
+                if($gs->error) {
+                    $this->core->logs->add($gs->errorMsg,'error_readEnvVarsFromGCPSecrets');
+                    return false;
+                }
+
+                if(!$secrets) {
+                    $this->core->logs->add('the secret is empty','error_readEnvVarsFromGCPSecrets');
+                    return false;
+                }
+
+                $env_vars = json_decode($secrets,true);
+                if(!$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
+                    $this->core->logs->add('the secret does not have a right json structure','error_readEnvVarsFromGCPSecrets');
+                    return false;
+                }
+
+                $this->core->logs->add('core.gcp.secrets.env_vars loaded: '.$this->get('core.gcp.secrets.env_vars'));
+                $this->core->cache->set("{$this->core->gc_project_id}_{$this->core->gc_project_service}_core.gcp.secrets.env_vars",$env_vars);
+
+            }
+
+            if($env_vars && isset($env_vars['env_vars:']) && $env_vars['env_vars:']) {
+                $this->data['env_vars'] = array_merge($this->data['env_vars'],$env_vars['env_vars:']);
+            }
+
+            $this->core->cache->activateMemory();
+
+            return true;
+
+        }
+
 
     }
 
