@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07171';
+        var $_version = 'v73.07173';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -133,13 +133,22 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
 
+
             //setup GCP basic vars
             if($this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
             $this->gc_project_id = getenv('PROJECT_ID');
+            $this->gc_project_service = ($this->config->get('core.gcp.project_service'))?$this->config->get('core.gcp.project_service'):'default';
+
+            // DATASTORE_DATASET
             if($this->gc_project_id && !getenv('DATASTORE_DATASET'))  putenv('DATASTORE_DATASET='.$this->gc_project_id);
 
+
+            // $this->config->data['env_vars']
+            if(!isset($this->config->data['env_vars']) || !is_array($this->config->data['env_vars'])) $this->config->data['env_vars'] = [];
+            $this->config->data['env_vars'] = array_merge($this->config->data['env_vars'],getenv());
+
             //region setup core.gcp.secrets.env_vars
-            if($this->config->get('core.gcp.secrets.env_vars')) {
+            if($this->gc_project_id && $this->config->get('core.gcp.secrets.env_vars') && $this->gc_project_id) {
 
                 // Evaluate the cache method
                 if($this->config->get('core.gcp.secrets.cache_path') ) {
@@ -147,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
 
                 // read data from cache
-                $env_vars = $this->cache->get('core.gcp.secrets.env_vars');
+                $env_vars = $this->cache->get("{$this->gc_project_id}_{$this->gc_project_service}_core.gcp.secrets.env_vars");
                 if(!$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
                     /** @var GoogleSecrets $gs */
                     $gs = $this->loadClass('GoogleSecrets');
@@ -165,7 +174,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                                     if(!isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) $this->errors->add('core.gcp.secrets.env_vars does not have env_vars index in array');
                                     else {
                                         $this->logs->add('core.gcp.secrets.env_vars loaded: '.$this->config->get('core.gcp.secrets.env_vars'));
-                                        $this->cache->set('core.gcp.secrets.env_vars',$env_vars);
+                                        $this->cache->set("{$this->gc_project_id}_{$this->gc_project_service}_core.gcp.secrets.env_vars",$env_vars);
 
                                     }
                                 }
@@ -1834,10 +1843,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             $this->core = $core;
 
-            // Adding env_vars in config
-            $this->data['env_vars'] = getenv();
-
-
             // Read first json file
             $this->readConfigJSONFile($path);
 
@@ -1974,7 +1979,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Try to read a JOSN file to process it as a corfig file
+         * Try to read a JSON file to process it as a corfig file
          * @param $path string
          * @return bool
          */
