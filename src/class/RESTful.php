@@ -459,19 +459,29 @@ if (!defined("_RESTfull_CLASS_")) {
             $this->rewrite = $response;
         }
 
+        /**
+         * Init the data to be returned
+         * @param $data
+         */
         function setReturnData($data)
         {
             $this->returnData['data'] = $data;
         }
 
+        /**
+         * Add a new record to be returned
+         * @param $value
+         */
         function addReturnData($value)
         {
+
             if (!isset($this->returnData['data'])) $this->setReturnData($value);
             else {
                 if (!is_array($value)) $value = array($value);
                 if (!is_array($this->returnData['data'])) $this->returnData['data'] = array($this->returnData['data']);
                 $this->returnData['data'] = array_merge($this->returnData['data'], $value);
             }
+
         }
 
         /**
