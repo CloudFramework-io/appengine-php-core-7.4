@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07181';
+        var $_version = 'v73.07201';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2334,13 +2334,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * The config variables needed are:
          *   - core.gcp.secrets.env_vars: name of the secret in GCP
          *   - core.gcp.secrets.cache_path: If the cache is not in memory specify the directory to store the secrets
-         *
+         *   - core.gcp.secrets.cache_encrypt_key: To encryt the data in cache you can define a config-var key
+         *   - core.gcp.secrets.cache_encrypt_iv: To encryt the data in cache you can define a config-var iv
+         *   - @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
+         *   - @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache         *
          * @param $secret_id string secre id in gcp.secrets. if empty it will take $this->get('core.gcp.secrets.env_vars')
          * @param $reload boolean false by default. if true, force to read it from gcp.secrets
-         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
-         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache
+
          */
-        function readEnvVarsFromGCPSecrets($secret_id='',$reload=false, $cache_secret_key='', $cache_secret_iv='') {
+        function readEnvVarsFromGCPSecrets($secret_id='',$reload=false) {
 
             if(!$secret_id) $secret_id = $this->get('core.gcp.secrets.env_vars');
 
@@ -2362,6 +2364,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->logs->add('Missing $this->core->gc_project_service','error_readEnvVarsFromGCPSecrets');
                 return false;
             }
+
+            // takes the secret_id  from: $this->core->config->get('core.gcp.secrets.env_vars') if it is not set from local_config
+            $cache_secret_key=$this->core->config->get('core.gcp.secrets.cache_encrypt_key');
+            // openssl rand -base64 24
+            $cache_secret_iv=$this->core->config->get('core.gcp.secrets.cache_encrypt_iv');
 
 
             // Evaluate the cache method
@@ -2412,6 +2419,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
 
                 $this->core->logs->add('core.gcp.secrets.env_vars loaded: '.$this->get('core.gcp.secrets.env_vars'));
+
+
+
                 $this->core->cache->set($key,$env_vars,$hash, $cache_secret_key, $cache_secret_iv);
 
             }
@@ -4156,6 +4166,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function dbQuery($title, $SQL, $params=[],$types=null) {
 
+
             if(!is_string($SQL)) return($this->addError('Wrong $SQL method parameter in: dbQuery($title, $SQL, $params=[]) '));
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
@@ -4476,6 +4487,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             parent::__construct($core);
             $this->argv = $argv;
+
         }
 
         function hasOption($option) {

@@ -34,10 +34,10 @@ if(true) {
 
     if(count($argv)>1) {
         if(strpos($argv[1],'?'))
-            list($script, $params) = explode('?', str_replace('..', '', $argv[1]), 2);
+            list($script, $formParams) = explode('?', str_replace('..', '', $argv[1]), 2);
         else {
             $script = $argv[1];
-            $params = '';
+            $formParams = '';
         }
         $script = explode('/', $script);
         $path = ($script[0][0] == '_') ? __DIR__ : $core->system->app_path.'/scripts';
@@ -74,8 +74,9 @@ if(true) {
 
     $run = new Script($core,$argv);
     $run->params = $script;
-    if(strlen($params))
-        parse_str($params,$run->formParams);
+
+    if(strlen($formParams))
+        parse_str($formParams,$run->formParams);
     
     if(!method_exists($run,'main')) die('The class Script does not include the method "main()'."\n\n");
 }
