@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.07201';
+        var $_version = 'v73.07221';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -157,11 +157,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Config objects based in config
             $this->cache->setSpaceName($this->config->get('cacheSpacename'));
-
-            // Evaluate core.google.secrets.env_vars
-            if($this->config->get('core.google.secrets.env_vars')) {
-
-            }
 
             // If the $this->system->app_path ends in / delete the char.
             $this->system->app_path = preg_replace('/\/$/','',$this->system->app_path);
@@ -2383,20 +2378,25 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $env_vars = $this->core->cache->get($key,$expiration,$hash, $cache_secret_key, $cache_secret_iv);
 
 
+            // for local development force reload if local_env_vars does not exist
+            if($this->core->is->development() && !is_file($this->core->system->root_path.'/local_env_vars.json')) {
+                $reload=true;
+            }
+
             // if the cache is empty or $reload then read from gcp secrets
             if($reload || !$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
 
                 // performance init
                 $this->core->__p->add('GoogleSecrets', $secret_id, 'note');
 
-                // GoogleSecrets init
+                // INSTANCE OF GoogleSecrets init
                 $gs = $this->core->loadClass('GoogleSecrets');
                 if($gs->error) {
                     $this->core->logs->add($gs->errorMsg,'error_readEnvVarsFromGCPSecrets');
                     return false;
                 }
 
-                // read secret
+                // READ secret FROM gcp.secrets
                 $secrets = $gs->getSecret($this->get('core.gcp.secrets.env_vars'));
                 if($gs->error) {
                     $this->core->logs->add($gs->errorMsg,'error_readEnvVarsFromGCPSecrets');
@@ -2420,9 +2420,29 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                 $this->core->logs->add('core.gcp.secrets.env_vars loaded: '.$this->get('core.gcp.secrets.env_vars'));
 
+                // For development in localhost
+                if($this->core->is->development() && isset($env_vars['env_vars:'])) {
+                    $local_envars = [];
 
+                    // If file env_vars.json exists, read it to update with secrets
+                    if(is_file($this->core->system->root_path.'/local_env_vars.json')) {
+                        $f_env_vars = file_get_contents($this->core->system->root_path.'/local_env_vars.json');
+                        $f_env_vars = json_decode($f_env_vars,true);
+                        if(is_array($f_env_vars)) $local_envars+=$f_env_vars;
+                    }
+
+                    $local_envars['gpc.secrets.loaded.id:'] = $this->get('core.gcp.secrets.env_vars');
+                    $local_envars['gpc.secrets.loaded.date:'] = date('Y-m-d H:i:s');
+                    $local_envars['gpc.secrets.loaded.env_vars:'] = $env_vars['env_vars:'];
+                    foreach ($env_vars['env_vars:'] as $key_local=>$val) {
+                        $local_envars['gpc.secrets.loaded.env_vars:'][$key_local]='******';
+                    }
+                    file_put_contents($this->core->system->root_path.'/local_env_vars.json',json_encode($local_envars,JSON_PRETTY_PRINT));
+                    $this->core->logs->add('local_env_vars.json created');
+                }
 
                 $this->core->cache->set($key,$env_vars,$hash, $cache_secret_key, $cache_secret_iv);
+                $this->core->logs->add('data cached');
 
             }
 
@@ -2430,8 +2450,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->data['env_vars'] = array_merge($this->data['env_vars'],$env_vars['env_vars:']);
             }
 
-            $this->core->cache->activateMemory();
-
+            if(getenv('REDIS_HOST'))
+                $this->core->cache->activateMemory();
 
             return true;
 

@@ -1,3 +1,11 @@
 .git/*
 composer.lock
 vendor/*
+**/local_config.json
+**/local_data/*
+**/local_env_vars.json
+**/cache/*
+**/tests/*
+**/tmp/*
+**/composer.lock
+**/vendor/*
