@@ -1156,7 +1156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function activateCacheFile($path, $spacename = '')
         {
-            if ((isset($_SESSION) && $_SESSION['Core_CacheFile_' . $path]) || is_dir($path) || @mkdir($path)) {
+            if (isset($_SESSION['Core_CacheFile_' . $path]) || is_dir($path) || @mkdir($path)) {
                 $this->type = 'directory';
                 $this->dir = $path;
                 if (strlen($spacename)) $spacename = '_' . $spacename;
