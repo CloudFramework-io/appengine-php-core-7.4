@@ -29,7 +29,7 @@ class API extends RESTful
             // Requires to create a complete URL
             $value['url_queued'] = $_url;
             $value['interative'] = true;
-            $value['headers'] = $this->getHeadersToResend();
+            $value['headers'] = $this->getHeadersToResend((isset($this->formParams['_extra_headers']))?$this->formParams['_extra_headers']:null);
 
             // Avoid to send automatica Headers.
             $this->core->request->automaticHeaders = false;
@@ -123,7 +123,7 @@ class API extends RESTful
                     break;
             }
 
-            $httpRequest->setHeaders($this->getHeadersToResend());
+            $httpRequest->setHeaders($this->getHeadersToResend((isset($this->formParams['_extra_headers']))?$this->formParams['_extra_headers']:null));
 
             // Create a Cloud Task object.
             $task = new Task();

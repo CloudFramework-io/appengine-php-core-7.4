@@ -782,11 +782,19 @@ if (!defined("_RESTfull_CLASS_")) {
             return ($ret);
         }
 
-        function getHeadersToResend()
+        function getHeadersToResend($extra_headers=null)
         {
             $ret = array();
             foreach ($_SERVER as $key => $value) if (strpos($key, 'HTTP_X_') === 0) {
                 $ret[str_replace('_','-',str_replace('HTTP_', '', $key))] = $value;
+            }
+
+            if($extra_headers) {
+                $extra_headers = explode(',',$extra_headers);
+                foreach ($extra_headers as $extra_header) {
+                    $header = 'HTTP_'.str_replace('-','_',strtoupper($extra_header));
+                    $ret[$extra_header] = (isset($_SERVER[$header]))?$_SERVER[$header]:'';
+                }
             }
             return ($ret);
         }
