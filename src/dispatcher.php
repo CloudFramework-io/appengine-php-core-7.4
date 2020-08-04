@@ -11,10 +11,14 @@ $core = new Core7();
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
 if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
+
+    // grpc or rest
     if($core->is->development()) {
-        $datastore = new DatastoreClient(['transport'=>'rest']);
+        $transport = ($core->config->get('core.datastore.transport'))?:'rest';
+        $datastore = new DatastoreClient(['transport'=>$transport]);
     } else {
-        $datastore = new DatastoreClient(['transport'=>'grpc']);
+        $transport = ($core->config->get('core.datastore.transport'))?:'grpc';
+        $datastore = new DatastoreClient(['transport'=>$transport]);
     }
 }
 
