@@ -143,7 +143,13 @@ if (!defined("_RESTfull_CLASS_")) {
 
         }
 
-        function sendCorsHeaders($methods = 'GET,POST,PUT', $origin = '')
+        /**
+         * Setup CORS Headers to allow Ajax Web Calls
+         * @param string $methods
+         * @param string $origin
+         * @param string $allow_extra_headers If you need to add headers to be allowed use this variable.
+         */
+        function sendCorsHeaders($methods = 'GET,POST,PUT', $origin = '',$allow_extra_headers='')
         {
 
             // Rules for Cross-Domain AJAX
@@ -152,7 +158,11 @@ if (!defined("_RESTfull_CLASS_")) {
             if (!strlen($origin)) $origin = ((array_key_exists('HTTP_ORIGIN',$_SERVER) && strlen($_SERVER['HTTP_ORIGIN'])) ? preg_replace('/\/$/', '', $_SERVER['HTTP_ORIGIN']) : '*');
             header("Access-Control-Allow-Origin: $origin");
             header("Access-Control-Allow-Methods: $methods");
-            header("Access-Control-Allow-Headers: Content-Type,Authorization,X-CloudFrameWork-AuthToken,X-CLOUDFRAMEWORK-SECURITY,X-DS-TOKEN,X-REST-TOKEN,X-EXTRA-INFO,X-WEB-KEY,X-SERVER-KEY,X-REST-USERNAME,X-REST-PASSWORD,X-APP-KEY,Cache-Control,origin,x-requested-with");
+
+            $allow_headers='Content-Type,Authorization,X-CloudFrameWork-AuthToken,X-CLOUDFRAMEWORK-SECURITY,X-DS-TOKEN,X-REST-TOKEN,X-EXTRA-INFO,X-WEB-KEY,X-SERVER-KEY,X-REST-USERNAME,X-REST-PASSWORD,X-APP-KEY';
+            if($allow_extra_headers && is_string($allow_extra_headers)) $allow_headers.=','.strtoupper($allow_extra_headers);
+
+            header("Access-Control-Allow-Headers: {$allow_headers}");
             header("Access-Control-Allow-Credentials: true");
             header('Access-Control-Max-Age: 1000');
 
@@ -161,9 +171,8 @@ if (!defined("_RESTfull_CLASS_")) {
                 header("HTTP/1.1 200 OK");
                 exit();
             }
-
-
         }
+
 
         function setAuth($val, $msg = '')
         {
