@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08041';
+        var $_version = 'v73.08251';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -211,8 +211,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         // Include the external file $pathfile
                         if (strlen($pathfile)) {
                             // init data storage client wrapper if filepath starts with gs://
+                            $this->__p->add('Loaded $pathfile', __METHOD__,'note');
                             @include_once $pathfile;
-                            $this->__p->add('Loaded $pathfile', __METHOD__);
+                            $this->__p->add('Loaded $pathfile', __METHOD__,'endnote');
 
                         }
 
