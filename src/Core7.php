@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08272';
+        var $_version = 'v73.08273';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3725,14 +3725,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $options['http']['method'] = $verb;
 
             // Content-type
-            if ($verb != 'GET')
+            $MULTIPART_BOUNDARY= '--------------------------'.microtime(true);
+            if ($verb != 'GET') {
                 if (stripos($options['http']['header'], 'Content-type') === false) {
                     if ($raw) {
                         $options['http']['header'] .= 'Content-type: application/json' . "\r\n";
+                    } if(($verb == 'POST' || $verb == 'PUT') && is_array($data) && key_exists('__files', $data) && $data['__files']){
+                        $options['http']['header'] .= 'Content-Type: multipart/form-data; boundary='.$MULTIPART_BOUNDARY;
                     } else {
                         $options['http']['header'] .= 'Content-type: application/x-www-form-urlencoded' . "\r\n";
                     }
                 }
+            }
 
 
             // Build contents received in $data as an array
@@ -3755,9 +3759,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         } else
                             $build_data = $data;
                     } else {
-                        if(($verb == 'POST' || $verb == 'PUT') && is_array($data) && key_exists('__files',$data)) {
-                            $MULTIPART_BOUNDARY= '--------------------------'.microtime(true);
-                            $options['http']['header'] = 'Content-Type: multipart/form-data; boundary='.$MULTIPART_BOUNDARY;
+                        if(($verb == 'POST' || $verb == 'PUT') && is_array($data) && key_exists('__files',$data) && $data['__files']) {
                             $build_data = '';
                             foreach ($data['__files'] as $file) {
 
