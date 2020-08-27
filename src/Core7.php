@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08271';
+        var $_version = 'v73.08272';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3755,7 +3755,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         } else
                             $build_data = $data;
                     } else {
-                        if($verb == 'POST' && is_array($data) && key_exists('__files',$data)) {
+                        if(($verb == 'POST' || $verb == 'PUT') && is_array($data) && key_exists('__files',$data)) {
                             $MULTIPART_BOUNDARY= '--------------------------'.microtime(true);
                             $options['http']['header'] = 'Content-Type: multipart/form-data; boundary='.$MULTIPART_BOUNDARY;
                             $build_data = '';
