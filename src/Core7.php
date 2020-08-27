@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08252';
+        var $_version = 'v73.08271';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3654,11 +3654,36 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $this->call($route, $data, 'PATCH', $extra_headers, $send_in_json);
         }
 
-        function delete($route, $extra_headers = null)
-        {
-            return $this->call($route, null, 'DELETE', $extra_headers);
-        }
-
+        /**
+         * Allow to execute a GET,POST,PUT,PATCH,DELETE call with variables and files
+         * All the calls will try to add the following headers if they exit in $this->core->config:
+         *   - X-CLOUDFRAMEWORK-SECURITY
+         *   - X-SERVER-KEY
+         *   - X-DS-TOKEN
+         *   - X-EXTRA-INFO
+         *
+         * Sending files:
+         *     If you need to send files it can only be made with POST/PUT and $raw=false
+         *     $data has to include $data['__files'] = array($file,$file,..) where
+         *     $file = [
+         *           'file_content'=>'{content to send}'  // if file_path is not sent this is mandatory. Content of file
+         *          ,'file_path'=>'{path_to_content}'     // if file_content is not sent this is mandatory. Path of the file content
+         *          ,'file_name'=>'{name_of_file}'        // Name of file
+         *          ,'file_type'=>'{file type}'           // Content-Type of the file. Example: application/pdf
+         *          ,'file_var'=>'{name_of_var}'          // Optional var name to be used sending the file. You can use {name_of_var}[] for multiple files in the same var. default = file
+         *
+         * Sending JSON data:
+         *     Put $raw = true;
+         *
+         *
+         * Extra info: https://stackoverflow.com/questions/4003989/upload-a-file-using-file-get-contents
+         * @param $route
+         * @param null $data
+         * @param string $verb
+         * @param null $extra_headers
+         * @param bool $raw
+         * @return bool|false|string
+         */
         function call($route, $data = null, $verb = 'GET', $extra_headers = null, $raw = false)
         {
             $route = $this->getServiceUrl($route);
@@ -3730,7 +3755,51 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         } else
                             $build_data = $data;
                     } else {
-                        $build_data = http_build_query($data);
+                        if($verb == 'POST' && is_array($data) && key_exists('__files',$data)) {
+                            $MULTIPART_BOUNDARY= '--------------------------'.microtime(true);
+                            $options['http']['header'] = 'Content-Type: multipart/form-data; boundary='.$MULTIPART_BOUNDARY;
+                            $build_data = '';
+                            foreach ($data['__files'] as $file) {
+
+                                //region SET $file_var
+                                $file_var = (isset($file['file_var']) && $file['file_var'])?$file['file_var']:'file';
+                                //endregion
+                                //region SET $file_content
+                                $file_content=null;
+                                if(key_exists('file_content',$file) && !empty($file['file_content'])) {
+                                    $file_content = $file['file_content'];
+                                    if(!$file_content) return($this->addError('Error trying to send a file. file_content is empty.'));
+                                } elseif(key_exists('file_path',$file) && !empty($file['file_path'])) {
+                                    $file_content = @file_get_contents($file['file_path']);
+                                    if(false === $file_content) return($this->addError('Error trying to send a file. The file_path {'.$file['file_path'].'} does not return content'));
+                                } else {
+                                    return($this->addError('Error trying to send a file. Missing file_content or file_path variables'));
+                                }
+                                //endregion
+                                //region SET $file_name
+                                $file_name = (isset($file['file_name']) && $file['file_name'])?$file['file_name']:null;
+                                if(!$file_name) return($this->addError('Error trying to send a file. Missing file_name variable'));
+                                //endregion
+                                //region SET $file_type
+                                $file_type = (isset($file['file_type']) && $file['file_type'])?$file['file_type']:null;
+                                if(!$file_type) return($this->addError('Error trying to send a file. Missing file_name variable'));
+                                //endregion
+
+                                $build_data.=  '--'.$MULTIPART_BOUNDARY."\r\n".
+                                    'Content-Disposition: form-data; name="'.$file_var.'"; filename="'.$file_name."\"\r\n".
+                                    'Content-Type: '.$file_type."\r\n\r\n".
+                                    $file_content."\r\n";
+                            }
+                            unset($data['__files']);
+                            foreach ($data as $key=>$datum) {
+                                $build_data.=  '--'.$MULTIPART_BOUNDARY."\r\n".
+                                    'Content-Disposition: form-data; name="'.$key.'"'."\r\n\r\n".
+                                    $datum."\r\n";
+                            }
+                            $build_data.=  '--'.$MULTIPART_BOUNDARY."--\r\n";
+                        } else {
+                            $build_data = http_build_query($data);
+                        }
                     }
                     $options['http']['content'] = $build_data;
 
@@ -3783,6 +3852,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
             return ($ret);
+        }
+
+        function delete($route, $extra_headers = null)
+        {
+            return $this->call($route, null, 'DELETE', $extra_headers);
         }
 
         function getLastResponseCode()
