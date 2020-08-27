@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08273';
+        var $_version = 'v73.08274';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3799,11 +3799,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                                     $datum."\r\n";
                             }
                             $build_data.=  '--'.$MULTIPART_BOUNDARY."--\r\n";
+
                         } else {
                             $build_data = http_build_query($data);
                         }
                     }
                     $options['http']['content'] = $build_data;
+                    if(isset($_GET['_debug'])) _printe($options);
 
                     // You have to calculate the Content-Length to run as script
                     if($this->core->is->script())
