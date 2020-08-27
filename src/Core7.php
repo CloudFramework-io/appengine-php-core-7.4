@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08274';
+        var $_version = 'v73.08276';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1048,7 +1048,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function script()
         {
-            return (isset($_SERVER['PWD']));
+            return (isset($_SERVER['PWD']) && !isset($_SERVER['GAE_SERVICE']));
         }
 
         function dirReadble($dir)
@@ -3805,7 +3805,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         }
                     }
                     $options['http']['content'] = $build_data;
-                    if(isset($_GET['_debug'])) _printe($options);
 
                     // You have to calculate the Content-Length to run as script
                     if($this->core->is->script())
