@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08276';
+        var $_version = 'v73.08301';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -132,6 +132,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->request = new CoreRequest($this);
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
+            $this->cfiLog = new CFILog($this);
 
 
             //setup GCP basic vars
@@ -4419,6 +4420,122 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
 
+
+    }
+
+    /**
+     * Class to Manage Datastore Logs
+     * @package Core
+     */
+    class CFILog
+    {
+        /** @var Core7 $core */
+        var $core;
+
+        /** @var DataStore $dsLogs */
+        var $dsLogs;
+
+        var $error = false;
+        var $errorMsg = null;
+
+        function __construct(Core7 &$core)
+        {
+            $this->core = $core;
+        }
+
+        /**
+         * Add a LOG entry in CloudFrameWorkLogs
+         * @param $app
+         * @param $action string 'ok', 'error', 'check'..
+         * @param $title
+         * @param $method
+         * @param $user
+         * @param null $json
+         * @param null $slack_url
+         */
+        public function add($app, $action, $title, $method, $user, $json=null,$slack_url=null) {
+            if(!$this->initDSLogs()) return;
+
+            //region SET $fingerprint
+            $fingerprint = $this->core->system->getRequestFingerPrint();
+            if(!isset($fingerprint['ip'])) $fingerprint['ip'] = $this->core->system->ip;
+            if(!isset($fingerprint['http_referer'])) $fingerprint['http_referer'] = 'unknown';
+            //endregion
+
+            //region SET $entity
+            $entity = ["Host"=>(isset($_SERVER['HTTP_HOST']))?$_SERVER['HTTP_HOST']:'NO HTTP_HOST'];
+            $entity["App"]=$app;
+            $entity["Method"]=$method;
+            $entity["DateInsertion"]="now";
+            $entity["User"]=$user;
+            $entity["Ip"]=$fingerprint['ip'];
+            $entity["Action"]=$action;
+            $entity["Title"]=$title;
+            $entity["JSON"]=[
+                'url'=>(array_key_exists('REQUEST_URI',$_SERVER))?$_SERVER['REQUEST_URI']:''
+                ,'http_referer'=> $fingerprint['http_referer']
+                ,'data'=>$json
+                ,'fingerprint'=>$fingerprint
+                ,'slack_url'=>$slack_url
+            ];
+            //endregion
+
+            // If slack integration. Send the post to slack_url
+            if($slack_url) {
+                $data = ['text'=>"[$user]{$method}:{$app}: {$action}. {$title}"];
+                $ret = $this->core->request->post_json_decode($slack_url,$data,['Content-type'=> 'application/json'],true);
+                if($this->core->request->error) {
+                    $entity["JSON"]['slack_url_error'] = $this->core->request->errorMsg;
+                    $this->core->logs->add($this->core->request->errorMsg,'slack_error');
+                } else {
+                    $this->core->logs->add('slack_url');
+                    $entity["JSON"]['slack_url_ok'] = $ret;
+                }
+            }
+
+            //region $this->dsLogs->createEntities($entity)
+            $this->dsLogs->createEntities($entity);
+            if ($this->dsLogs->error) {
+                $this->addError($this->dsLogs->errorMsg);
+                return($this->core->logs->add(['data'=>$entity,'error'=>$this->dsLogs->errorMsg],'CFILog_add_error'));
+            } else {
+                $this->core->logs->add('CFILog_add_ok');
+                return true;
+            }
+            //endregion
+        }
+
+        /**
+         * Init $this->dsLog
+         */
+        private function initDSLogs() {
+
+            if(is_object($this->dsLogs)) return;
+            $model = json_decode('{
+                    "Host": ["string","index"],
+                    "App": ["string","index"],
+                    "Method": ["string","index"],
+                    "DateInsertion": ["datetime","index|forcevalue:now"],
+                    "Title": ["string","index"],
+                    "User": ["string","index"],
+                    "Ip": ["string","index"],
+                    "Action": ["string","index"],
+                    "JSON": ["json","allownull"]
+                  }',true);
+            $this->core->model->processModels(['DataStoreEntities'=>['CloudFrameWorkLogs'=>['model'=>$model]]]);
+            if($this->core->model->error) return($this->addError($this->core->model->errorMsg));
+
+            $this->dsLogs = $this->core->model->getModelObject('CloudFrameWorkLogs');$this->dsLogs = $this->core->model->getModelObject('CloudFrameWorkLogs');
+            return true;
+        }
+
+        /*
+         *  Add an error in the class
+         */
+        private function addError($msg) {
+            $this->error = true;
+            $this->errorMsg[] = $msg;
+        }
 
     }
 
