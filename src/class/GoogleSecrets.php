@@ -25,12 +25,18 @@ if (!defined ("_Google_CLASS_") ) {
 
         var $client = null;
         var $projectPath = null;
+        var $project_id = null;
 
         function __construct(Core7 &$core)
         {
-            if(!getenv('PROJECT_ID')) return($this->addError('Missing PROJECT_ID env_var'));
+            $this->core = $core;
+            if(getenv('PROJECT_ID')) $this->project_id = getenv('PROJECT_ID');
+            if($this->core->config->get('core.gcp.project_id')) $this->project_id = $this->core->config->get('core.gcp.project_id');
+            if($this->core->config->get('core.gcp.secrets.project_id')) $this->project_id = $this->core->config->get('core.gcp.secrets.project_id');
+
+            if(!$this->project_id) return($this->addError('Missing PROJECT_ID env_var or core.gcp.project_id, core.gcp.secrets.project_id config vars'));
             $this->client = new SecretManagerServiceClient();
-            $this->projectPath = $this->client->projectName(getenv('PROJECT_ID'));
+            $this->projectPath = $this->client->projectName($this->project_id);
         }
 
         /**
@@ -59,7 +65,7 @@ if (!defined ("_Google_CLASS_") ) {
         public function getSecret($secretId,$version='latest') {
             if($this->error) return;
             try {
-                $secretName = $this->client->secretVersionName(getenv('PROJECT_ID'), $secretId,$version);
+                $secretName = $this->client->secretVersionName($this->project_id, $secretId,$version);
                 $response = $this->client->accessSecretVersion($secretName);
                 return($response->getPayload()->getData());
             } catch (Exception $e) {
