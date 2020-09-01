@@ -2,6 +2,7 @@
 /*
 *  ADNBP Mysql Class
 *  Feel free to use a distribute it. 
+ * last-update 2020-09-01
 */
 
 class CloudSQLError extends Exception {
@@ -55,6 +56,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         var $_dbdatabase;        // MySQL Database
         var $_dbsocket;        // MySQL Database
         var $_dbport = '3306';        // MySQL Database
+        var $_dbcharset = '';        // MySQL Charset. Ex: utf8mb4
         var $_dbtype = 'mysql';
         var $_limit = 10000;
         var $_page = 0;
@@ -73,7 +75,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         protected $_dblink=false;                // Database Connection Link
         var $_debug=false;
 
-        Function __construct (Core7 &$core,$h='',$u='',$p='',$db='',$port='3306',$socket='') {
+        Function __construct (Core7 &$core,$h='',$u='',$p='',$db='',$port='3306',$socket='',$charset='') {
 
             $this->core = $core;
 
@@ -84,6 +86,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $this->_dbdatabase = trim($db);
                 $this->_port = trim($port);
                 $this->_dbsocket = trim($socket);
+                $this->_dbcharset = trim($charset);
             }  else if(strlen( trim($this->core->config->get("dbServer")))  || trim($this->core->config->get("dbSocket"))) {
                 // It load from $this->core->config->get("vars"): dbServer,dbUser,dbPassword,dbName,dbSocket,dbPort,dbPort
                 $this->loadCoreConfigVars();
@@ -101,13 +104,15 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         }
 
         function loadCoreConfigVars() {
-                $this->_dbserver = trim($this->core->config->get("dbServer"));
-                $this->_dbuser = trim($this->core->config->get("dbUser"));
-                $this->_dbpassword = trim($this->core->config->get("dbPassword"));
-                $this->_dbdatabase = trim($this->core->config->get("dbName"));
-                $this->_dbsocket = trim($this->core->config->get("dbSocket"));
-                if(strlen(trim($this->core->config->get("dbPort"))))
-                    $this->_dbport = trim($this->core->config->get("dbPort"));
+            $this->_dbserver = trim($this->core->config->get("dbServer"));
+            $this->_dbuser = trim($this->core->config->get("dbUser"));
+            $this->_dbpassword = trim($this->core->config->get("dbPassword"));
+            $this->_dbdatabase = trim($this->core->config->get("dbName"));
+            $this->_dbsocket = trim($this->core->config->get("dbSocket"));
+            $this->_dbcharset = ($this->core->config->get("dbCharset"))?$this->core->config->get("dbCharset"):'';
+            if(strlen(trim($this->core->config->get("dbPort"))))
+                $this->_dbport = trim($this->core->config->get("dbPort"));
+
         }
 
         function setConf($var,$value) {
@@ -118,6 +123,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 case 'dbName':$this->_dbdatabase = $value; break;
                 case 'dbSocket':$this->_dbsocket = $value; break;
                 case 'dbPort':$this->_dbport = $value; break;
+                case 'dbCharset':$this->_dbcharset = $value; break;
                 default:
                     $this->setError('Unknown "confVar". Please use: dbServer, dbUer, dbPassword, dbName, dbSocket, dbPort');
                     break;
@@ -133,6 +139,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 case 'dbName':$ret = $this->_dbdatabase; break;
                 case 'dbSocket':$ret = $this->_dbsocket; break;
                 case 'dbPort':$ret = $this->_dbport; break;
+                case 'dbCharset':$ret = $this->_dbcharset; break;
                 default:
                     $ret = 'Unknown "confVar". Please use: dbServer, dbUer, dbPassword, dbName, dbSocket, dbPort';
                     break;
@@ -147,9 +154,10 @@ if (!defined ("_MYSQLI_CLASS_") ) {
          * @param string $db DB Name
          * @param string $port Port. Default 3306
          * @param string $socket Socket
+         * @param string $charset Allow to specify a charste. Ex:
          * @return bool True if connection is ok.
          */
-        function connect($h='',$u='',$p='',$db='',$port="3306",$socket='') {
+        function connect($h='',$u='',$p='',$db='',$port="3306",$socket='',$charset='') {
 
             if($this->_dblink)  return($this->_dblink); // Optimize current connection.
 
@@ -160,6 +168,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $this->_dbdatabase = $db;
                 $this->_dbport = $port;
                 $this->_dbsocket = $socket;
+                $this->_dbcharset = $charset;
             }
 
             if(strlen($this->_dbserver) || strlen($this->_dbsocket)) {
@@ -171,6 +180,9 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                     if($this->_db->connect_error)  $this->setError('Connect Error to: '.((strlen($this->_dbsocket))?$this->_dbsocket:$this->_dbserver).' (' . $this->_db->connect_errno . ') '. $mysqli->connect_error);
                     else $this->_dblink = true;
+
+                    if($this->_dbcharset)
+                        $this->_db->set_charset($this->_dbcharset);
 
                 } catch (Exception $e) {
                     $err = 'Connect Error to: '.((strlen($this->_dbsocket))?$this->_dbsocket:$this->_dbserver);

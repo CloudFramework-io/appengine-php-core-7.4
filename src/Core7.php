@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.08312';
+        var $_version = 'v73.09011';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4131,16 +4131,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param int $cache integer If you want to use cache thet it hast to be > 0
          * @return boolean|void
          */
-        function readModelsFromCloudFramework($models,$api_key,$cache_time=0) {
+        function readModelsFromCloudFramework($models,$api_key,$cache_time=-1) {
             $ret_models = [];
             if($cache_time) $ret_models = $this->core->cache->get('readModelsFromCloudFramework_'.$models,$cache_time);
-            if(!$ret_models) {
+            if(!$ret_models || isset($_GET['_readModelsFromCloudFramework'])) {
                 $ret_models =  $this->core->request->get_json_decode('https://api7.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));
                 $ret_models = $ret_models['data'];
                 $this->core->cache->set('readModelsFromCloudFramework_'.$models,$ret_models);
             }
             if(!$ret_models || !$this->processModels($ret_models)) return;
+
             return true;
         }
 
