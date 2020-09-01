@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.09011';
+        var $_version = 'v73.09012';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4134,15 +4134,16 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function readModelsFromCloudFramework($models,$api_key,$cache_time=-1) {
             $ret_models = [];
             if($cache_time) $ret_models = $this->core->cache->get('readModelsFromCloudFramework_'.$models,$cache_time);
-            if(!$ret_models || isset($_GET['_readModelsFromCloudFramework'])) {
+            $ret_models=[];
+            if(!$ret_models || isset($ret_models['Unknown']) || isset($_GET['_readModelsFromCloudFramework'])) {
                 $ret_models =  $this->core->request->get_json_decode('https://api7.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));
                 $ret_models = $ret_models['data'];
-                $this->core->cache->set('readModelsFromCloudFramework_'.$models,$ret_models);
+                if(!isset($ret_models['Unknown']))
+                    $this->core->cache->set('readModelsFromCloudFramework_'.$models,$ret_models);
             }
-            if(!$ret_models || !$this->processModels($ret_models)) return;
-
-            return true;
+            if(!$ret_models || isset($ret_models['Unknown']) || !$this->processModels($ret_models)) return($this->addError($ret_models));
+            return $ret_models;
         }
 
         /**
