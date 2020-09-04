@@ -5,13 +5,6 @@
 inbound_services:
 - mail
 - mail_bounce
-handlers:
-- url: /_ah/mail/.+
-  script: vendor/cloudframework-io/appengine-php-core/src/dispatcher.php
-  login: admin
-- url: /_ah/bounce
-  script: vendor/cloudframework-io/appengine-php-core/src/dispatcher.php
-  login: admin
  */
 $_include = '';
 $_email = file_get_contents('php://input');
@@ -32,15 +25,15 @@ if($_include) {
             if(!isset($this->params[0])) $this->params[0]='none';
             switch ($this->params[0]) {
                 case "mail":
-                    $this->core->logs->add(['mail'=>$this->formParams['_raw_input_']]);
+                    $this->core->logs->add(['mail'=>$this->formParams['_raw_input_']],'_ah_mail');
                     //Incoming mail
                     break;
                 case "bounce":
-                    $this->core->logs->add(['bounce'=>$this->formParams['_raw_input_']]);
+                    $this->core->logs->add(['bounce'=>$this->formParams['_raw_input_']],'_ah_bouce');
                     //bounce email
                     break;
                 default:
-                    $this->core->logs->add([$this->params[0]=>$this->formParams['_raw_input_']]);
+                    $this->core->logs->add([$this->params[0]=>$this->formParams['_raw_input_']],'_ah_none');
                     //unknown
                     break;
             }
