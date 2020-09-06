@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.09042';
+        var $_version = 'v73.09061';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -158,6 +158,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Config objects based in config
             $this->cache->setSpaceName($this->config->get('cacheSpacename'));
+            if($this->config->get('core.cache.cache_path')) $this->cache->activateCacheFile($this->config->get('core.cache.cache_path'));
 
             // If the $this->system->app_path ends in / delete the char.
             $this->system->app_path = preg_replace('/\/$/','',$this->system->app_path);
@@ -1413,17 +1414,20 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function set($path, $data)
         {
+            $path = preg_replace('/[\/\.;]/','_',$path);
             return @file_put_contents($this->dir . $path, gzcompress(serialize($data)));
         }
 
         function delete($path)
         {
+            $path = preg_replace('/[\/\.;]/','_',$path);
             return @unlink($this->dir . $path);
         }
 
         function get($path)
         {
             $ret = false;
+            $path = preg_replace('/[\/\.;]/','_',$path);
             if (is_file($this->dir . $path))
                 $ret = file_get_contents($this->dir . $path);
             if (false === $ret) return null;
@@ -2368,11 +2372,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $cache_secret_iv=$this->core->config->get('core.gcp.secrets.cache_encrypt_iv');
 
 
-            // Evaluate the cache method
-            if($this->get('core.gcp.secrets.cache_path') ) {
-                $this->core->cache->activateCacheFile($this->get('core.gcp.secrets.cache_path'));
-            }
-
             // read data from cache and enrypt data
             $key ="{$this->core->gc_project_id}_{$this->core->gc_project_service}_core.gcp.secrets.env_vars";
             $expiration=-1;
@@ -2451,9 +2450,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if($env_vars && isset($env_vars['env_vars:']) && $env_vars['env_vars:']) {
                 $this->data['env_vars'] = array_merge($this->data['env_vars'],$env_vars['env_vars:']);
             }
-
-            if(getenv('REDIS_HOST'))
-                $this->core->cache->activateMemory();
 
             return true;
 
@@ -4128,13 +4124,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * Read models from CloudFramework
          * @param $models string Models separated by ,
          * @param $api_key string API Key of the licence
-         * @param int $cache integer If you want to use cache thet it hast to be > 0
+         * @param int $cache integer By default the result is cached (-1). If you want to expire cache then it hast to be >= 0 (seconds to expire the cache)
          * @return boolean|void
          */
         function readModelsFromCloudFramework($models,$api_key,$cache_time=-1) {
             $ret_models = [];
             if($cache_time) $ret_models = $this->core->cache->get('readModelsFromCloudFramework_'.$models,$cache_time);
-            $ret_models=[];
             if(!$ret_models || isset($ret_models['Unknown']) || isset($_GET['_readModelsFromCloudFramework'])) {
                 $ret_models =  $this->core->request->get_json_decode('https://api7.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));

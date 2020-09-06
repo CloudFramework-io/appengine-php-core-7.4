@@ -28,7 +28,7 @@ if(!$_include && $this->config->get('_ah_default_include')) {
 
 // Include the file if found and if not sent the output to logs.
 if($_include) {
-        include_once $_include;
+    include_once $_include;
 } else {
     class API extends RESTful
     {
