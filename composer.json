@@ -12,7 +12,8 @@
     "google/apiclient": "^2.4",
     "google/cloud-tasks": "^1.6",
     "google/cloud-bigquery": "^1.16",
-    "google/cloud-secret-manager": "^1.0"
+    "google/cloud-secret-manager": "^1.0",
+    "zbateson/mail-mime-parser": "^1.2"
   },
   "authors": [
     { "name": "Héctor López", "email": "hl@cloudframework.io"},
