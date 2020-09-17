@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.09171';
+        var $_version = 'v73.09172';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3756,7 +3756,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         } else
                             $build_data = $data;
                     } else {
-                        if(($verb == 'POST' || $verb == 'PUT') && is_array($data) && key_exists('__files',$data) && $data['__files']) {
+                        if(($verb == 'POST' || $verb == 'PUT' || $verb == 'PATCH') && is_array($data) && key_exists('__files',$data) && $data['__files']) {
                             $build_data = '';
                             foreach ($data['__files'] as $file) {
 
