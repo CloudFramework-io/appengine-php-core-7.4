@@ -539,8 +539,12 @@ if (!defined("_RESTfull_CLASS_")) {
             if(strlen($extramsg)) $extramsg = " [{$extramsg}]";
 
             // Delete from code any character :.* to delete potential comments
-            $this->setError($this->getCodeLib($code).$extramsg,$this->getCodeLibError($code),preg_replace('/:.*/','',$code));
-        }
+            $this->setError(
+                $this->getCodeLib($code).$extramsg
+                ,$this->getCodeLibError($code)
+                ,preg_replace('/:.*/','' ,$code)
+                ,$this->getCodeLib($code)
+            );        }
 
         /**
          * Return the code applied with setError and defined in __codes
