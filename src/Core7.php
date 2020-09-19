@@ -1210,7 +1210,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             if ($this->type == 'memory') {
                 if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
-                    $this->log->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
+                    if($this->debug)
+                        $this->log->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
                     $this->cache=-1;
                     return;
                 } else {
@@ -4709,6 +4710,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /** @var array $argv Keep the arguments passed to the logic if it runs as a script  */
         public $argv = null;
         var $tests;
+        /** @var CoreCache */
         var $cache = null;
 
         /**
@@ -4720,6 +4722,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             parent::__construct($core);
             $this->argv = $argv;
+            $this->cache = &$this->core->cache;
 
         }
 
@@ -4727,15 +4730,35 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return(in_array('--'.$option, $this->argv));
         }
 
-        function sendTerminal($info) {
+        function sendTerminal($info='') {
             if(is_string($info)) echo $info."\n";
             else print_r($info);
         }
 
-        function prompt($title,$default=null) {
+        /**
+         * Execute a user Prompt
+         * @param $title
+         * @param null $default
+         * @param null $cache_var
+         * @return false|string|null
+         */
+        function prompt($title,$default=null,$cache_var=null) {
+
+            // Check Cache var
+            if($cache_var) {
+                $cache_content = $this->cache->get('Core7_Scripts2020_'.$cache_var);
+                if($cache_content) $default = $cache_content;
+            }
+
+            // Check default value
             if($default) $title.="[{$default}] ";
             $ret = readline($title);
             if(!$ret) $ret=$default;
+
+            // Set Cache var
+            if($cache_var) {
+                $this->cache->set('Core7_Scripts2020_'.$cache_var,$ret);
+            }
             return $ret;
         }
 
