@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.09174';
+        var $_version = 'v73.09211';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3621,9 +3621,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $ret;
         }
 
-        function delete_json_decode($route, $extra_headers = null)
+        function delete_json_decode($route, $extra_headers = null, $data = null)
         {
-            $this->rawResult = $this->delete($route, $extra_headers);
+            $this->rawResult = $this->delete($route, $extra_headers, $data);
             $ret = json_decode($this->rawResult, true);
             if (JSON_ERROR_NONE === json_last_error()) $this->rawResult = '';
             else {
@@ -3855,9 +3855,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return ($ret);
         }
 
-        function delete($route, $extra_headers = null)
+        function delete($route, $extra_headers = null, $data = null)
         {
-            return $this->call($route, null, 'DELETE', $extra_headers);
+            return $this->call($route, $data, 'DELETE', $extra_headers);
         }
 
         function getLastResponseCode()
