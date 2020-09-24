@@ -1303,7 +1303,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 // decrypt data if $cache_secret_key and $cache_secret_iv are not empty
                 if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
 
-                return (unserialize(gzuncompress($info['_data_'])));
+                if($info['_data_']) return (unserialize(gzuncompress($info['_data_'])));
+                else return null;
 
             } else {
                 if($this->debug) $this->log->add("get($key,$expireTime,$hash) failed (beacause it does not exist) token: ".$this->spacename . '-' . $key,'CoreCache');
@@ -4712,6 +4713,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $tests;
         /** @var CoreCache */
         var $cache = null;
+        var $cache_secret_key = '';
+        var $cache_secret_iv = '';
 
         /**
          * Scripts constructor.
@@ -4746,7 +4749,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Check Cache var
             if($cache_var) {
-                $cache_content = $this->cache->get('Core7_Scripts2020_'.$cache_var);
+                $cache_content = $this->cache->get('Core7_Scripts2020_'.$cache_var,-1,'',$this->cache_secret_key,$this->cache_secret_iv);
                 if($cache_content) $default = $cache_content;
             }
 
@@ -4757,7 +4760,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Set Cache var
             if($cache_var) {
-                $this->cache->set('Core7_Scripts2020_'.$cache_var,$ret);
+                $this->cache->set('Core7_Scripts2020_'.$cache_var,$ret,'',$this->cache_secret_key,$this->cache_secret_iv);
             }
             return $ret;
         }
