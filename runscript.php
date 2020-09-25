@@ -40,8 +40,7 @@ if(true) {
             $formParams = '';
         }
         $script = explode('/', $script);
-        $path = ($script[0][0] == '_') ? __DIR__ : $core->system->app_path.'/scripts';
-        if($core->config->get('core.scripts.path')) $path=$core->config->get('core.scripts.path');
+        $path = ($script[0][0] == '_') ? __DIR__.'/scripts' : (($core->config->get('core.scripts.path')?$core->config->get('core.scripts.path'):$core->system->app_path.'/scripts'));
     }
 
     echo "CloudFramwork Script v1.0\nroot_path: {$rootPath}\napp_path: {$path}\n";
