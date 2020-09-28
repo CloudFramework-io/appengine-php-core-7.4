@@ -31,7 +31,7 @@ if(true) {
 
     $script = [];
 
-
+    $path='';
     if(count($argv)>1) {
         if(strpos($argv[1],'?'))
             list($script, $formParams) = explode('?', str_replace('..', '', $argv[1]), 2);
@@ -43,8 +43,9 @@ if(true) {
         $path = ($script[0][0] == '_') ? __DIR__.'/scripts' : (($core->config->get('core.scripts.path')?$core->config->get('core.scripts.path'):$core->system->app_path.'/scripts'));
     }
 
+
     echo "CloudFramwork Script v1.0\nroot_path: {$rootPath}\napp_path: {$path}\n";
-    if(!strlen($script[0])) die ('Mising Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
+    if(!isset($script[0]) || !strlen($script[0])) die ('Mising Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
     echo "Script: /scripts/{$script[0]}.php\n";
 
     // Reading local_script
