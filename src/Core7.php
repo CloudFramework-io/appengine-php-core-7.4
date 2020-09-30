@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.09211';
+        var $_version = 'v73.09301';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4715,6 +4715,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache = null;
         var $cache_secret_key = '';
         var $cache_secret_iv = '';
+        var $cache_data = null;
 
         /**
          * Scripts constructor.
@@ -4736,6 +4737,28 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function sendTerminal($info='') {
             if(is_string($info)) echo $info."\n";
             else print_r($info);
+        }
+
+        function readCache() {
+            // Read cache into $this->cache_data if not cache default value [];
+            $this->cache_data = ($this->cache->get('Core7_Scripts2020_cache',-1,'',$this->cache_secret_key,$this->cache_secret_iv))?:[];
+        }
+
+        function cleanCache() {
+            // Read cache into $this->cache_data if not cache default value [];
+            $this->cache_data = [];
+            $this->cache->set('Core7_Scripts2020_cache',$this->cache_data,'',$this->cache_secret_key,$this->cache_secret_iv);
+        }
+
+        function getCacheVar($var) {
+            if($this->cache_data === null) $this->readCache();
+            return((isset($this->cache_data[$var]))?$this->cache_data[$var]:null);
+        }
+
+        function setCacheVar($var,$value) {
+            if($this->cache_data === null) $this->readCache();
+            $this->cache_data[$var] = $value;
+            $this->cache->set('Core7_Scripts2020_cache',$this->cache_data,'',$this->cache_secret_key,$this->cache_secret_iv);
         }
 
         /**
@@ -4764,6 +4787,50 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             return $ret;
         }
+
+        /**
+         * Execute a user Prompt user for a specific var
+         *  $options['title'] = titlte to be shown
+         *  $options['default'] = default value
+         *  $options['values'] = [array of valid values]
+         *  $options['cache_var'] = 'name to cache the result. If result is cached it rewrites defaul'
+         *  $options['type'] = password | number | float
+         *  $options['allowed_values'] = allowed values
+         *
+         * @param $options array array of options
+         * @return false|string|null
+         */
+        function promptVar($options) {
+
+            $title = (isset($options['title']) && $options['title'])?$options['title']:'missing title in prompt';
+            $default = (isset($options['default']) && $options['default'])?$options['default']:null;
+            $cache_var = (isset($options['cache_var']) && $options['cache_var'])?$options['cache_var']:null;
+            $type = (isset($options['type']) && $options['type'])?$options['type']:null;
+            $allowed_values = (isset($options['allowed_values']) && is_array($options['allowed_values']))?$options['allowed_values']:null;
+            // Check rewrite $default
+            if($cache_var && ($cache_content = $this->getCacheVar($options['cache_var']))) $default = $cache_content;
+
+            // Check default value
+            if($allowed_values) $title.= ' '.json_encode($allowed_values);
+            if($default) {
+                if($type=='password') $title.=" (*******)";
+                else $title.=" ({$default})";
+            }
+            $title.=' :';
+            do {
+                $ret = readline($title);
+                if(!$ret) $ret=$default;
+                $error = false;
+                if($allowed_values && !in_array($ret,$allowed_values)) $error = true;
+            } while($error);
+
+
+            // Set Cache var
+            if($cache_var) $this->setCacheVar($cache_var,$ret);
+
+            return $ret;
+        }
+
 
         function setErrorFromCodelib($code,$msg) {
             $this->sendTerminal([$code=>$msg]);

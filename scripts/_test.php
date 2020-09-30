@@ -6,10 +6,14 @@
 class Script extends Scripts2020
 {
 
+    var $organization = null;
+    var $_environment = null;
+    var $testId = null;
     var $test = [];
     var $run_vars = [];
     var $user_email = '';
     var $user_token = '';
+    var $report = [];
 
     function main()
     {
@@ -65,6 +69,7 @@ class Script extends Scripts2020
             $this->params[2] = $this->prompt('Write the name of your organization _test/erp/');
         }
         $org = $this->params[2];
+        $this->organization = $org;
         //endregion
 
         if(!$this->checkCloudFrameworkUserCredentials($org)) return;
@@ -81,6 +86,9 @@ class Script extends Scripts2020
             $this->params[3] = $this->prompt('Select area to test _test/erp/'.$org.'/');
         }
         if(!($test = $this->loadTest($org,$this->params[3]))) return;
+
+        $this->testId = $this->params[3];
+
         $this->sendTerminal('Test updated by: '.$test['CloudFrameworkUser']);
         $this->sendTerminal($test['Description']);
         $this->sendTerminal();
@@ -131,8 +139,8 @@ class Script extends Scripts2020
      */
     private function generateCloudFrameworkToken() {
         $this->sendTerminal('Sign in ERP/Backoffice '.$this->params[2]);
-        $user = $this->prompt(' - Give me your user: ',null,'user');
-        $password = $this->prompt(' - Give me your password: ');
+        $user = $this->promptVar(['title'=>' - Give me your user: ','cache_var'=>'user']);
+        $password = $this->promptVar(['title'=>' - Give me your password: ','type'=>'password']);
 
         $url = "https://api.cloudframework.io/core/signin/{$this->params[2]}/in";
         $params = ['user'=>$user,'password'=>$password,'type'=>'userpassword'];
@@ -169,28 +177,27 @@ class Script extends Scripts2020
 
     /**
      * Execute a test previously readed
-     * @param $area
+     * @param $testModule
      */
-    private function runTest($area) {
+    private function runTest($testModule) {
 
-        if(!isset($this->test[$area])) return($this->addError($area.' does not exist'));
+        if(!isset($this->test[$testModule])) return($this->addError($testModule.' does not exist'));
+
+        $this->test[$testModule]['vars']['_environment']['value']  = $this->promptVar(['title'=>'_environment','default'=>'Stage','cache_var'=>"_environment",'allowed_values'=>['Local','Stage','Production']]);
+        $this->_environment = $this->test[$testModule]['vars']['_environment']['value'];
+        $this->test[$testModule]['vars']['_token']['value']  = $this->cache->get('token');
 
         //region Evaluate prompt variables: "prompt_vars": { .. }
-        if(isset($this->test[$area]['prompt_vars']) && is_array($this->test[$area]['prompt_vars'])) {
-            foreach ($this->test[$area]['prompt_vars'] as $prompt=>$prompt_description) {
-                // extract mandatory values $mandatory_values
-                $mandatory_values = (isset($prompt_description['values']) && $prompt_description['values'] && is_array($prompt_description['values']))?$prompt_description['values']:[];
+        if(isset($this->test[$testModule]['prompt_vars']) && is_array($this->test[$testModule]['prompt_vars'])) {
+            foreach ($this->test[$testModule]['prompt_vars'] as $prompt=> $prompt_description) {
+                // extract mandatory values $allowed_values
+                $allowed_values = (isset($prompt_description['values']) && $prompt_description['values'] && is_array($prompt_description['values']))?$prompt_description['values']:[];
 
                 // Assign title with default value
                 $title = ((isset($prompt_description['title']))?$prompt_description['title']:$prompt);
-                if($mandatory_values) $title.= ' '.json_encode($prompt_description['values']);
-                $title.=': ';
                 $default_value = (isset($prompt_description['defaultvalue']))?$prompt_description['defaultvalue']:'';
-
-                // Do de prompt
-                do {
-                    $this->test[$area]['vars'][$prompt]['value']  = $this->prompt($title,$default_value,"{$area}{$prompt}");
-                } while($mandatory_values && !in_array($this->test[$area]['vars'][$prompt]['value'],$mandatory_values));
+                $type = (isset($prompt_description['type']))?$prompt_description['type']:'any';
+                $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
 
             }
         }
@@ -198,25 +205,30 @@ class Script extends Scripts2020
 
         //region Merge _default vars with test vars: "_default": { "vars": { .. } }"
         if(!isset($this->test['_default']['vars']) || !is_array($this->test['_default']['vars'])) $this->test['_default']['vars'] = [];
-        if(!isset($this->test[$area]['vars']) || !is_array($this->test[$area]['vars'])) $this->test[$area]['vars'] = [];
+        if(!isset($this->test[$testModule]['vars']) || !is_array($this->test[$testModule]['vars'])) $this->test[$testModule]['vars'] = [];
 
-        $this->test[$area]['vars'] = array_merge($this->test['_default']['vars'],$this->test[$area]['vars']);
-        $this->test[$area]['vars'] = array_merge($this->test[$area]['vars'],$this->run_vars);
-        if(isset($this->test[$area]['vars'])) {
-            $vars_txt = json_encode($this->test[$area]['vars']);
+        $this->test[$testModule]['vars'] = array_merge($this->test['_default']['vars'],$this->test[$testModule]['vars']);
+        $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
+        if(isset($this->test[$testModule]['vars'])) {
+            $vars_txt = json_encode($this->test[$testModule]['vars']);
             if(strpos($vars_txt,'{{') && strpos($vars_txt,'}}')) {
-                foreach ($this->test[$area]['vars'] as $var=>$content) if(strpos($vars_txt,'{{'.$var)) {
-                    if(isset($this->test[$area]['vars'][$var]['value']))
-                        $vars_txt = str_replace('{{'.$var.'}}',$this->test[$area]['vars'][$var]['value'],$vars_txt);
+                foreach ($this->test[$testModule]['vars'] as $var=> $content) if(strpos($vars_txt,'{{'.$var)) {
+                    if(isset($this->test[$testModule]['vars'][$var]['value']))
+                        $vars_txt = str_replace('{{'.$var.'}}',$this->test[$testModule]['vars'][$var]['value'],$vars_txt);
                 }
-                $this->test[$area]['vars'] = json_decode($vars_txt,true);
+                $this->test[$testModule]['vars'] = json_decode($vars_txt,true);
             }
         }
         //endregion
 
+        $report = [];
         //region execute "calls": [ {..},{..} ]
-        if(isset($this->test[$area]['calls']) && is_array($this->test[$area]['calls'])) {
-            foreach ($this->test[$area]['calls'] as $i=>$content) {
+        if(isset($this->test[$testModule]['calls']) && is_array($this->test[$testModule]['calls'])) {
+            foreach ($this->test[$testModule]['calls'] as $i=> $content) {
+
+                // init report
+                $report = [];
+                $error = false;
 
                 //region verify mandatory fields: $content['url']
                 if(!isset($content['url']) || !$content['url']) {
@@ -228,9 +240,9 @@ class Script extends Scripts2020
                 //region apply {{var}} substitutions in $content
                 $content_txt = json_encode($content);
                 if(strpos($content_txt,'{{') && strpos($content_txt,'}}')) {
-                    foreach ($this->test[$area]['vars'] as $var=>$var_content) if(strpos($content_txt,'{{'.$var)) {
-                        if(isset($this->test[$area]['vars'][$var]['value']))
-                            $content_txt = str_replace('{{'.$var.'}}',$this->test[$area]['vars'][$var]['value'],$content_txt);
+                    foreach ($this->test[$testModule]['vars'] as $var=> $var_content) if(strpos($content_txt,'{{'.$var)) {
+                        if(isset($this->test[$testModule]['vars'][$var]['value']))
+                            $content_txt = str_replace('{{'.$var.'}}',$this->test[$testModule]['vars'][$var]['value'],$content_txt);
                     }
                     $content = json_decode($content_txt,true);
                 }
@@ -242,15 +254,36 @@ class Script extends Scripts2020
                 $payload = (isset($content['payload']) && $content['payload'])? $content['payload']:null;
                 $method = (isset($content['method']) && in_array(strtoupper($content['method']),['GET','POST','PUT','PATCH']))?strtoupper($content['method']):'GET';
                 $headers = (isset($content['headers']) && is_array($content['headers']))?$content['headers']:null;
+                $stop_on_error = (isset($content['stop-on-error']) && $content['stop-on-error']===true)?true:false;
                 //endregion
 
                 //region GET,POST,PUT..: $url.
                 $this->sendTerminal();
-                $this->sendTerminal("{$area} {$title}");
-                $ret = $this->core->request->call($url,$payload, $method,$headers);
+                $this->sendTerminal("{$testModule} {$title}");
+
+                $time = microtime(true);
+                $ret = $this->core->request->call($url,$payload, $method,$headers,true);
+                $time = microtime(true)-$time;
+
+                // prepare report
+                $report = ['method'=>$method,'url'=>$url,'payload'=>$payload,'headers'=>$headers];
+                if(isset($report['payload']['password'])) $report['payload']['password'] = '********';
+                if(isset($report['payload']['passw'])) $report['payload']['password'] = '********';
+
+                $report ['status'] = $this->core->request->getLastResponseCode();
                 if($this->core->request->error) {
                     $this->sendTerminal(' - RESPONSE NOT OK '.$this->core->request->getLastResponseCode());
+                    $this->sendTerminal('payload => '.json_encode($payload));
+                    $this->sendTerminal('result => '.$ret);
+                    $report['error'] = $this->core->request->errorMsg;
+                    $error = true;
+                    if($stop_on_error) {
+                        $this->sendReport($this->testId,$testModule,$title,'ERROR',"[{$method}] {$url}",$time,['ERROR_'.$i=>$report]);
+                        return;
+                    }
+
                 } else {
+                    $report['result'] = json_decode($ret,true);
                     $this->sendTerminal(' - OK '.$this->core->request->getLastResponseCode());
                 }
                 //TODO: send report to CloudFramework.
@@ -259,9 +292,16 @@ class Script extends Scripts2020
                 //region EVALUATE status
                 if(isset($content['status']) && $content['status']) {
                     if($this->core->request->getLastResponseCode() == $content['status']) {
+                        $report['status_'.$content['status']] = 'OK';
                         $this->sendTerminal(' - OK Status is '.$content['status']);
                     } else {
                         $this->sendTerminal(' - ERROR Status is not '.$content['status']);
+                        $report['status_'.$content['status']] = 'ERROR';
+                        $error = true;
+                        if($stop_on_error) {
+                            $this->sendReport($this->testId,$testModule,$title,'ERROR',"[{$method}] {$url}",$time,['ERROR_'.$i=>$report]);
+                            return;
+                        }
                     }
                 }
                 //endregion
@@ -280,11 +320,14 @@ class Script extends Scripts2020
                             }
                             else {
                                 $pointer = null;
+                                $report['check_var_'.$check_var] = 'ERROR';
                                 $this->sendTerminal(' - ERROR returned structure. Does not exist: '.$check_var.'=>'.json_encode($check_var_content));
+                                $error = true;
                                 break;
                             }
                         }
                         if($pointer) {
+                            $report['check_var_'.$check_var] = 'OK';
                             $this->sendTerminal(' - OK JSON Var exist: '.$check_var.'=>'.json_encode($check_var_content));
                         }
                         unset($pointer);
@@ -305,6 +348,9 @@ class Script extends Scripts2020
                                 $pointer = &$pointer[$item];
                             }
                             else {
+                                $report['set_run_var_'.$check_var] = 'ERROR';
+                                $report['set_run_var_'.$check_var.'_content'] = $check_var_content;
+                                $error = true;
                                 $pointer = null;
                                 $this->sendTerminal('  ERROR returned structure. It can not create set-run-var: '.$check_var.'=>'.$check_var_content);
                             }
@@ -312,11 +358,13 @@ class Script extends Scripts2020
                         if($pointer) {
                             $this->run_vars[$check_var] = ['value'=>$pointer];
                             $this->cache->set('CloudFramework_test_run_vars_'.$this->params[1], $this->run_vars);
+                            $report['set_run_var_'.$check_var] = 'OK';
                             $this->sendTerminal(' - OK Updated set-run-var "'.$check_var.'" <- {'.$check_var_content.'}: '.$pointer);
                         }
                         unset($pointer);
                     }
-                    $this->test[$area]['vars'] = array_merge($this->test[$area]['vars'],$this->run_vars);
+                    $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
+                    $this->sendReport($this->testId,$testModule,$title,($error)?'ERROR':'OK',"[{$method}] {$url}",$time,[(($error)?'ERROR':'OK').'_'.$i=>$report]);
 
                 }
                 //endregion
@@ -324,6 +372,33 @@ class Script extends Scripts2020
             }
         }
         //endregion
+    }
+
+    /**
+     * Send a report to CloudFrameWorkTestsLogs
+     */
+    private function sendReport($testId,$testModule,$title,$status,$url,$time,$json) {
+
+        $cfurl = "https://api.cloudframework.io/core/tests/{$this->organization}/{$testId}";
+        $data = [
+             'Environment'=>$this->_environment
+            ,'TestModule'=>$testModule
+            ,'TestTitle'=>$title
+            ,'Status'=>$status
+            ,'Time'=>round(floatval($time),4)
+            ,'Url'=>$url
+            ,'Status'=>$status
+            ,'JSON'=>$json
+        ];
+        $report = $this->core->request->post_json_decode($cfurl,$data,['X-WEB-KEY'=>'Production','X-DS-TOKEN'=>$this->user_token]);
+        if($this->core->request->error) {
+            $this->sendTerminal('Error sending Logs');
+            $this->sendTerminal($this->core->request->errorMsg);
+            $this->core->request->error=false;
+            $this->core->request->errorMsg=[];
+            return null;
+        }
+        return true;
     }
 
     /**
