@@ -14,6 +14,7 @@ class Script extends Scripts2020
     var $user_email = '';
     var $user_token = '';
     var $report = [];
+    var $debug = false;
 
     function main()
     {
@@ -21,9 +22,8 @@ class Script extends Scripts2020
         $method = (isset($this->params[1])) ? $this->params[1] : 'default';
         if (!is_dir('./local_data')) mkdir('./local_data');
         $this->cache->debug = false;
-        //$this->cache_secret_key = 'test';
-        //$this->cache_secret_iv = 'test';
 
+        if($this->hasOption('debug')) $this->debug = true;
 
         // $this->core->cache->debug = false;
         //Call internal ENDPOINT_{$this->params[1]}
@@ -36,7 +36,8 @@ class Script extends Scripts2020
         if (!$this->error) $this->core->logs->data = null;
         $this->core->errors->data = null;
         $this->sendTerminal('');
-        $this->prompt('Enter to finish');
+        if(!$this->hasOption('no-finish-prompt'))
+            $this->prompt('Enter to finish');
     }
 
     /**
@@ -72,6 +73,8 @@ class Script extends Scripts2020
         $this->organization = $org;
         //endregion
 
+        if(!$this->debug)
+            $this->core->request->sendSysLogs = false;
         if(!$this->checkCloudFrameworkUserCredentials($org)) return;
 
         if(!($tests = $this->loadTest($org))) return;
@@ -89,8 +92,9 @@ class Script extends Scripts2020
 
         $this->testId = $this->params[3];
 
-        $this->sendTerminal('Test updated by: '.$test['CloudFrameworkUser']);
-        $this->sendTerminal($test['Description']);
+        $this->sendTerminal('Running tests in: '.$this->testId);
+        $this->sendTerminal(' - Test updated by: '.$test['CloudFrameworkUser']);
+        $this->sendTerminal('   "'.$test['Description'].'"');
         $this->sendTerminal();
         $this->test = $test['JSON'];
 
@@ -106,8 +110,12 @@ class Script extends Scripts2020
         if(!isset($this->test[$area])) return($this->sendTerminal($this->params[3].'/'.$area.' does not exist in '.$org));
         //endregion
 
-        $this->runTest($area);
-
+        $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
+        for($i=1;$i<=$times;$i++) {
+            $this->sendTerminal("\n{$i}/{$times} Executing ".$this->testId.'/'.$area);
+            $this->sendTerminal("------------------------------------------------------");
+            $this->runTest($area);
+        }
     }
 
     /**
@@ -129,7 +137,7 @@ class Script extends Scripts2020
         $this->cache_secret_iv = $user_data['data']['User']['UserEmail'];
         $this->user_email = $user_data['data']['User']['UserEmail'];
         $this->user_token = $token;
-        $this->sendTerminal('user confirmed: '.$this->user_email);
+        $this->sendTerminal(' - user confirmed: '.$this->user_email."\n");
         return($user_data);
     }
 
@@ -139,8 +147,8 @@ class Script extends Scripts2020
      */
     private function generateCloudFrameworkToken() {
         $this->sendTerminal('Sign in ERP/Backoffice '.$this->params[2]);
-        $user = $this->promptVar(['title'=>' - Give me your user: ','cache_var'=>'user']);
-        $password = $this->promptVar(['title'=>' - Give me your password: ','type'=>'password']);
+        $user = $this->promptVar(['title'=>' - Give me your user','cache_var'=>'user']);
+        $password = $this->promptVar(['title'=>' - Give me your password','type'=>'password']);
 
         $url = "https://api.cloudframework.io/core/signin/{$this->params[2]}/in";
         $params = ['user'=>$user,'password'=>$password,'type'=>'userpassword'];
@@ -161,7 +169,7 @@ class Script extends Scripts2020
      */
     private function checkCloudFrameworkUserCredentials($organization) {
 
-        $this->sendTerminal('Verifying user credentials');
+        $this->sendTerminal('Verifying user credentials in CloudFramework ERP');
         // Get Cloudframework token
         $token = $this->cache->get('token');
         $user_data = [];
@@ -181,13 +189,53 @@ class Script extends Scripts2020
      */
     private function runTest($testModule) {
 
+
         if(!isset($this->test[$testModule])) return($this->addError($testModule.' does not exist'));
 
-        $this->test[$testModule]['vars']['_environment']['value']  = $this->promptVar(['title'=>'_environment','default'=>'Stage','cache_var'=>"_environment",'allowed_values'=>['Local','Stage','Production']]);
+        // Read _environment
+        if($this->hasOption('default-values')) {
+            $value = $this->getCacheVar("_environment");
+            if(!$value) {
+                $this->test[$testModule]['vars']['_environment']['value']  = $this->promptVar(['title'=>'_environment','default'=>'Stage','cache_var'=>"_environment",'allowed_values'=>['Local','Stage','Production']]);
+            } else {
+                $this->sendTerminal(' - _environment='.$value);
+                $this->test[$testModule]['vars']['_environment']['value'] = $value;
+            }
+        } else {
+            $this->test[$testModule]['vars']['_environment']['value']  = $this->promptVar(['title'=>'_environment','default'=>'Stage','cache_var'=>"_environment",'allowed_values'=>['Local','Stage','Production']]);
+        }
+
         $this->_environment = $this->test[$testModule]['vars']['_environment']['value'];
         $this->test[$testModule]['vars']['_token']['value']  = $this->cache->get('token');
 
         //region Evaluate prompt variables: "prompt_vars": { .. }
+        if(isset($this->test['_default']['prompt_vars']) && is_array($this->test['_default']['prompt_vars'])) {
+            foreach ($this->test['_default']['prompt_vars'] as $prompt=> $prompt_description) {
+                // extract mandatory values $allowed_values
+                $allowed_values = (isset($prompt_description['values']) && $prompt_description['values'] && is_array($prompt_description['values']))?$prompt_description['values']:[];
+
+                // Assign title with default value
+                $title = ((isset($prompt_description['title']))?$prompt_description['title']:$prompt);
+                $default_value = (isset($prompt_description['defaultvalue']))?$prompt_description['defaultvalue']:'';
+                $type = (isset($prompt_description['type']))?$prompt_description['type']:'any';
+
+                if($this->hasOption('default-values')) {
+                    $value = $this->getCacheVar("{$prompt}");
+                    if(!$value) $value = $default_value;
+                    if($value) {
+                        $this->sendTerminal(' - '.$title.'='.$value);
+                        $this->test[$testModule]['vars'][$prompt]['value'] = $value;
+                    }
+                    else
+                        $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+                } else {
+                    $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+                }
+
+
+            }
+        }
+
         if(isset($this->test[$testModule]['prompt_vars']) && is_array($this->test[$testModule]['prompt_vars'])) {
             foreach ($this->test[$testModule]['prompt_vars'] as $prompt=> $prompt_description) {
                 // extract mandatory values $allowed_values
@@ -197,7 +245,19 @@ class Script extends Scripts2020
                 $title = ((isset($prompt_description['title']))?$prompt_description['title']:$prompt);
                 $default_value = (isset($prompt_description['defaultvalue']))?$prompt_description['defaultvalue']:'';
                 $type = (isset($prompt_description['type']))?$prompt_description['type']:'any';
-                $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+
+                if($this->hasOption('default-values')) {
+                    $value = $this->getCacheVar("{$prompt}");
+                    if(!$value) $value = $default_value;
+                    if($value) {
+                        $this->sendTerminal(' - '.$title.'='.$value);
+                        $this->test[$testModule]['vars'][$prompt]['value'] = $value;
+                    }
+                    else
+                        $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+                } else {
+                    $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+                }
 
             }
         }
@@ -264,17 +324,21 @@ class Script extends Scripts2020
                 $time = microtime(true);
                 $ret = $this->core->request->call($url,$payload, $method,$headers,true);
                 $time = microtime(true)-$time;
-
+                $this->sendTerminal(' - Execution time '.round($time,4).' ms');
                 // prepare report
                 $report = ['method'=>$method,'url'=>$url,'payload'=>$payload,'headers'=>$headers];
                 if(isset($report['payload']['password'])) $report['payload']['password'] = '********';
                 if(isset($report['payload']['passw'])) $report['payload']['password'] = '********';
 
+                if(!$this->debug)
+                    $this->core->request->sendSysLogs = true;
                 $report ['status'] = $this->core->request->getLastResponseCode();
+                if(!$this->debug)
+                    $this->core->request->sendSysLogs = false;
                 if($this->core->request->error) {
                     $this->sendTerminal(' - RESPONSE NOT OK '.$this->core->request->getLastResponseCode());
-                    $this->sendTerminal('payload => '.json_encode($payload));
-                    $this->sendTerminal('result => '.$ret);
+                    $this->sendTerminal('   payload => '.json_encode($payload));
+                    $this->sendTerminal('   result => '.$ret);
                     $report['error'] = $this->core->request->errorMsg;
                     $error = true;
                     if($stop_on_error) {
@@ -321,7 +385,7 @@ class Script extends Scripts2020
                             else {
                                 $pointer = null;
                                 $report['check_var_'.$check_var] = 'ERROR';
-                                $this->sendTerminal(' - ERROR returned structure. Does not exist: '.$check_var.'=>'.json_encode($check_var_content));
+                                $this->sendTerminal(' - ERROR returned structure. Does not exist: '.$check_var.' => '.json_encode($check_var_content));
                                 $error = true;
                                 break;
                             }
@@ -329,6 +393,14 @@ class Script extends Scripts2020
                         if($pointer) {
                             $report['check_var_'.$check_var] = 'OK';
                             $this->sendTerminal(' - OK JSON Var exist: '.$check_var.'=>'.json_encode($check_var_content));
+                            if(isset($check_var_content['equals'])) {
+                                if($check_var_content['equals'] == $pointer) {
+                                    $this->sendTerminal(' - OK Value equals to: '.$check_var_content['equals']);
+                                } else {
+                                    $report['check_var_'.$check_var] = 'ERROR';
+                                    $error = true;
+                                }
+                            }
                         }
                         unset($pointer);
                     }

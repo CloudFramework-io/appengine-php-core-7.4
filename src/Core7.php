@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.09301';
+        var $_version = 'v73.10011';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3428,9 +3428,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public $error = false;
         public $errorMsg = [];
         public $options = null;
-        private $curl = [];
         var $rawResult = '';
         var $automaticHeaders = true; // Add automatically the following headers if exist on config: X-CLOUDFRAMEWORK-SECURITY, X-SERVER-KEY, X-SERVER-KEY, X-DS-TOKEN,X-EXTRA-INFO
+        var $sendSysLogs = true;
 
         function __construct(Core7 &$core)
         {
@@ -3688,7 +3688,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $route = $this->getServiceUrl($route);
             $this->responseHeaders = null;
 
-            $this->core->logs->sendToSysLog("request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+            if($this->sendSysLogs)
+                $this->core->logs->sendToSysLog("request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
             //syslog(LOG_INFO,"request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
             $this->core->__p->add("Request->{$verb}: ", "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
@@ -3848,8 +3849,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->addError(error_get_last());
                 $this->addError($e->getMessage());
             }
-
-            $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'),(($this->error)?'debug':'info'));
+            if($this->sendSysLogs)
+                $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'),(($this->error)?'debug':'info'));
             //syslog(($this->error)?LOG_DEBUG:LOG_INFO,"end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
             $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
@@ -4716,6 +4717,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache_secret_key = '';
         var $cache_secret_iv = '';
         var $cache_data = null;
+        var $vars = [];
 
         /**
          * Scripts constructor.
@@ -4724,14 +4726,27 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function __construct(Core7 $core, $argv=null)
         {
+
             parent::__construct($core);
             $this->argv = $argv;
+
+            // Adding $vars
+            foreach ($this->argv as $item) {
+                if(strpos($item,'--')===0 && strpos($item,'=')) {
+                    list($var,$value) = explode('=',$item,2);
+                    $this->vars[$var] = $value;
+                }
+            }
             $this->cache = &$this->core->cache;
 
         }
 
         function hasOption($option) {
             return(in_array('--'.$option, $this->argv));
+        }
+
+        function getOptionVar($option) {
+            return((isset($this->vars['--'.$option]))?$this->vars['--'.$option]:null);
         }
 
         function sendTerminal($info='') {
@@ -4813,15 +4828,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // Check default value
             if($allowed_values) $title.= ' '.json_encode($allowed_values);
             if($default) {
-                if($type=='password') $title.=" (*******)";
-                else $title.=" ({$default})";
+                if($type=='password') $title.=" (*******) :";
+                else $title.=" ({$default}) :";
+            } else {
+                $title.=' :';
             }
-            $title.=' :';
             do {
-                $ret = readline($title);
-                if(!$ret) $ret=$default;
-                $error = false;
-                if($allowed_values && !in_array($ret,$allowed_values)) $error = true;
+                if($type=='password') {
+                    system('stty -echo');
+                    echo $title;
+                    $ret = trim(fgets(STDIN));
+                    echo "\n";
+                    system('stty echo');
+                    if(!$ret) $ret=$default;
+                } else {
+                    $ret = readline($title);
+                    if(!$ret) $ret=$default;
+                }
+                $error = ($allowed_values && !in_array($ret,$allowed_values))?true:false;
             } while($error);
 
 
