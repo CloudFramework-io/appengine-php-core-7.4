@@ -19,8 +19,12 @@ class Script extends Scripts2020
     function main()
     {
 
+        $this->sendTerminal('CloudFrameworkTest v73.1002');
+        $this->sendTerminal('  -  more info in: https://www.notion.so/cloudframework/Using-CloudframeworkTest-APIs-b1808be7b8c5454ba585bc64592ccff6'."\n");
         $method = (isset($this->params[1])) ? $this->params[1] : 'default';
         if (!is_dir('./local_data')) mkdir('./local_data');
+        if (!is_dir('./local_data/cache')) mkdir('./local_data/cache');
+        if(!$this->core->config->get("core.cache.cache_path")) $this->core->config->set("core.cache.cache_path","{{rootPath}}/local_data/cache");
         $this->cache->debug = false;
 
         if($this->hasOption('debug')) $this->debug = true;
@@ -110,12 +114,16 @@ class Script extends Scripts2020
         if(!isset($this->test[$area])) return($this->sendTerminal($this->params[3].'/'.$area.' does not exist in '.$org));
         //endregion
 
+        $time = microtime(true);
         $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
         for($i=1;$i<=$times;$i++) {
             $this->sendTerminal("\n{$i}/{$times} Executing ".$this->testId.'/'.$area);
             $this->sendTerminal("------------------------------------------------------");
             $this->runTest($area);
         }
+        $time = microtime(true)-$time;
+        $this->sendTerminal("------------------------------------------------------\nTOTAL TIME TO RUN SCRIPT: ".round($time,4));
+
     }
 
     /**

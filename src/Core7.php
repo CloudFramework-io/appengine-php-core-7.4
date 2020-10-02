@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10011';
+        var $_version = 'v73.10021';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4826,7 +4826,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if($cache_var && ($cache_content = $this->getCacheVar($options['cache_var']))) $default = $cache_content;
 
             // Check default value
-            if($allowed_values) $title.= ' '.json_encode($allowed_values);
+            if($allowed_values) $title.= ' ['.implode(', ',$allowed_values).']';
             if($default) {
                 if($type=='password') $title.=" (*******) :";
                 else $title.=" ({$default}) :";
