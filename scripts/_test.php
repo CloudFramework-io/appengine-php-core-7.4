@@ -15,6 +15,7 @@ class Script extends Scripts2020
     var $user_token = '';
     var $report = [];
     var $debug = false;
+    var $total_time = 0;
 
     function main()
     {
@@ -114,15 +115,8 @@ class Script extends Scripts2020
         if(!isset($this->test[$area])) return($this->sendTerminal($this->params[3].'/'.$area.' does not exist in '.$org));
         //endregion
 
-        $time = microtime(true);
-        $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
-        for($i=1;$i<=$times;$i++) {
-            $this->sendTerminal("\n{$i}/{$times} Executing ".$this->testId.'/'.$area);
-            $this->sendTerminal("------------------------------------------------------");
-            $this->runTest($area);
-        }
-        $time = microtime(true)-$time;
-        $this->sendTerminal("------------------------------------------------------\nTOTAL TIME TO RUN SCRIPT: ".round($time,4));
+        $this->runTest($area);
+        $this->sendTerminal("------------------------------------------------------\nTOTAL TIME TO RUN SCRIPT: ".round($this->total_time,4));
 
     }
 
@@ -289,169 +283,177 @@ class Script extends Scripts2020
         }
         //endregion
 
-        $report = [];
-        //region execute "calls": [ {..},{..} ]
-        if(isset($this->test[$testModule]['calls']) && is_array($this->test[$testModule]['calls'])) {
-            foreach ($this->test[$testModule]['calls'] as $i=> $content) {
+        $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
+        for($ntimes=1;$ntimes<=$times;$ntimes++) {
+            $this->sendTerminal("\n{$ntimes}/{$times} Executing " . $this->testId . '/' . $testModule);
+            $this->sendTerminal("------------------------------------------------------");
 
-                // init report
-                $report = [];
-                $error = false;
+            $report = [];
+            //region execute "calls": [ {..},{..} ]
+            if(isset($this->test[$testModule]['calls']) && is_array($this->test[$testModule]['calls'])) {
+                foreach ($this->test[$testModule]['calls'] as $i=> $content) {
 
-                //region verify mandatory fields: $content['url']
-                if(!isset($content['url']) || !$content['url']) {
-                    $this->sendTerminal('ERROR. Missing url in call: '.$i);
-                    continue;
-                }
-                //endregion
+                    // init report
+                    $report = [];
+                    $error = false;
 
-                //region apply {{var}} substitutions in $content
-                $content_txt = json_encode($content);
-                if(strpos($content_txt,'{{') && strpos($content_txt,'}}')) {
-                    foreach ($this->test[$testModule]['vars'] as $var=> $var_content) if(strpos($content_txt,'{{'.$var)) {
-                        if(isset($this->test[$testModule]['vars'][$var]['value']))
-                            $content_txt = str_replace('{{'.$var.'}}',$this->test[$testModule]['vars'][$var]['value'],$content_txt);
+                    //region verify mandatory fields: $content['url']
+                    if(!isset($content['url']) || !$content['url']) {
+                        $this->sendTerminal('ERROR. Missing url in call: '.$i);
+                        continue;
                     }
-                    $content = json_decode($content_txt,true);
-                }
-                //endregion
+                    //endregion
 
-                //region SET: $url,$payload,$method,$headers
-                $url = $content['url'];
-                $title = (isset($content['title']) && $content['title'])? $content['title']:null;
-                $payload = (isset($content['payload']) && $content['payload'])? $content['payload']:null;
-                $method = (isset($content['method']) && in_array(strtoupper($content['method']),['GET','POST','PUT','PATCH']))?strtoupper($content['method']):'GET';
-                $headers = (isset($content['headers']) && is_array($content['headers']))?$content['headers']:null;
-                $stop_on_error = (isset($content['stop-on-error']) && $content['stop-on-error']===true)?true:false;
-                //endregion
-
-                //region GET,POST,PUT..: $url.
-                $this->sendTerminal();
-                $this->sendTerminal("{$testModule} {$title}");
-
-                $time = microtime(true);
-                $ret = $this->core->request->call($url,$payload, $method,$headers,true);
-                $time = microtime(true)-$time;
-                $this->sendTerminal(' - Execution time '.round($time,4).' ms');
-                // prepare report
-                $report = ['method'=>$method,'url'=>$url,'payload'=>$payload,'headers'=>$headers];
-                if(isset($report['payload']['password'])) $report['payload']['password'] = '********';
-                if(isset($report['payload']['passw'])) $report['payload']['password'] = '********';
-
-                if(!$this->debug)
-                    $this->core->request->sendSysLogs = true;
-                $report ['status'] = $this->core->request->getLastResponseCode();
-                if(!$this->debug)
-                    $this->core->request->sendSysLogs = false;
-                if($this->core->request->error) {
-                    $this->sendTerminal(' - RESPONSE NOT OK '.$this->core->request->getLastResponseCode());
-                    $this->sendTerminal('   payload => '.json_encode($payload));
-                    $this->sendTerminal('   result => '.$ret);
-                    $report['error'] = $this->core->request->errorMsg;
-                    $error = true;
-                    if($stop_on_error) {
-                        $this->sendReport($this->testId,$testModule,$title,'ERROR',"[{$method}] {$url}",$time,['ERROR_'.$i=>$report]);
-                        return;
+                    //region apply {{var}} substitutions in $content
+                    $content_txt = json_encode($content);
+                    if(strpos($content_txt,'{{') && strpos($content_txt,'}}')) {
+                        foreach ($this->test[$testModule]['vars'] as $var=> $var_content) if(strpos($content_txt,'{{'.$var)) {
+                            if(isset($this->test[$testModule]['vars'][$var]['value']))
+                                $content_txt = str_replace('{{'.$var.'}}',$this->test[$testModule]['vars'][$var]['value'],$content_txt);
+                        }
+                        $content = json_decode($content_txt,true);
                     }
+                    //endregion
 
-                } else {
-                    $report['result'] = json_decode($ret,true);
-                    $this->sendTerminal(' - OK '.$this->core->request->getLastResponseCode());
-                }
-                //TODO: send report to CloudFramework.
-                //endregion
+                    //region SET: $url,$payload,$method,$headers
+                    $url = $content['url'];
+                    $title = (isset($content['title']) && $content['title'])? $content['title']:null;
+                    $payload = (isset($content['payload']) && $content['payload'])? $content['payload']:null;
+                    $method = (isset($content['method']) && in_array(strtoupper($content['method']),['GET','POST','PUT','PATCH']))?strtoupper($content['method']):'GET';
+                    $headers = (isset($content['headers']) && is_array($content['headers']))?$content['headers']:null;
+                    $stop_on_error = (isset($content['stop-on-error']) && $content['stop-on-error']===true)?true:false;
+                    //endregion
 
-                //region EVALUATE status
-                if(isset($content['status']) && $content['status']) {
-                    if($this->core->request->getLastResponseCode() == $content['status']) {
-                        $report['status_'.$content['status']] = 'OK';
-                        $this->sendTerminal(' - OK Status is '.$content['status']);
-                    } else {
-                        $this->sendTerminal(' - ERROR Status is not '.$content['status']);
-                        $report['status_'.$content['status']] = 'ERROR';
+                    //region GET,POST,PUT..: $url.
+                    $this->sendTerminal();
+                    $this->sendTerminal("{$testModule} {$title}");
+
+                    $time = microtime(true);
+                    $ret = $this->core->request->call($url,$payload, $method,$headers,true);
+                    $time = microtime(true)-$time;
+                    $this->total_time+=$time;
+                    $this->sendTerminal(' - Execution time '.round($time,4).' ms');
+                    // prepare report
+                    $report = ['method'=>$method,'url'=>$url,'payload'=>$payload,'headers'=>$headers];
+                    if(isset($report['payload']['password'])) $report['payload']['password'] = '********';
+                    if(isset($report['payload']['passw'])) $report['payload']['password'] = '********';
+
+                    if(!$this->debug)
+                        $this->core->request->sendSysLogs = true;
+                    $report ['status'] = $this->core->request->getLastResponseCode();
+                    if(!$this->debug)
+                        $this->core->request->sendSysLogs = false;
+                    if($this->core->request->error) {
+                        $this->sendTerminal(' - RESPONSE NOT OK '.$this->core->request->getLastResponseCode());
+                        $this->sendTerminal('   payload => '.json_encode($payload));
+                        $this->sendTerminal('   result => '.$ret);
+                        $report['error'] = $this->core->request->errorMsg;
                         $error = true;
                         if($stop_on_error) {
                             $this->sendReport($this->testId,$testModule,$title,'ERROR',"[{$method}] {$url}",$time,['ERROR_'.$i=>$report]);
                             return;
                         }
+
+                    } else {
+                        $report['result'] = json_decode($ret,true);
+                        $this->sendTerminal(' - OK '.$this->core->request->getLastResponseCode());
                     }
-                }
-                //endregion
+                    //TODO: send report to CloudFramework.
+                    //endregion
 
-                //region EVALUATE check-json-values
-                if(isset($content['check-json-values']) && is_array($content['check-json-values'])) {
-                    $ret_array = $this->core->jsonDecode($ret);
-
-                    foreach ($content['check-json-values'] as $check_var=>$check_var_content) {
-                        $array_path = explode('.',$check_var);
-
-                        $pointer = $ret_array;
-                        foreach ($array_path as $item) {
-                            if(isset($pointer[$item])) {
-                                $pointer = &$pointer[$item];
-                            }
-                            else {
-                                $pointer = null;
-                                $report['check_var_'.$check_var] = 'ERROR';
-                                $this->sendTerminal(' - ERROR returned structure. Does not exist: '.$check_var.' => '.json_encode($check_var_content));
-                                $error = true;
-                                break;
+                    //region EVALUATE status
+                    if(isset($content['status']) && $content['status']) {
+                        if($this->core->request->getLastResponseCode() == $content['status']) {
+                            $report['status_'.$content['status']] = 'OK';
+                            $this->sendTerminal(' - OK Status is '.$content['status']);
+                        } else {
+                            $this->sendTerminal(' - ERROR Status is not '.$content['status']);
+                            $report['status_'.$content['status']] = 'ERROR';
+                            $error = true;
+                            if($stop_on_error) {
+                                $this->sendReport($this->testId,$testModule,$title,'ERROR',"[{$method}] {$url}",$time,['ERROR_'.$i=>$report]);
+                                return;
                             }
                         }
-                        if($pointer) {
-                            $report['check_var_'.$check_var] = 'OK';
-                            $this->sendTerminal(' - OK JSON Var exist: '.$check_var.'=>'.json_encode($check_var_content));
-                            if(isset($check_var_content['equals'])) {
-                                if($check_var_content['equals'] == $pointer) {
-                                    $this->sendTerminal(' - OK Value equals to: '.$check_var_content['equals']);
-                                } else {
+                    }
+                    //endregion
+
+                    //region EVALUATE check-json-values
+                    if(isset($content['check-json-values']) && is_array($content['check-json-values'])) {
+                        $ret_array = $this->core->jsonDecode($ret);
+
+                        foreach ($content['check-json-values'] as $check_var=>$check_var_content) {
+                            $array_path = explode('.',$check_var);
+
+                            $pointer = $ret_array;
+                            foreach ($array_path as $item) {
+                                if(isset($pointer[$item])) {
+                                    $pointer = &$pointer[$item];
+                                }
+                                else {
+                                    $pointer = null;
                                     $report['check_var_'.$check_var] = 'ERROR';
+                                    $this->sendTerminal(' - ERROR returned structure. Does not exist: '.$check_var.' => '.json_encode($check_var_content));
                                     $error = true;
+                                    break;
                                 }
                             }
-                        }
-                        unset($pointer);
-                    }
-                }
-                //endregion
-
-                //region EVALUATE set-run-vars
-                if(isset($content['set-run-vars']) && is_array($content['set-run-vars'])) {
-                    $ret_array = $this->core->jsonDecode($ret);
-
-                    foreach ($content['set-run-vars'] as $check_var=>$check_var_content) {
-                        $array_path = explode('.',$check_var_content);
-
-                        $pointer = &$ret_array;
-                        foreach ($array_path as $item) {
-                            if(isset($pointer[$item])) {
-                                $pointer = &$pointer[$item];
+                            if($pointer) {
+                                $report['check_var_'.$check_var] = 'OK';
+                                $this->sendTerminal(' - OK JSON Var exist: '.$check_var.'=>'.json_encode($check_var_content));
+                                if(isset($check_var_content['equals'])) {
+                                    if($check_var_content['equals'] == $pointer) {
+                                        $this->sendTerminal(' - OK Value equals to: '.$check_var_content['equals']);
+                                    } else {
+                                        $report['check_var_'.$check_var] = 'ERROR';
+                                        $error = true;
+                                    }
+                                }
                             }
-                            else {
-                                $report['set_run_var_'.$check_var] = 'ERROR';
-                                $report['set_run_var_'.$check_var.'_content'] = $check_var_content;
-                                $error = true;
-                                $pointer = null;
-                                $this->sendTerminal('  ERROR returned structure. It can not create set-run-var: '.$check_var.'=>'.$check_var_content);
-                            }
+                            unset($pointer);
                         }
-                        if($pointer) {
-                            $this->run_vars[$check_var] = ['value'=>$pointer];
-                            $this->cache->set('CloudFramework_test_run_vars_'.$this->params[1], $this->run_vars);
-                            $report['set_run_var_'.$check_var] = 'OK';
-                            $this->sendTerminal(' - OK Updated set-run-var "'.$check_var.'" <- {'.$check_var_content.'}: '.$pointer);
-                        }
-                        unset($pointer);
                     }
-                    $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
-                    $this->sendReport($this->testId,$testModule,$title,($error)?'ERROR':'OK',"[{$method}] {$url}",$time,[(($error)?'ERROR':'OK').'_'.$i=>$report]);
+                    //endregion
+
+                    //region EVALUATE set-run-vars
+                    if(isset($content['set-run-vars']) && is_array($content['set-run-vars'])) {
+                        $ret_array = $this->core->jsonDecode($ret);
+
+                        foreach ($content['set-run-vars'] as $check_var=>$check_var_content) {
+                            $array_path = explode('.',$check_var_content);
+
+                            $pointer = &$ret_array;
+                            foreach ($array_path as $item) {
+                                if(isset($pointer[$item])) {
+                                    $pointer = &$pointer[$item];
+                                }
+                                else {
+                                    $report['set_run_var_'.$check_var] = 'ERROR';
+                                    $report['set_run_var_'.$check_var.'_content'] = $check_var_content;
+                                    $error = true;
+                                    $pointer = null;
+                                    $this->sendTerminal('  ERROR returned structure. It can not create set-run-var: '.$check_var.'=>'.$check_var_content);
+                                }
+                            }
+                            if($pointer) {
+                                $this->run_vars[$check_var] = ['value'=>$pointer];
+                                $this->cache->set('CloudFramework_test_run_vars_'.$this->params[1], $this->run_vars);
+                                $report['set_run_var_'.$check_var] = 'OK';
+                                $this->sendTerminal(' - OK Updated set-run-var "'.$check_var.'" <- {'.$check_var_content.'}: '.$pointer);
+                            }
+                            unset($pointer);
+                        }
+                        $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
+                        $this->sendReport($this->testId,$testModule,$title,($error)?'ERROR':'OK',"[{$method}] {$url}",$time,[(($error)?'ERROR':'OK').'_'.$i=>$report]);
+
+                    }
+                    //endregion
 
                 }
-                //endregion
-
             }
+            //endregion
         }
-        //endregion
+
     }
 
     /**
