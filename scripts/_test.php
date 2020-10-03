@@ -20,9 +20,9 @@ class Script extends Scripts2020
     function main()
     {
 
-        $this->sendTerminal('CloudFrameworkTest v73.1002');
+        $this->sendTerminal('CloudFrameworkTest v73.1003');
         $this->sendTerminal('  -  more info in: https://www.notion.so/cloudframework/Using-CloudframeworkTest-APIs-b1808be7b8c5454ba585bc64592ccff6'."\n");
-        $method = (isset($this->params[1])) ? $this->params[1] : 'default';
+        $method = (isset($this->params[0]) && $this->params[0][0]!='-') ? $this->params[0] : 'default';
         if (!is_dir('./local_data')) mkdir('./local_data');
         if (!is_dir('./local_data/cache')) mkdir('./local_data/cache');
         if(!$this->core->config->get("core.cache.cache_path")) $this->core->config->set("core.cache.cache_path","{{rootPath}}/local_data/cache");
@@ -50,9 +50,15 @@ class Script extends Scripts2020
      */
     public function METHOD_default()
     {
-        $this->sendTerminal('Available methods:');
-        $this->sendTerminal(' - _test/erp/{your_org}  (to start erp tests)');
-        $this->sendTerminal(' - _test/clean  (clean local cache)');
+        $this->sendTerminal('Available parameters:');
+        $this->sendTerminal(' - erp/{your_org}[/{testname}/{testmodule}]  [--options] (to start erp tests)');
+        $this->sendTerminal('   options:');
+        $this->sendTerminal('      --debug: show internal calls to store the data in the ERP');
+        $this->sendTerminal('      --default-values: does not prompt a variable if it has default values or values have previously written.');
+        $this->sendTerminal('      --no-finish-prompt: avoid to confirm a prompt when finish the script');
+        $this->sendTerminal('      --repeat=n: repeat the test n times.');
+
+        $this->sendTerminal(' - clean  (clean local cache)');
     }
 
     /**
@@ -71,10 +77,10 @@ class Script extends Scripts2020
 
 
         //region SET $area
-        if(!isset($this->params[2]) || !$this->params[2]) {
-            $this->params[2] = $this->prompt('Write the name of your organization _test/erp/');
+        if(!isset($this->params[1]) || !$this->params[1]) {
+            $this->params[2] = $this->prompt('Write the name of your organization erp/');
         }
-        $org = $this->params[2];
+        $org = $this->params[1];
         $this->organization = $org;
         //endregion
 
@@ -86,35 +92,44 @@ class Script extends Scripts2020
         $this->run_vars = ($this->cache->get('CloudFramework_test_run_vars_'.$org))?:[];
 
         //region SET $area
-        if(!isset($this->params[3]) || !$this->params[3]) {
+        if(!isset($this->params[2]) || !$this->params[2]) {
             $this->sendTerminal('You can Use:');
             foreach ($tests as $key) if($key[0]!='_') {
-                $this->sendTerminal('  - _test/erp/'.$org.'/'.urlencode($key));
+                $this->sendTerminal('  - erp/'.$org.'/'.urlencode($key));
             }
-            $this->params[3] = $this->prompt('Select area to test _test/erp/'.$org.'/');
+            do{
+                $this->params[2] = $this->prompt('    WRITE WHICH TEST YOU WANT: erp/'.$org.'/');
+            } while(!$this->params[2] || !in_array($this->params[2],$tests));
+
+            $this->sendTerminal('');
         }
-        if(!($test = $this->loadTest($org,$this->params[3]))) return;
+        if(!($test = $this->loadTest($org,$this->params[2]))) return;
 
-        $this->testId = $this->params[3];
+        $this->testId = $this->params[2];
 
-        $this->sendTerminal('Running tests in: '.$this->testId);
-        $this->sendTerminal(' - Test updated by: '.$test['CloudFrameworkUser']);
-        $this->sendTerminal('   "'.$test['Description'].'"');
+        $this->sendTerminal('TESTNAME: '.$this->testId);
+        $this->sendTerminal('  Test updated by: '.$test['CloudFrameworkUser']);
+        $this->sendTerminal('  '.$test['Description'].'');
+        $this->sendTerminal('  ----------------');
         $this->sendTerminal();
         $this->test = $test['JSON'];
 
         //region set $test
-        if(!isset($this->params[4]) || !$this->params[4]) {
-            $this->sendTerminal('You can Use:');
+        if(!isset($this->params[3]) || !$this->params[3]) {
+            $this->sendTerminal('  You can Use:');
             foreach ($this->test as $key=>$foo) if($key[0]!='_') {
-                $this->sendTerminal('  - _test/erp/'.$org.'/'.$this->params[3].'/'.$key);
+                $this->sendTerminal('  - erp/'.$org.'/'.$this->params[2].'/'.$key);
             }
-            $this->params[4] = $this->prompt('Select area to test _test/erp/'.$org.'/'.$this->params[3].'/');
+            do {
+                $this->params[3] = $this->prompt('    WRITE WHICH TESTMODULE YOU WANT: erp/'.$org.'/'.$this->params[2].'/');
+            } while(!$this->params[3] || !key_exists($this->params[3],$this->test));
+            $this->sendTerminal();
         }
-        $area = $this->params[4];
-        if(!isset($this->test[$area])) return($this->sendTerminal($this->params[3].'/'.$area.' does not exist in '.$org));
+        $area = $this->params[3];
+        if(!isset($this->test[$area])) return($this->sendTerminal($this->params[2].'/'.$area.' does not exist in '.$org));
         //endregion
 
+        $this->sendTerminal("TESTMODULE: {$area}");
         $this->runTest($area);
         $this->sendTerminal("------------------------------------------------------\nTOTAL TIME TO RUN SCRIPT: ".round($this->total_time,4));
 
@@ -148,11 +163,11 @@ class Script extends Scripts2020
      * @return bool[]|false[]|mixed|string[]|null
      */
     private function generateCloudFrameworkToken() {
-        $this->sendTerminal('Sign in ERP/Backoffice '.$this->params[2]);
+        $this->sendTerminal('Sign in ERP/Backoffice '.$this->params[1]);
         $user = $this->promptVar(['title'=>' - Give me your user','cache_var'=>'user']);
         $password = $this->promptVar(['title'=>' - Give me your password','type'=>'password']);
 
-        $url = "https://api.cloudframework.io/core/signin/{$this->params[2]}/in";
+        $url = "https://api.cloudframework.io/core/signin/{$this->params[1]}/in";
         $params = ['user'=>$user,'password'=>$password,'type'=>'userpassword'];
         $user_data = $this->core->request->post_json_decode($url,$params,['X-WEB-KEY'=>'Production']);
         if($this->core->request->error) {
@@ -204,7 +219,7 @@ class Script extends Scripts2020
                 $this->test[$testModule]['vars']['_environment']['value'] = $value;
             }
         } else {
-            $this->test[$testModule]['vars']['_environment']['value']  = $this->promptVar(['title'=>'_environment','default'=>'Stage','cache_var'=>"_environment",'allowed_values'=>['Local','Stage','Production']]);
+            $this->test[$testModule]['vars']['_environment']['value']  = $this->promptVar(['title'=>'  _environment','default'=>'Stage','cache_var'=>"_environment",'allowed_values'=>['Local','Stage','Production']]);
         }
 
         $this->_environment = $this->test[$testModule]['vars']['_environment']['value'];
@@ -229,9 +244,9 @@ class Script extends Scripts2020
                         $this->test[$testModule]['vars'][$prompt]['value'] = $value;
                     }
                     else
-                        $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+                        $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>'  '.$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
                 } else {
-                    $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
+                    $this->test[$testModule]['vars'][$prompt]['value']  = $this->promptVar(['title'=>'  '.$title,'default'=>$default_value,'cache_var'=>"{$prompt}",'allowed_values'=>$allowed_values,'type'=>$type]);
                 }
 
 
@@ -285,7 +300,7 @@ class Script extends Scripts2020
 
         $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
         for($ntimes=1;$ntimes<=$times;$ntimes++) {
-            $this->sendTerminal("\n{$ntimes}/{$times} Executing " . $this->testId . '/' . $testModule);
+            $this->sendTerminal("\n{$ntimes}/{$times} EXECUTING " . $this->testId . '/' . $testModule);
             $this->sendTerminal("------------------------------------------------------");
 
             $report = [];

@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10022';
+        var $_version = 'v73.10031';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1206,7 +1206,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(null !== $this->cache) return(is_object($this->cache));
 
             if($this->debug)
-                $this->log->add("init(). type: {$this->type} spacename: {$this->spacename}",'CoreCache');
+                $this->log->add("init(). type: {$this->type}",'CoreCache');
 
             if ($this->type == 'memory') {
                 if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
