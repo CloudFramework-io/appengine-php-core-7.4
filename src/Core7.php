@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10031';
+        var $_version = 'v73.10071';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -136,7 +136,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
             //setup GCP basic vars
-            if($this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
+            if(!getenv('PROJECT_ID') && $this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
             $this->gc_project_id = getenv('PROJECT_ID');
             $this->gc_project_service = ($this->config->get('core.gcp.project_service'))?$this->config->get('core.gcp.project_service'):'default';
 
@@ -1303,8 +1303,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 // decrypt data if $cache_secret_key and $cache_secret_iv are not empty
                 if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
 
-                if($info['_data_']) return (unserialize(gzuncompress($info['_data_'])));
-                else return null;
+                // unserialize vars
+                try {
+                    $ret = ($info['_data_'])?unserialize(gzuncompress($info['_data_'])):null;
+                } catch (Exception $e) {
+                    $ret = null;
+                }
+                return $ret;
+
 
             } else {
                 if($this->debug) $this->log->add("get($key,$expireTime,$hash) failed (beacause it does not exist) token: ".$this->spacename . '-' . $key,'CoreCache');
@@ -3862,6 +3868,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $this->call($route, $data, 'DELETE', $extra_headers);
         }
 
+        /*
+         * Returns the status number of the last call
+         */
         function getLastResponseCode()
         {
             $code = null;
@@ -3872,7 +3881,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
-        // time, has to to be microtime().
+        /**
+         * Generate a CloudFrameWork SecurityS tring to be used with a API with CloudFramework Technology
+         * @param $id
+         * @param string $time time, has to to be microtime()
+         * @param string $secret
+         * @return string|null
+         * @throws Exception
+         */
         function generateCloudFrameWorkSecurityString($id, $time = '', $secret = '')
         {
             $ret = null;
@@ -3891,6 +3907,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             return $ret;
         }
+
         /**
          * @param string $url
          * @param int $format
@@ -3904,55 +3921,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->errors->add(error_get_last()['message']);
             }
             return $headers;
-
-            /*
-            $url_info=parse_url($url);
-            if (isset($url_info['scheme']) && $url_info['scheme'] == 'https') {
-                $port = 443;
-                $fp= @fsockopen('ssl://'.$url_info['host'], $port, $errno, $errstr, 30);
-            } else {
-                $port = isset($url_info['port']) ? $url_info['port'] : 80;
-                $fp = @fsockopen($url_info['host'], $port, $errno, $errstr, 30);
-
-            }
-            if($fp)
-            {
-                $head = "HEAD ".@$url_info['path']."?".@$url_info['query']." HTTP/1.0\r\nHost: ".@$url_info['host']."\r\n\r\n";
-                fputs($fp, $head);
-                while(!feof($fp))
-                {
-                    if($header=trim(fgets($fp, 1024)))
-                    {
-                        if($format == 1)
-                        {
-                            $key = array_shift(explode(':',$header));
-                            // the first element is the http header type, such as HTTP 200 OK,
-                            // it doesn't have a separate name, so we have to check for it.
-                            if($key == $header)
-                            {
-                                $headers[] = $header;
-                            }
-                            else
-                            {
-                                $headers[$key]=substr($header,strlen($key)+2);
-                            }
-                            unset($key);
-                        }
-                        else
-                        {
-                            $headers[] = $header;
-                        }
-                    }
-                }
-                fclose($fp);
-                return $headers;
-            }
-            else
-            {
-                $this->core->errors->add(error_get_last());
-                return false;
-            }
-            */
         }
 
         /**
@@ -4034,16 +4002,23 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $ret;
         }
 
-        function sendCorsHeaders($methods = 'GET,POST,PUT', $origin = '')
+        /**
+         * Send Cors headers to allow AJAX calls
+         * @param string $methods
+         * @param string $origin
+         * @param string $extra_headers
+         */
+        function sendCorsHeaders($methods = 'GET,POST,PUT', $origin = '',$extra_headers='')
         {
 
+            if($extra_headers) $extra_headers = ','.$extra_headers;
             // Rules for Cross-Domain AJAX
             // https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
             // $origin =((strlen($_SERVER['HTTP_ORIGIN']))?preg_replace('/\/$/', '', $_SERVER['HTTP_ORIGIN']):'*')
             if (!strlen($origin)) $origin = ((strlen($_SERVER['HTTP_ORIGIN'])) ? preg_replace('/\/$/', '', $_SERVER['HTTP_ORIGIN']) : '*');
             header("Access-Control-Allow-Origin: $origin");
             header("Access-Control-Allow-Methods: $methods");
-            header("Access-Control-Allow-Headers: Content-Type,Authorization,X-CloudFrameWork-AuthToken,X-CLOUDFRAMEWORK-SECURITY,X-DS-TOKEN,X-REST-TOKEN,X-EXTRA-INFO,X-WEB-KEY,X-SERVER-KEY,X-REST-USERNAME,X-REST-PASSWORD,X-APP-KEY,cache-control,x-requested-with");
+            header("Access-Control-Allow-Headers: Content-Type,Authorization,X-CloudFrameWork-AuthToken,X-CLOUDFRAMEWORK-SECURITY,X-DS-TOKEN,X-REST-TOKEN,X-EXTRA-INFO,X-WEB-KEY,X-SERVER-KEY,X-REST-USERNAME,X-REST-PASSWORD,X-APP-KEY,cache-control,x-requested-with".$extra_headers);
             header("Access-Control-Allow-Credentials: true");
             header('Access-Control-Max-Age: 1000');
 
@@ -4057,6 +4032,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
 
+        /**
+         * Returns a specific Header received in a API call
+         * @param $str
+         * @return mixed|string
+         */
         function getHeader($str)
         {
             $str = strtoupper($str);
@@ -4064,6 +4044,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return ((isset($_SERVER['HTTP_' . $str])) ? $_SERVER['HTTP_' . $str] : '');
         }
 
+        /**
+         * Return all headers received in a API call
+         * @return array
+         */
         function getHeaders()
         {
             $ret = array();
@@ -4071,6 +4055,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $ret[str_replace('HTTP_', '', $key)] = $value;
             }
             return ($ret);
+        }
+
+        /**
+         * Reset $this->errorMsg and $this->error vars
+         */
+        function reset() {
+            $this->errorMsg = [];
+            $this->error = false;
         }
 
 

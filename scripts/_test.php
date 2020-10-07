@@ -42,7 +42,7 @@ class Script extends Scripts2020
         $this->core->errors->data = null;
         $this->sendTerminal('');
         if(!$this->hasOption('no-finish-prompt'))
-            $this->prompt('Enter to finish');
+            $this->prompt('[Enter to finish]');
     }
 
     /**
@@ -201,6 +201,39 @@ class Script extends Scripts2020
     }
 
     /**
+     * Search for {{vars}} strings in $vars and take $var_values as an array of values
+     * @param $var
+     * @param $var_values
+     */
+    private function replaceVars(&$var,&$var_values) {
+        if( is_string($var) && preg_match('/\{\{([^\}]*)\}\}/',$var,$preg_matches)) {
+            do {
+                $replace_var = trim($preg_matches[1]);
+                $value = null;
+                if (strpos($replace_var, '.')) {
+                    list($array_var, $replace_var) = explode('.', $replace_var, 2);
+                    $var_value = (isset($var_values[$array_var]['value'])) ? $var_values[$array_var]['value'] : [];
+                    while (strpos($replace_var, '.')) {
+                        list($array_var, $replace_var) = explode('.', $replace_var, 2);
+                        $var_value = (isset($var_value[$array_var])) ? $var_value[$array_var] : [];
+                    }
+                    $value = (isset($var_value[$replace_var])) ? $var_value[$replace_var] : '_not_found_';
+                } else {
+                    $value = (isset($var_values[$replace_var]['value'])) ? $var_values[$replace_var]['value'] : '_not_found_';
+                }
+
+                if($value=='_not_found') {
+                    $this->sendTerminal("\n----\nError replacing variable: {$var}");
+                    exit;
+                }
+
+
+                $var = str_replace($preg_matches[0], $value, $var);
+            } while (preg_match('/\{\{([^\}]*)\}\}/', $var, $preg_matches));
+        }
+    }
+
+    /**
      * Execute a test previously readed
      * @param $testModule
      */
@@ -286,16 +319,31 @@ class Script extends Scripts2020
 
         $this->test[$testModule]['vars'] = array_merge($this->test['_default']['vars'],$this->test[$testModule]['vars']);
         $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
-        if(isset($this->test[$testModule]['vars'])) {
-            $vars_txt = json_encode($this->test[$testModule]['vars']);
-            if(strpos($vars_txt,'{{') && strpos($vars_txt,'}}')) {
-                foreach ($this->test[$testModule]['vars'] as $var=> $content) if(strpos($vars_txt,'{{'.$var)) {
-                    if(isset($this->test[$testModule]['vars'][$var]['value']))
-                        $vars_txt = str_replace('{{'.$var.'}}',$this->test[$testModule]['vars'][$var]['value'],$vars_txt);
-                }
-                $this->test[$testModule]['vars'] = json_decode($vars_txt,true);
+
+        //region REPLACE {{random:vars}} {{vars}}
+        //looking for {{random:vars}}. Only one tag is allowed by var
+        if(is_array($this->test[$testModule]['vars'] ))
+        foreach ($this->test[$testModule]['vars'] as $var=> $content) if( preg_match('/\{\{random:([^\}]*)\}\}/',$content['value'],$preg_matches)) {
+            $random_var = trim(strtolower($preg_matches[1]));
+            $url = "https://api.cloudframework.io/core/tests/{$this->organization}/{$this->testId}/random";
+            $data = ['lang'=>'es','var'=>$random_var];
+            $random_data = $this->core->request->get_json_decode($url,$data,['X-WEB-KEY'=>'Production','X-DS-TOKEN'=>$this->user_token]);
+            $random_value = (isset($random_data['data']))?$random_data['data']:null;
+            if($this->core->request->error) {
+                $this->sendTerminal('  ERROR calling random service in var: '.$random_var);
+                $this->sendTerminal($this->core->request->errorMsg);
+                return;
             }
+            $this->test[$testModule]['vars'][$var]['value'] = $random_value;
         }
+
+        // Looking for {{vars}} values to replace it.
+        if(is_array($this->test[$testModule]['vars'] ))
+        foreach ($this->test[$testModule]['vars'] as $var=>$content) if( is_string($content['value']) && preg_match('/\{\{([^\}]*)\}\}/',$content['value'],$preg_matches)) {
+            $this->replaceVars($content['value'],$this->test[$testModule]['vars']);
+            $this->test[$testModule]['vars'][$var] = $content;
+        }
+
         //endregion
 
         $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
@@ -321,13 +369,8 @@ class Script extends Scripts2020
 
                     //region apply {{var}} substitutions in $content
                     $content_txt = json_encode($content);
-                    if(strpos($content_txt,'{{') && strpos($content_txt,'}}')) {
-                        foreach ($this->test[$testModule]['vars'] as $var=> $var_content) if(strpos($content_txt,'{{'.$var)) {
-                            if(isset($this->test[$testModule]['vars'][$var]['value']))
-                                $content_txt = str_replace('{{'.$var.'}}',$this->test[$testModule]['vars'][$var]['value'],$content_txt);
-                        }
-                        $content = json_decode($content_txt,true);
-                    }
+                    $this->replaceVars($content_txt,$this->test[$testModule]['vars']);
+                    $content = json_decode($content_txt,true);
                     //endregion
 
                     //region SET: $url,$payload,$method,$headers
@@ -343,11 +386,16 @@ class Script extends Scripts2020
                     $this->sendTerminal();
                     $this->sendTerminal("{$testModule} {$title}");
 
+                    $this->sendTerminal("  [{$method}] {$url}");
+                    $this->sendTerminal("  payload: ".json_encode($payload));
+                    $this->sendTerminal("  headers: ".json_encode($headers));
+
+
                     $time = microtime(true);
                     $ret = $this->core->request->call($url,$payload, $method,$headers,true);
                     $time = microtime(true)-$time;
                     $this->total_time+=$time;
-                    $this->sendTerminal(' - Execution time '.round($time,4).' ms');
+                    $this->sendTerminal('   - Execution time '.round($time,4).' ms');
                     // prepare report
                     $report = ['method'=>$method,'url'=>$url,'payload'=>$payload,'headers'=>$headers];
                     if(isset($report['payload']['password'])) $report['payload']['password'] = '********';
@@ -359,9 +407,8 @@ class Script extends Scripts2020
                     if(!$this->debug)
                         $this->core->request->sendSysLogs = false;
                     if($this->core->request->error) {
-                        $this->sendTerminal(' - RESPONSE NOT OK '.$this->core->request->getLastResponseCode());
-                        $this->sendTerminal('   payload => '.json_encode($payload));
-                        $this->sendTerminal('   result => '.$ret);
+                        $this->sendTerminal('   - RESPONSE NOT OK '.$this->core->request->getLastResponseCode());
+                        $this->sendTerminal('     result => '.$ret);
                         $report['error'] = $this->core->request->errorMsg;
                         $error = true;
                         if($stop_on_error) {
@@ -371,7 +418,7 @@ class Script extends Scripts2020
 
                     } else {
                         $report['result'] = json_decode($ret,true);
-                        $this->sendTerminal(' - OK '.$this->core->request->getLastResponseCode());
+                        $this->sendTerminal('   - OK '.$this->core->request->getLastResponseCode());
                     }
                     //TODO: send report to CloudFramework.
                     //endregion
@@ -380,9 +427,9 @@ class Script extends Scripts2020
                     if(isset($content['status']) && $content['status']) {
                         if($this->core->request->getLastResponseCode() == $content['status']) {
                             $report['status_'.$content['status']] = 'OK';
-                            $this->sendTerminal(' - OK Status is '.$content['status']);
+                            $this->sendTerminal('   - OK Status is '.$content['status']);
                         } else {
-                            $this->sendTerminal(' - ERROR Status is not '.$content['status']);
+                            $this->sendTerminal('   - ERROR Status is not '.$content['status']);
                             $report['status_'.$content['status']] = 'ERROR';
                             $error = true;
                             if($stop_on_error) {
@@ -407,23 +454,26 @@ class Script extends Scripts2020
                                 }
                                 else {
                                     $pointer = null;
-                                    $report['check_var_'.$check_var] = 'ERROR';
-                                    $this->sendTerminal(' - ERROR returned structure. Does not exist: '.$check_var.' => '.json_encode($check_var_content));
-                                    $error = true;
                                     break;
                                 }
                             }
                             if($pointer) {
-                                $report['check_var_'.$check_var] = 'OK';
-                                $this->sendTerminal(' - OK JSON Var exist: '.$check_var.'=>'.json_encode($check_var_content));
                                 if(isset($check_var_content['equals'])) {
                                     if($check_var_content['equals'] == $pointer) {
-                                        $this->sendTerminal(' - OK Value equals to: '.$check_var_content['equals']);
+                                        $this->sendTerminal('   - OK check-json-values: ['.$check_var.'] equals to '.$pointer);
                                     } else {
-                                        $report['check_var_'.$check_var] = 'ERROR';
+                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var_content['equals']." != {$pointer}";
+                                        $this->sendTerminal('   - ERROR check-json-values: ['.$check_var.'] '.$check_var_content['equals'].' != '.$pointer);
                                         $error = true;
                                     }
+                                } else {
+                                    $report['check_var_'.$check_var] = 'OK';
+                                    $this->sendTerminal('   - OK check-json-values exist: '.$check_var.'=>'.json_encode($check_var_content));
                                 }
+                            } else {
+                                $report['check_var_'.$check_var] = 'ERROR';
+                                $this->sendTerminal('   - ERROR check-json-values '.$check_var.' => it does not exist: '.json_encode($check_var_content));
+                                $error = true;
                             }
                             unset($pointer);
                         }
@@ -447,20 +497,26 @@ class Script extends Scripts2020
                                     $report['set_run_var_'.$check_var.'_content'] = $check_var_content;
                                     $error = true;
                                     $pointer = null;
-                                    $this->sendTerminal('  ERROR returned structure. It can not create set-run-var: '.$check_var.'=>'.$check_var_content);
+                                    $this->sendTerminal('    ERROR returned structure. It can not create set-run-var: '.$check_var.'=>'.$check_var_content);
                                 }
                             }
                             if($pointer) {
                                 $this->run_vars[$check_var] = ['value'=>$pointer];
                                 $this->cache->set('CloudFramework_test_run_vars_'.$this->params[1], $this->run_vars);
                                 $report['set_run_var_'.$check_var] = 'OK';
-                                $this->sendTerminal(' - OK Updated set-run-var "'.$check_var.'" <- {'.$check_var_content.'}: '.$pointer);
+                                $this->sendTerminal('   - OK Updated set-run-var "'.$check_var.'" <- {'.$check_var_content.'}: '.$pointer);
+                            } else {
+                                $report['set_run_var_'.$check_var] = 'ERROR';
+                                $report['set_run_var_'.$check_var.'_content'] = $check_var_content;
+                                $error = true;
+                                $pointer = null;
+                                $this->sendTerminal('    ERROR returned structure. It can not create set-run-var: '.$check_var.'=>'.$check_var_content);
                             }
                             unset($pointer);
                         }
                         $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
                         $this->sendReport($this->testId,$testModule,$title,($error)?'ERROR':'OK',"[{$method}] {$url}",$time,[(($error)?'ERROR':'OK').'_'.$i=>$report]);
-
+                        $this->core->errors->add($testModule);
                     }
                     //endregion
 
