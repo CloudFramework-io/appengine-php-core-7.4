@@ -369,7 +369,7 @@ class Script extends Scripts2020
 
                     //region SET: $url,$payload,$method,$headers
                     $url = $content['url'];
-                    $title = (isset($content['title']) && $content['title'])? $content['title']:null;
+                    $title = (isset($content['title']) && $content['title'])? $content['title']:$i;
                     $payload = (isset($content['payload']) && $content['payload'])? $content['payload']:null;
                     $method = (isset($content['method']) && in_array(strtoupper($content['method']),['GET','POST','PUT','PATCH']))?strtoupper($content['method']):'GET';
                     $headers = (isset($content['headers']) && is_array($content['headers']))?$content['headers']:null;
@@ -378,7 +378,7 @@ class Script extends Scripts2020
 
                     //region GET,POST,PUT..: $url.
                     $this->sendTerminal();
-                    $this->sendTerminal("{$testModule} {$title}");
+                    $this->sendTerminal("  #[{$testModule}]/".strtoupper($title));
 
                     $this->sendTerminal("  [{$method}] {$url}");
                     $this->sendTerminal("  payload: ".json_encode($payload));
@@ -454,12 +454,23 @@ class Script extends Scripts2020
                                 }
                             }
                             if($pointer!== null) {
-                                if(isset($check_var_content['equalsto'])) {
-                                    if($check_var_content['equalsto'] == $pointer) {
-                                        $this->sendTerminal('   - OK check-json-values: ['.$check_var.'] equals to '.$pointer);
+                                if(isset($check_var_content['equals'])) {
+                                    if((is_array($check_var_content['equals']) && in_array($pointer,$check_var_content['equals'])) || $check_var_content['equals'] == $pointer) {
+                                        $this->sendTerminal('   - OK check-json-values: ['.$check_var.'] value is '.$pointer.' and it [equals] '.((is_array($check_var_content['equals']))?json_encode($check_var_content['equals']):$check_var_content['equals']));
                                     } else {
-                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var.' value is '.$check_var_content['equalsto']." and it is not [equalsto] {$pointer}";
-                                        $this->sendTerminal('   - ERROR check-json-values: ['.$check_var.' value is '.$check_var.'] '.$check_var_content['equalsto'].' and it is not [equalsto] '.$pointer);
+                                        $report['check_var_'.$check_var] = '   - ERROR check-json-values: ['.$check_var.'] value is '.$pointer.' and it does not [equals] '.((is_array($check_var_content['equals']))?json_encode($check_var_content['equals']):$check_var_content['equals']);
+                                        $this->sendTerminal('   - ERROR check-json-values: ['.$check_var.'] value is '.$pointer.' and it does not [equals] '.((is_array($check_var_content['equals']))?json_encode($check_var_content['equals']):$check_var_content['equals']));
+
+                                        $error = true;
+                                    }
+                                }
+
+                                if(isset($check_var_content['doesnotequal'])) {
+                                    if((is_array($check_var_content['doesnotequal']) && !in_array($pointer,$check_var_content['doesnotequal'])) || $check_var_content['doesnotequal'] != $pointer) {
+                                        $this->sendTerminal('   - OK check-json-values: ['.$check_var.'] value is '.$pointer.' and it [doesnotequal] '.((is_array($check_var_content['doesnotequal']))?json_encode($check_var_content['doesnotequal']):$check_var_content['doesnotequal']));
+                                    } else {
+                                        $report['check_var_'.$check_var] = '   - ERROR check-json-values: ['.$check_var.'] value is '.$pointer.' and it does not [doesnotequal] '.((is_array($check_var_content['doesnotequal']))?json_encode($check_var_content['doesnotequal']):$check_var_content['doesnotequal']);
+                                        $this->sendTerminal('   - ERROR check-json-values: ['.$check_var.'] value is '.$pointer.' and it does not [doesnotequal] '.((is_array($check_var_content['doesnotequal']))?json_encode($check_var_content['doesnotequal']):$check_var_content['doesnotequal']));
                                         $error = true;
                                     }
                                 }
@@ -557,7 +568,9 @@ class Script extends Scripts2020
                         $this->sendReport($this->testId,$testModule,$title,($error)?'ERROR':'OK',"[{$method}] {$url}",$time,[(($error)?'ERROR':'OK').'_'.$i=>$report]);
                     }
                     //endregion
-
+                    if($error) {
+                        $this->core->errors->add($testModule);
+                    }
                     // Stop calls if $stop_on_error && $error
                     if($error && $stop_on_error) {
                         return;
