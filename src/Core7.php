@@ -1305,7 +1305,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                 // unserialize vars
                 try {
-                    $ret = ($info['_data_'])?unserialize(gzuncompress($info['_data_'])):null;
+                    $ret = ($info['_data_'])?@unserialize(@gzuncompress($info['_data_'])):null;
                 } catch (Exception $e) {
                     $ret = null;
                 }

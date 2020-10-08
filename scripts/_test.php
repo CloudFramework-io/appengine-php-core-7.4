@@ -21,7 +21,8 @@ class Script extends Scripts2020
     {
 
         $this->sendTerminal('CloudFrameworkTest v73.1003');
-        $this->sendTerminal('  -  more info in: https://www.notion.so/cloudframework/Using-CloudframeworkTest-APIs-b1808be7b8c5454ba585bc64592ccff6'."\n");
+        $this->sendTerminal('  -  more info in: https://www.notion.so/cloudframework/Using-CloudframeworkTest-APIs-b1808be7b8c5454ba585bc64592ccff6');
+        $this->sendTerminal('  -  accepted flags: --debug --default-values --repeat=n'."\n");
         $method = (isset($this->params[0]) && $this->params[0][0]!='-') ? $this->params[0] : 'default';
         if (!is_dir('./local_data')) mkdir('./local_data');
         if (!is_dir('./local_data/cache')) mkdir('./local_data/cache');
@@ -37,12 +38,6 @@ class Script extends Scripts2020
             return ($this->setErrorFromCodelib('params-error', "/{$method} is not implemented"));
         }
 
-        // Clean-up logs when everything is OK.
-        if (!$this->error) $this->core->logs->data = null;
-        $this->core->errors->data = null;
-        $this->sendTerminal('');
-        if(!$this->hasOption('no-finish-prompt'))
-            $this->prompt('[Enter to finish]');
     }
 
     /**
@@ -55,9 +50,7 @@ class Script extends Scripts2020
         $this->sendTerminal('   options:');
         $this->sendTerminal('      --debug: show internal calls to store the data in the ERP');
         $this->sendTerminal('      --default-values: does not prompt a variable if it has default values or values have previously written.');
-        $this->sendTerminal('      --no-finish-prompt: avoid to confirm a prompt when finish the script');
         $this->sendTerminal('      --repeat=n: repeat the test n times.');
-
         $this->sendTerminal(' - clean  (clean local cache)');
     }
 
@@ -132,7 +125,6 @@ class Script extends Scripts2020
         $this->sendTerminal("TESTMODULE: {$area}");
         $this->runTest($area);
         $this->sendTerminal("------------------------------------------------------\nTOTAL TIME TO RUN SCRIPT: ".round($this->total_time,4));
-
     }
 
     /**
@@ -323,7 +315,7 @@ class Script extends Scripts2020
         //region REPLACE {{random:vars}} {{vars}}
         //looking for {{random:vars}}. Only one tag is allowed by var
         if(is_array($this->test[$testModule]['vars'] ))
-        foreach ($this->test[$testModule]['vars'] as $var=> $content) if( preg_match('/\{\{random:([^\}]*)\}\}/',$content['value'],$preg_matches)) {
+        foreach ($this->test[$testModule]['vars'] as $var=>$content) if( isset($content['value']) && is_string($content['value']) && preg_match('/\{\{random:([^\}]*)\}\}/',$content['value'],$preg_matches)) {
             $random_var = trim(strtolower($preg_matches[1]));
             $url = "https://api.cloudframework.io/core/tests/{$this->organization}/{$this->testId}/random";
             $data = ['lang'=>'es','var'=>$random_var];
@@ -339,11 +331,13 @@ class Script extends Scripts2020
 
         // Looking for {{vars}} values to replace it.
         if(is_array($this->test[$testModule]['vars'] ))
-        foreach ($this->test[$testModule]['vars'] as $var=>$content) if( is_string($content['value']) && preg_match('/\{\{([^\}]*)\}\}/',$content['value'],$preg_matches)) {
+        foreach ($this->test[$testModule]['vars'] as $var=>$content) if( isset($content['value']) && is_string($content['value']) && preg_match('/\{\{([^\}]*)\}\}/',$content['value'],$preg_matches)) {
             $this->replaceVars($content['value'],$this->test[$testModule]['vars']);
             $this->test[$testModule]['vars'][$var] = $content;
+        } elseif(!isset($content['value'])) {
+            $this->sendTerminal('   ERROR. Missing value attribute in definition of var: '.$var);
+            return;
         }
-
         //endregion
 
         $times = ($this->getOptionVar('repeat'))?intval($this->getOptionVar('repeat')):1;
@@ -400,6 +394,7 @@ class Script extends Scripts2020
                     $report = ['method'=>$method,'url'=>$url,'payload'=>$payload,'headers'=>$headers];
                     if(isset($report['payload']['password'])) $report['payload']['password'] = '********';
                     if(isset($report['payload']['passw'])) $report['payload']['password'] = '********';
+                    if(isset($report['payload']['credentials'])) $report['payload']['credentials'] = '********';
 
                     if(!$this->debug)
                         $this->core->request->sendSysLogs = true;
@@ -413,6 +408,7 @@ class Script extends Scripts2020
                         $error = true;
                         if($stop_on_error) {
                             $this->sendReport($this->testId,$testModule,$title,'ERROR',"[{$method}] {$url}",$time,['ERROR_'.$i=>$report]);
+                            $this->core->errors->add('ERROR');
                             return;
                         }
 
@@ -457,16 +453,59 @@ class Script extends Scripts2020
                                     break;
                                 }
                             }
-                            if($pointer) {
-                                if(isset($check_var_content['equals'])) {
-                                    if($check_var_content['equals'] == $pointer) {
+                            if($pointer!== null) {
+                                if(isset($check_var_content['equalsto'])) {
+                                    if($check_var_content['equalsto'] == $pointer) {
                                         $this->sendTerminal('   - OK check-json-values: ['.$check_var.'] equals to '.$pointer);
                                     } else {
-                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var_content['equals']." != {$pointer}";
-                                        $this->sendTerminal('   - ERROR check-json-values: ['.$check_var.'] '.$check_var_content['equals'].' != '.$pointer);
+                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var.' value is '.$check_var_content['equalsto']." and it is not [equalsto] {$pointer}";
+                                        $this->sendTerminal('   - ERROR check-json-values: ['.$check_var.' value is '.$check_var.'] '.$check_var_content['equalsto'].' and it is not [equalsto] '.$pointer);
                                         $error = true;
                                     }
-                                } else {
+                                }
+
+                                if(isset($check_var_content['greaterthan'])) {
+                                    if($pointer > $check_var_content['greaterthan']) {
+                                        $this->sendTerminal('   - OK check-json-values: '.$check_var.' value is '.$pointer.' and it is [greaterthan] '.$check_var_content['greaterthan']);
+                                    } else {
+                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var.' value is '.$pointer.' is not [greaterthan] '.$check_var_content['greaterthan'];
+                                        $this->sendTerminal('   - ERROR check-json-values: '.$check_var.' value is '.$pointer.' is not [greaterthan] '.$check_var_content['greaterthan']);
+                                        $error = true;
+                                    }
+                                }
+
+                                if(isset($check_var_content['greaterorequalthan'])) {
+                                    if($pointer >= $check_var_content['greaterorequalthan']) {
+                                        $this->sendTerminal('   - OK check-json-values: '.$check_var.' value is '.$pointer.' and it is [greaterorequalthan] '.$check_var_content['greaterorequalthan']);
+                                    } else {
+                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var.' value is '.$pointer.' is not [greaterorequalthan] '.$check_var_content['greaterorequalthan'];
+                                        $this->sendTerminal('   - ERROR check-json-values: '.$check_var.' value is '.$pointer.' is not [greaterorequalthan] '.$check_var_content['greaterorequalthan']);
+                                        $error = true;
+                                    }
+                                }
+
+                                if(isset($check_var_content['lessthan'])) {
+                                    if($pointer < $check_var_content['lessthan']) {
+                                        $this->sendTerminal('   - OK check-json-values: '.$check_var.' value is '.$pointer.' and it is [lessthan] '.$check_var_content['lessthan']);
+                                    } else {
+                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var.' value is '.$pointer.' is not [lessthan] '.$check_var_content['lessthan'];
+                                        $this->sendTerminal('   - ERROR check-json-values: '.$check_var.' value is '.$pointer.' is not [lessthan] '.$check_var_content['lessthan']);
+                                        $error = true;
+                                    }
+                                }
+
+                                if(isset($check_var_content['lessorequalthan'])) {
+                                    if($pointer <= $check_var_content['lessorequalthan']) {
+                                        $this->sendTerminal('   - OK check-json-values: '.$check_var.' value is '.$pointer.' and it is [lessorequalthan] '.$check_var_content['lessorequalthan']);
+                                    } else {
+                                        $report['check_var_'.$check_var] = "ERROR: ".$check_var.' value is '.$pointer.' is not [lessorequalthan] '.$check_var_content['lessorequalthan'];
+                                        $this->sendTerminal('   - ERROR check-json-values: '.$check_var.' value is '.$pointer.' is not [lessorequalthan] '.$check_var_content['lessorequalthan']);
+                                        $error = true;
+                                    }
+                                }
+
+                                if(!$error)
+                                {
                                     $report['check_var_'.$check_var] = 'OK';
                                     $this->sendTerminal('   - OK check-json-values exist: '.$check_var.'=>'.json_encode($check_var_content));
                                 }
@@ -516,10 +555,13 @@ class Script extends Scripts2020
                         }
                         $this->test[$testModule]['vars'] = array_merge($this->test[$testModule]['vars'],$this->run_vars);
                         $this->sendReport($this->testId,$testModule,$title,($error)?'ERROR':'OK',"[{$method}] {$url}",$time,[(($error)?'ERROR':'OK').'_'.$i=>$report]);
-                        $this->core->errors->add($testModule);
                     }
                     //endregion
 
+                    // Stop calls if $stop_on_error && $error
+                    if($error && $stop_on_error) {
+                        return;
+                    }
                 }
             }
             //endregion
@@ -532,6 +574,7 @@ class Script extends Scripts2020
      */
     private function sendReport($testId,$testModule,$title,$status,$url,$time,$json) {
 
+        $this->core->request->reset();
         $cfurl = "https://api.cloudframework.io/core/tests/{$this->organization}/{$testId}";
         $data = [
              'Environment'=>$this->_environment
@@ -567,7 +610,7 @@ class Script extends Scripts2020
         $ret = $this->core->request->get_json_decode($url,null,['X-API-KEY'=>'Production','X-DS-TOKEN'=>$this->user_token]);
         if($this->core->request->error) {
             $this->sendTerminal('Error reading tests: '.$url);
-            $this->sendTerminal($this->core->request->error);
+            $this->sendTerminal($this->core->request->errorMsg);
             $this->core->request->error=false;
             $this->core->request->errorMsg=[];
             return null;

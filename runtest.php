@@ -48,8 +48,8 @@ try {
     $run->sendTerminal(error_get_last());
     $run->sendTerminal($e->getMessage());
 }
-echo "\n------------------------------\n";
-if($core->errors->lines) {
+echo "------------------------------\n";
+if($core->errors->data) {
     $run->sendTerminal('Test: ERROR');
 }
 else $run->sendTerminal('Test: OK');
