@@ -46,7 +46,7 @@ echo "CloudFramworkTest v202010\nroot_path: {$rootPath}\n";
 echo "------------------------------\n";
 
 // Evaluate if you have access to source script
-if($argv[1]=='update' || (!is_file($rootPath.'/local_data/test.cf') && !is_file($rootPath.'/buckets/cloudframework.io/test_script.php'))) {
+if((isset($argv[1]) && $argv[1]=='update') || (!is_file($rootPath.'/local_data/test.cf') && !is_file($rootPath.'/buckets/cloudframework.io/test_script.php'))) {
     echo "Downloading CloudFrameworkTest last version\n";
     $file =$core->request->get('https://api.cloudframework.io/core/tests/_download');
     if($core->request->error) {
