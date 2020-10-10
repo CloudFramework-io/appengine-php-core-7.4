@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10091';
+        var $_version = 'v73.10101';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1429,7 +1429,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function delete($path)
         {
             $path = preg_replace('/[\/\.;]/','_',$path);
-            return @unlink($this->dir . $path);
+            if(is_file($this->dir . $path))
+                return @unlink($this->dir . $path);
         }
 
         function get($path)

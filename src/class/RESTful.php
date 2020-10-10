@@ -535,16 +535,18 @@ if (!defined("_RESTfull_CLASS_")) {
             return (isset($this->codeLibError[$code]))?$this->codeLibError[$code]:400;
         }
         function setErrorFromCodelib($code,$extramsg='') {
-            if(is_array($extramsg)) $extramsg = json_encode($extramsg,JSON_PRETTY_PRINT);
-            if(strlen($extramsg)) $extramsg = " [{$extramsg}]";
+            $formatted_message =$extramsg;
+            if(is_array($formatted_message)) $formatted_message = json_encode($formatted_message,JSON_PRETTY_PRINT);
+            if(strlen($formatted_message)) $formatted_message = " [{$formatted_message}]";
 
             // Delete from code any character :.* to delete potential comments
             $this->setError(
-                $this->getCodeLib($code).$extramsg
+                $this->getCodeLib($code).$formatted_message
                 ,$this->getCodeLibError($code)
                 ,preg_replace('/:.*/','' ,$code)
-                ,$this->getCodeLib($code)
-            );        }
+                ,($extramsg)?:$this->getCodeLib($code)
+            );
+        }
 
         /**
          * Return the code applied with setError and defined in __codes
