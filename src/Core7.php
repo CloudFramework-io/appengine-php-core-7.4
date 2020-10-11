@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10101';
+        var $_version = 'v73.10111';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1809,6 +1809,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         private $_configPaths = [];
         var $data = [];
         var $menu = [];
+        var $cache = null;
+        // takes the secret_id  from: $this->core->config->get('core.gcp.secrets.env_vars') if it is not set from local_config
+        var $cache_secret_key = '';
+        // openssl rand -base64 24
+        var $cache_secret_iv = '';
         protected $lang = 'en';
 
 
@@ -1832,6 +1837,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $this->core->session->delete('_CloudFrameWorkLang_');
                     }
             }
+
+            // Cache secrets to encrypt data in Cache
+            $this->cache_secret_key=$this->get('core.gcp.secrets.cache_encrypt_key');
+            $this->cache_secret_iv=$this->get('core.gcp.secrets.cache_encrypt_iv');
 
         }
 
@@ -2314,8 +2323,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @return mixed|string
          */
         public function convertTags($data)
-
-
         {
             $_array = is_array($data);
 
@@ -2354,8 +2361,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function readEnvVarsFromGCPSecrets($secret_id='',$reload=false) {
 
-            if(!$secret_id) $secret_id = $this->get('core.gcp.secrets.env_vars');
+            if($this->core->is->development()
+                && is_file($this->core->system->root_path.'/local_config.json')
+                && isset($this->data['env_vars'] )) {
+                $this->core->logs->add('readEnvVarsFromGCPSecrets avoided because local_config.json exists');
+                return true;
+            }
 
+            if(!$secret_id) $secret_id = $this->get('core.gcp.secrets.env_vars');
 
             if(!isset($this->data['env_vars']) || !is_array($this->data['env_vars']))
                 $this->data['env_vars'] = [];
@@ -2375,20 +2388,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 return false;
             }
 
-            // takes the secret_id  from: $this->core->config->get('core.gcp.secrets.env_vars') if it is not set from local_config
-            $cache_secret_key=$this->core->config->get('core.gcp.secrets.cache_encrypt_key');
-            // openssl rand -base64 24
-            $cache_secret_iv=$this->core->config->get('core.gcp.secrets.cache_encrypt_iv');
-
-
             // read data from cache and enrypt data
             $key ="{$this->core->gc_project_id}_{$this->core->gc_project_service}_core.gcp.secrets.env_vars";
-            $expiration=-1;
-            $hash='';
-            $env_vars = $this->core->cache->get($key,$expiration,$hash, $cache_secret_key, $cache_secret_iv);
+            $env_vars = $this->getCache($key);
 
-
-            // for local development force reload if local_env_vars does not exist
+            // for local development force reload if local_env_vars.json does not exist
             if($this->core->is->development() && !is_file($this->core->system->root_path.'/local_env_vars.json')) {
                 $reload=true;
             }
@@ -2412,9 +2416,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->core->logs->add($gs->errorMsg,'error_readEnvVarsFromGCPSecrets');
                     return false;
                 }
-
                 // performane end
                 $this->core->__p->add('GoogleSecrets', '', 'endnote');
+                $this->core->logs->add('GCP Secrets service used: core.gcp.secrets.env_vars='.$this->get('core.gcp.secrets.env_vars'));
 
 
                 if(!$secrets) {
@@ -2428,7 +2432,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     return false;
                 }
 
-                $this->core->logs->add('core.gcp.secrets.env_vars loaded: '.$this->get('core.gcp.secrets.env_vars'));
 
                 // For development in localhost
                 if($this->core->is->development() && isset($env_vars['env_vars:'])) {
@@ -2451,8 +2454,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->core->logs->add('local_env_vars.json created');
                 }
 
-                $this->core->cache->set($key,$env_vars,$hash, $cache_secret_key, $cache_secret_iv);
-                $this->core->logs->add('data cached');
+                $this->updateCache($key,$env_vars);
+                $this->core->logs->add('Core7.CoreConfig data cached');
 
             }
 
@@ -2462,6 +2465,43 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             return true;
 
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function readCache() {
+
+            if($this->cache === null) {
+                $this->cache = $this->core->cache->get('Core7.CoreConfig', -1,'',$this->cache_secret_key,$this->cache_secret_iv);
+                if(!$this->cache) $this->cache=[];
+            }
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function resetCache() {
+            $this->cache = [];
+            $this->core->cache->set('Core7.CoreConfig',$this->cache,null,$this->cache_secret_key,$this->cache_secret_iv);
+        }
+
+        /**
+         * Update Cache of the module
+         */
+        public function updateCache($var,$data) {
+            $this->readCache();
+            $this->cache[$var] = $data;
+            $this->core->cache->set('Core7.CoreConfig',$this->cache,null,$this->cache_secret_key,$this->cache_secret_iv);
+        }
+
+        /**
+         * Get var Cache of the module
+         */
+        public function getCache($var) {
+            $this->readCache();
+            if(isset($this->cache[$var])) return $this->cache[$var];
+            else return null;
         }
 
 
@@ -2479,6 +2519,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         var $error = false;
         var $errorMsg = [];
+        var $cache = null;
 
         function __construct(Core7 &$core)
         {
@@ -2651,7 +2692,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
             return false;
         }
-
 
         /**
          * @param array|string $allows string to compare with the current IP
@@ -3094,6 +3134,75 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return($payload);
         }
 
+        /**
+         * Call https://api.clouframework.io/core/api-keys to verify an APIKey
+         * More info in: https://www.notion.so/cloudframework/CloudFrameworkSecurity-APIKeys-CFS-APIKeys-13b47034a6f14f23b836c1f4238da548
+         *
+         * @param string $token  token of the entity of CloudFrameWorkAPIKeys
+         * @param string $key   key of the APIKey to evaluate if it exists
+         * @param string $spacename spacename of the data. Default cloudframework.
+         * @param string $org organization of the entity inside of the spacename. Default common
+         * @return bool[]|false[]|mixed|string[]|void
+         */
+        public function checkAPIKey($token,$key,$spacename='cloudframework',$org='common') {
+
+            //Generate hash and evaluate return cached data
+            $hash = md5($token.$key.$spacename.$org);
+            if($data = $this->getCache($hash)) return $data;
+
+            // Call CloudFrameWorkAPIKeys Service
+            $url = 'https://api.cloudframework.io/core/api-keys/'.$spacename.'/'.$org;
+            $ret = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$key,'X-DS-TOKEN'=>$token]);
+            if($this->core->request->error) {
+                $this->addError(['checkAPIKey'=>$this->core->request->errorMsg]);
+                $this->core->request->reset();
+                return;
+            }
+            $this->core->logs->add('CloudFrameworkSecurity APIKeys service used');
+
+            //Update Cache
+            $this->updateCache($hash,$ret['data']);
+
+            // Return data
+            return $ret['data'];
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function readCache() {
+            if($this->cache === null)
+                $this->cache = ($this->core->cache->get('Core7.CoreSecurity'))?:[];
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function resetCache() {
+            $this->cache = [];
+            $this->core->cache->set('Core7.CoreSecurity',$this->cache);
+        }
+
+        /**
+         * Update Cache of the module
+         */
+        public function updateCache($var,$data) {
+            $this->readCache();
+            $this->cache[$var] = $data;
+            $this->core->cache->set('Core7.CoreSecurity',$this->cache);
+
+        }
+
+        /**
+         * Get var Cache of the module
+         */
+        public function getCache($var) {
+            $this->readCache();
+            if(isset($this->cache[$var])) return $this->cache[$var];
+            else return null;
+        }
+
+
         public function urlsafeB64Encode($input) {
             return str_replace('=', '', strtr(base64_encode($input), '+/', '-_'));
         }
@@ -3108,8 +3217,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return base64_decode(strtr($input, '-_', '+/'));
         }
 
-
-
+        /**
+         * Add an error Message
+         * @param $value
+         */
         function addError($value)
         {
             $this->error = true;
@@ -3704,6 +3815,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $options = array('ssl' => array('verify_peer' => false));
             $options['http']['ignore_errors'] = '1';
             $options['http']['header'] = 'Connection: close' . "\r\n";
+            $options['http']['header'] = 'Accept: */*' . "\r\n";
 
             if($this->automaticHeaders) {
                 // Automatic send header for X-CLOUDFRAMEWORK-SECURITY if it is defined in config
@@ -3876,7 +3988,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             $code = null;
             if (isset($this->responseHeaders[0])) {
-                list($foo, $code, $foo) = explode(' ', $this->responseHeaders[0], 3);
+                $parts = explode(' ', $this->responseHeaders[0]);
+                if(isset($parts[1])) $code=$parts[1];
             }
             return $code;
 
@@ -4083,6 +4196,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $db = null;
         /** @var DataMongo $db  */
         var $mongo = null;
+        var $cache = null;
 
         protected $core;
         var $models = null;
@@ -4124,15 +4238,19 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @return boolean|void
          */
         function readModelsFromCloudFramework($models,$api_key,$cache_time=-1) {
-            $ret_models = [];
-            if($cache_time) $ret_models = $this->core->cache->get('readModelsFromCloudFramework_'.$models,$cache_time);
-            if(!$ret_models || isset($ret_models['Unknown']) || isset($_GET['_readModelsFromCloudFramework'])) {
+
+            $ret_models = $this->getCache($models);
+            //$ret_models = [];
+            //if($cache_time) $ret_models = $this->core->cache->get('readModelsFromCloudFramework_'.$models,$cache_time);
+
+            if(!$ret_models || isset($ret_models['Unknown'])) {
                 $ret_models =  $this->core->request->get_json_decode('https://api7.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));
                 $ret_models = $ret_models['data'];
                 if(!isset($ret_models['Unknown']))
-                    $this->core->cache->set('readModelsFromCloudFramework_'.$models,$ret_models);
+                    $this->updateCache($models,$ret_models);
             }
+
             if(!$ret_models || isset($ret_models['Unknown']) || !$this->processModels($ret_models)) return($this->addError($ret_models));
             return $ret_models;
         }
@@ -4425,6 +4543,41 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         public function dbClose() {
             if(is_object($this->db)) $this->db->close();
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function readCache() {
+            if($this->cache === null)
+                $this->cache = ($this->core->cache->get('Core7.CoreModel'))?:[];
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function resetCache() {
+            $this->cache = [];
+            $this->core->cache->set('Core7.CoreModel',$this->cache);
+        }
+
+        /**
+         * Update Cache of the module
+         */
+        public function updateCache($var,$data) {
+            $this->readCache();
+            $this->cache[$var] = $data;
+            $this->core->cache->set('Core7.CoreModel',$this->cache);
+
+        }
+
+        /**
+         * Get var Cache of the module
+         */
+        public function getCache($var) {
+            $this->readCache();
+            if(isset($this->cache[$var])) return $this->cache[$var];
+            else return null;
         }
 
         private function addError($msg,$code=0) {

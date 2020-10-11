@@ -580,6 +580,10 @@ if (!defined("_RESTfull_CLASS_")) {
             $this->ok = $status;
         }
 
+        /**
+         * Translate Error codes into headers.
+         * Useful info: https://restfulapi.net/http-status-codes/
+         */
         function getResponseHeader()
         {
             switch ($this->getReturnStatus()) {
@@ -589,17 +593,26 @@ if (!defined("_RESTfull_CLASS_")) {
                 case 204:
                     $ret = ("HTTP/1.0 204 No Content");
                     break;
-                case 405:
-                    $ret = ("HTTP/1.0 405 Method Not Allowed");
-                    break;
                 case 400:
                     $ret = ("HTTP/1.0 400 Bad Request");
                     break;
                 case 401:
                     $ret = ("HTTP/1.0 401 Unauthorized");
                     break;
+                case 403:
+                    $ret = ("HTTP/1.0 403 Forbidden");
+                    break;
                 case 404:
                     $ret = ("HTTP/1.0 404 Not Found");
+                    break;
+                case 405:
+                    $ret = ("HTTP/1.0 405 Method Not Allowed");
+                    break;
+                case 409:
+                    $ret = ("HTTP/1.0 409 Conflict");
+                    break;
+                case 500:
+                    $ret = ("HTTP/1.0 500 Internal Server Error");
                     break;
                 case 503:
                     $ret = ("HTTP/1.0 503 Service Unavailable");
