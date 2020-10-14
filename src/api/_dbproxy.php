@@ -10,6 +10,7 @@ class API extends RESTful
     var $db;
     var $external_api = 'https://api.cloudframework.io/core/signin';
     var $user_spacename = '';
+    var $external_integration_key = '';
     var $dstoken_data = [];
     var $proxy = [];
 
@@ -49,6 +50,8 @@ class API extends RESTful
         //region Check if X-DS-TOKEN has been sent
         if (!strlen($this->getHeader('X-DS-TOKEN'))) return ($this->setErrorFromCodelib('params-error', 'missing X-DS-TOKEN header'));
         $this->dstoken = $this->getHeader('X-DS-TOKEN');
+        if (!strlen($this->getHeader('X-EXTRA-INFO'))) return ($this->setErrorFromCodelib('params-error', 'missing X-EXTRA-INFO header'));
+        $this->external_integration_key = $this->getHeader('X-EXTRA-INFO');
         //endregion
 
         //region SET $this->dstoken_data Checking X-DS-TOKEN with $this->external_api. Error the info is not en session or external_api returns error
@@ -69,6 +72,7 @@ class API extends RESTful
                 , ['Fingerprint' => $this->core->system->getRequestFingerPrint()]
                 , ['X-WEB-KEY' => 'Production'
                 , 'X-DS-TOKEN' => $this->dstoken
+                ,'X-EXTRA-INFO'=>$this->external_integration_key
             ]);
 
             if ($this->core->request->error) {

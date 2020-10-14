@@ -111,7 +111,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             $this->_dbdatabase = trim($this->core->config->get("dbName"));
             $this->_dbsocket = trim($this->core->config->get("dbSocket"));
             $this->_dbProxy = trim($this->core->config->get("dbProxy"));
-            $this->_dbProxyHeaders = trim($this->core->config->get("dbProxyHeaders"));
+            $this->_dbProxyHeaders = $this->core->config->get("dbProxyHeaders");
             $this->_dbcharset = ($this->core->config->get("dbCharset"))?$this->core->config->get("dbCharset"):'';
             if(strlen(trim($this->core->config->get("dbPort"))))
                 $this->_dbport = trim($this->core->config->get("dbPort"));
