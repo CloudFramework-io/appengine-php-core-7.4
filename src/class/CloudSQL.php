@@ -35,7 +35,6 @@ if (!defined ("_MYSQLI_CLASS_") ) {
     }
 
     class CloudSQL {
-
         // Base variables
         var $_error=[];                      // Holds the last error
         var $_lastRes=false;                                        // Holds the last result set
@@ -69,6 +68,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         var $_cloudFilterToAvoidCalculation = array();
         var $_queryFieldTypes = array();
         var $cfmode = true;
+        var $_dbProxy = null;
+        var $_dbProxyHeaders = null;
 
         protected $core = null;
 
@@ -109,6 +110,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             $this->_dbpassword = trim($this->core->config->get("dbPassword"));
             $this->_dbdatabase = trim($this->core->config->get("dbName"));
             $this->_dbsocket = trim($this->core->config->get("dbSocket"));
+            $this->_dbProxy = trim($this->core->config->get("dbProxy"));
+            $this->_dbProxyHeaders = trim($this->core->config->get("dbProxyHeaders"));
             $this->_dbcharset = ($this->core->config->get("dbCharset"))?$this->core->config->get("dbCharset"):'';
             if(strlen(trim($this->core->config->get("dbPort"))))
                 $this->_dbport = trim($this->core->config->get("dbPort"));
@@ -118,14 +121,16 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         function setConf($var,$value) {
             switch ($var) {
                 case 'dbServer':$this->_dbserver = $value; break;
-                case 'dbUer':$this->_dbuser = $value; break;
+                case 'dbUser':$this->_dbuser = $value; break;
                 case 'dbPassword':$this->_dbpassword = $value; break;
                 case 'dbName':$this->_dbdatabase = $value; break;
                 case 'dbSocket':$this->_dbsocket = $value; break;
                 case 'dbPort':$this->_dbport = $value; break;
                 case 'dbCharset':$this->_dbcharset = $value; break;
+                case 'dbProxy':$this->_dbProxy = $value; break;
+                case 'dbProxyHeaders':$this->_dbProxyHeaders = $value; break;
                 default:
-                    $this->setError('Unknown "confVar". Please use: dbServer, dbUer, dbPassword, dbName, dbSocket, dbPort');
+                    $this->setError('Unknown "confVar". Please use: dbServer, dbUer, dbPassword, dbName, dbSocket, dbPort, dbCharset, dbProxyHeaders');
                     break;
             }
         }
@@ -140,8 +145,10 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 case 'dbSocket':$ret = $this->_dbsocket; break;
                 case 'dbPort':$ret = $this->_dbport; break;
                 case 'dbCharset':$ret = $this->_dbcharset; break;
+                case 'dbProxy':$ret = $this->_dbProxy; break;
+                case 'dbProxyHeaders':$ret = $this->_dbProxyHeaders; break;
                 default:
-                    $ret = 'Unknown "confVar". Please use: dbServer, dbUer, dbPassword, dbName, dbSocket, dbPort';
+                    $ret = 'Unknown "confVar". Please use: dbServer, dbUer, dbPassword, dbName, dbSocket, dbPort, dbProxyHeaders';
                     break;
             }
             return($ret);
@@ -159,6 +166,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
          */
         function connect($h='',$u='',$p='',$db='',$port="3306",$socket='',$charset='') {
 
+            if($this->_dbProxy) return true; // avoid to stablish a connection with dbproxy
             if($this->_dblink)  return($this->_dblink); // Optimize current connection.
 
             if(strlen($h)) {
@@ -204,34 +212,57 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
 
         // It requires at least query argument
+        /*
+         * Execute a Query
+         */
         function getDataFromQuery() {
             $_q = $this->_buildQuery(func_get_args());
-            $this->core->__p->add('getDataFromQuery ',$_q,'note');
+
             if($this->error()) {
                 return(false);
             } else {
                 $ret=array();
-                if($this->_debug) _print($_q);
-                try {
-                    if( ($this->_lastRes = $this->_db->query($_q)) ) {
-                        $this->_affectedRows = $this->_db->affected_rows;
-                        if(is_object($this->_lastRes)){
-                            while ($fila = $this->_lastRes->fetch_assoc( )) {
-                                $ret[] = $fila;
-                            }
 
-                            $this->_lastRes->close();
-                        }
-                        $this->_lastRes = false;
-                    } else {
-                        $this->setError('Query Error [$q]: ' . $this->_db->error);
+                // Do a call a CloudFrameworkProxy
+                if($this->_dbProxy) {
+                    $this->core->__p->add('getDataFromQueryProxy ',$_q,'note');
+                    $ret = $this->core->request->post($this->_dbProxy,['q'=>$_q],$this->_dbProxyHeaders);
+                    if($this->core->request->error) {
+                        $this->core->__p->add('getDataFromQueryProxy ','','endnote');
+                        $this->setError('QueryProxy Error [$q]: ' . json_encode($this->core->request->errorMsg));
+                        $this->core->request->reset();
+                        return(false);
                     }
-                } catch (Exception $e) {
-                    $this->setError('Query Error [$q]: ' . $e->getMessage());
-                    return(false);
+                    $ret = unserialize(gzuncompress($ret));
+                    $this->core->__p->add('getDataFromQueryProxy ','','endnote');
+                    return $ret;
                 }
-                $this->core->__p->add('getDataFromQuery ','','endnote');
-                return($ret);
+                // Do a call Directly to DB connection
+                else {
+                    $this->core->__p->add('getDataFromQuery ',$_q,'note');
+                    try {
+                        if( ($this->_lastRes = $this->_db->query($_q)) ) {
+
+                            $this->_affectedRows = $this->_db->affected_rows;
+                            if(is_object($this->_lastRes)){
+                                while ($fila = $this->_lastRes->fetch_assoc( )) {
+                                    $ret[] = $fila;
+                                }
+
+                                $this->_lastRes->close();
+                            }
+                            $this->_lastRes = false;
+                        } else {
+                            $this->setError('Query Error [$q]: ' . $this->_db->error);
+                        }
+                        $this->core->__p->add('getDataFromQuery ','','endnote');
+                        return($ret);
+                    } catch (Exception $e) {
+                        $this->core->__p->add('getDataFromQuery ','','endnote');
+                        $this->setError('Query Error [$q]: ' . $e->getMessage());
+                        return(false);
+                    }
+                }
             }
         }
 
@@ -243,21 +274,37 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 return(false);
             } else {
 
-                if($this->_debug) _print($_q);
-                if( ($this->_lastRes = $this->_db->query($_q)) ) {
-                    $_ok=true;
-                    $this->_lastInsertId = $this->_db->insert_id;
-                    $this->_affectedRows = $this->_db->affected_rows;
-                    if(is_object($this->_lastRes)) {
-                        $this->_lastRes->close();
+                // Do a call a CloudFrameworkProxy
+                if($this->_dbProxy) {
+                    $this->core->__p->add('commandProxy ',$_q,'note');
+                    $ret = $this->core->request->post($this->_dbProxy,['q'=>$_q],$this->_dbProxyHeaders);
+                    if($this->core->request->error) {
+                        $this->core->__p->add('getDataFromQueryProxy ','','endnote');
+                        $this->setError('QueryProxy Error [$q]: ' . json_encode($this->core->request->errorMsg));
+                        $this->core->request->reset();
+                        return(false);
                     }
-                    $this->_lastRes = false;
-                } else {
-                    $_ok = false;
-                    $this->setError('Query Error [$q]: ' .  $this->_db->error);
+                    $ret = unserialize(gzuncompress($ret));
+                    $this->core->__p->add('commandProxy ','','endnote');
+                    return $ret;
                 }
-                $this->core->__p->add('command ','','endnote');
-                return($_ok);
+                else {
+                    if( ($this->_lastRes = $this->_db->query($_q)) ) {
+                        $_ok=true;
+                        $this->_lastInsertId = $this->_db->insert_id;
+                        $this->_affectedRows = $this->_db->affected_rows;
+                        if(is_object($this->_lastRes)) {
+                            $this->_lastRes->close();
+                        }
+                        $this->_lastRes = false;
+                    } else {
+                        $_ok = false;
+                        $this->setError('Query Error [$q]: ' .  $this->_db->error);
+                    }
+                    $this->core->__p->add('command ','','endnote');
+                    return($_ok);
+                }
+
             }
         }
 
@@ -274,11 +321,31 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 return false;
             }
             $_q = $this->_buildQuery(array("SELECT 1 FROM %s",$table));
-            if( ($this->_lastRes = $this->_db->query($_q)) ) {
-                return true;
-            } else {
-                return false;
+            if($this->_dbProxy) {
+                $this->core->__p->add('tableExistsProxy ',$_q,'note');
+                $ret = $this->core->request->post($this->_dbProxy,['q'=>$_q],$this->_dbProxyHeaders);
+                if($this->core->request->error) {
+                    $this->core->__p->add('tableExistsProxy ','','endnote');
+                    $this->setError('QueryProxy Error [$q]: ' . json_encode($this->core->request->errorMsg));
+                    $this->core->request->reset();
+                    return(false);
+                }
+                $ret = unserialize(gzuncompress($ret));
+                $this->core->__p->add('tableExistsProxy ','','endnote');
+                if( $ret ) {
+                    return true;
+                } else {
+                    return false;
+                }
             }
+            else {
+                if( ($this->_lastRes = $this->_db->query($_q)) ) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
             /*
             $_q = "SELECT count(*) TOT FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA='%s' AND TABLE_NAME = '%s' ";
             $tmp = $this->getDataFromQuery($_q,$this->_dbdatabase,$table );
@@ -290,7 +357,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         // Scape Query arguments
         function _buildQuery($args) {
 
-            if(!$this->_dblink ) {
+            if(!$this->_dbProxy && !$this->_dblink ) {
                 $this->setError("No db connection");
                 return false;
             }
@@ -1169,7 +1236,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $fields['interface']['update_fields'][$field] = ['field'=>$field];
 
                 if($is_key) {
-                    $fields['interface']['views']['default']['fields'][$field]['update_cfo']=true;
+                    $fields['interface']['views']['default']['fields'][$field]['display_cfo']=true;
                     $fields['interface']['display_fields'][$field]['read_only'] = true;
                     $fields['interface']['update_fields'][$field]['read_only'] = true;
                     $fields['interface']['delete_fields'][$field]= ['field'=>$field];

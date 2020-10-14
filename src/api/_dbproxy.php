@@ -1,114 +1,212 @@
 <?php
+
+/**
+ * It allows receive external connection to perform queries based on a security
+ * Class API for _dbproxy
+ */
 class API extends RESTful
 {
     /* @var $db CloudSQL */
     var $db;
+    var $external_api = 'https://api.cloudframework.io/core/signin';
+    var $user_spacename = '';
+    var $dstoken_data = [];
+    var $proxy = [];
+
+
     function main()
     {
         ini_set('memory_limit', '512M');
-        $this->checkMethod('POST');
-        if(!$this->error) $this->checkSecurity();
-        if(!$this->error) $this->checkMandatoryFormParams('q');
-        if(!$this->error) {
-            // Trying the connection
-            $this->db->connect();
-            if($this->db->error()) $this->setError('Error connecting db',503);
-            else {
+        if (!$this->checkMethod('POST')) return;
+        if (!$this->checkMandatoryFormParams('q')) return;
+        if (!$this->checkMandatoryParam(0, 'Mising name of proxy')) return;
+        $this->proxy = $this->core->config->get('core.db.proxy');
+        if (!$this->proxy || !isset($this->proxy[$this->params[0]])) return ($this->setErrorFromCodelib('params-error', 'core.db.proxy does not have any match proxy'));
+        $this->proxy = $this->proxy[$this->params[0]];
 
-                // Decode params
-                if(isset($this->formParams['params'])) $params = json_decode($this->formParams['params']);
-                if(!is_array($params)) $params=[];
 
-                // Execute command
-                switch ($this->formParams['command']) {
 
-                    case "update":
-                        $this->db->command('UPDATE '.$this->formParams['q'],$params);
-                        if(!$this->db->error()) {
-                            $ret = ['affected_rows'=>$this->db->getAffectedRows()];
-                        }
-                        break;
-                    default:
-                        $ret = $this->db->getDataFromQuery('SELECT '.$this->formParams['q'],$params);
-                        break;
-                }
+        if (!$this->checkSecurity()) return;
+        if (!$this->dbSettings()) return;
+        if (!$this->secureQuery($this->formParams['q'])) return;
 
-                // Analyze errors
-                if($this->db->error()) $this->setError('Error in query: '.$this->db->getQuery());
-                else {
-                    $this->db->close();
-                    if(isset($this->formParams['plain']))
-                        $this->addReturnData($ret);
-                    else
-                        $this->addReturnData(utf8_encode(gzcompress(json_encode($ret))));
-                    unset($ret);
-                }
+        $this->db->connect();
+        if($this->db->error()) return($this->setErrorFromCodelib('params-error',$this->db->getError()));
+
+        $ret = $this->db->getDataFromQuery($this->formParams['q']);
+        if($this->db->error()) return($this->setErrorFromCodelib('params-error',$this->db->getError()));
+        $this->db->close();
+
+        echo gzcompress(serialize($ret));
+        exit;
+    }
+
+    function checkSecurity()
+    {
+
+        if (!isset($this->proxy['security']['type']) || $this->proxy['security']['type'] != 'X-DS-TOKEN') return ($this->setErrorFromCodelib('system-error', 'proxy does not have security attribute configured correctly'));
+
+        //region Check if X-DS-TOKEN has been sent
+        if (!strlen($this->getHeader('X-DS-TOKEN'))) return ($this->setErrorFromCodelib('params-error', 'missing X-DS-TOKEN header'));
+        $this->dstoken = $this->getHeader('X-DS-TOKEN');
+        //endregion
+
+        //region SET $this->dstoken_data Checking X-DS-TOKEN with $this->external_api. Error the info is not en session or external_api returns error
+        if (!strpos($this->dstoken, '__')) return ($this->setErrorFromCodelib('params-error', 'wrong X-DS-TOKEN format'));
+        list($this->user_spacename, $foo) = explode('__', $this->dstoken, 2);
+        $this->updateReturnResponse(['user_spacename' => $this->user_spacename]);
+
+        $haskey = sha1($this->dstoken);
+        $this->core->session->init($haskey);
+
+        if ($haskey == $this->core->session->get('hashkey') && !isset($this->formParams['_reload'])) {
+            $this->dstoken_data = $this->core->session->get('dstoken_data');
+        } else {
+
+            //Call for external integration
+            $external_api = $this->core->request->post_json_decode(
+                $this->external_api . '/' . $this->user_spacename . '/check?_update&from_dbproxy'
+                , ['Fingerprint' => $this->core->system->getRequestFingerPrint()]
+                , ['X-WEB-KEY' => 'Production'
+                , 'X-DS-TOKEN' => $this->dstoken
+            ]);
+
+            if ($this->core->request->error) {
+                $this->core->session->delete('hashkey');
+                $this->core->session->delete('dstoken_data');
+                return ($this->setErrorFromCodelib('security-error', $external_api));
+            } else {
+                $this->dstoken_data = $external_api['data'];
+                $this->core->session->set('hashkey', $haskey);
+                $this->core->session->set('dstoken_data', $this->dstoken_data);
             }
-        }
+        };
+        //endregion
+
+        //region CHECK $this->checkAppSecurity($this->proxy['security']
+        if (!$this->checkAppSecurity($this->proxy['security'])) return;
+        //endregion
+
+        return true;
 
     }
 
-    function checkSecurity() {
-        if($this->existBasicAuth()) {
-            // if checkBasicAuthWithConfig has been passed we can get the array stored in setConf('CLOUDFRAMEWORK-ID-'.$id);
-            if ($this->checkBasicAuthSecurity()) {
-                $info = $this->getCloudFrameWorkSecurityInfo();
-                $org = $info['org_id'];
-                $org_name = $info['org_name'];
-                if (!$this->error && !strlen($org)) $this->setError('Missing org_id in conf-var array: CLOUDFRAMEWORK-ID-XX', 503);
-                if (!$this->error && !strlen($org_name)) $this->setError('Missing org_name in conf-var array: CLOUDFRAMEWORK-ID-XX', 503);
-                $this->updateReturnResponse(['security'=>'Basic Authentication']);
+    /**
+     * Check $security match with user $this->dstoken_data['User']['UserPrivileges'], $this->dstoken_data['User']['UserOrganizations'] or $this->dstoken_data['User']['UserSuperAdmin']
+     * @param $security
+     * @param bool $sendAPIError
+     * @return bool|void
+     */
+    protected function checkAppSecurity($security, $sendAPIError = true)
+    {
 
+        //region Update credentials in returnData to facilitate security debug
+        $this->returnData['UserSuperAdmin'] = (isset($this->dstoken_data['User']['UserSuperAdmin'])) ? $this->dstoken_data['User']['UserSuperAdmin'] : null;
+        $this->returnData['user_privileges'] = (isset($this->dstoken_data['User']['UserPrivileges'])) ? $this->dstoken_data['User']['UserPrivileges'] : null;
+        $this->returnData['user_organizations'] = (isset($this->dstoken_data['User']['UserOrganizations'])) ? $this->dstoken_data['User']['UserOrganizations'] : null;
+        if ($sendAPIError)
+            $this->returnData['app_security'] = $security;
+        //endregion
+
+        //if there is no security then any user can access. Then just return true;
+        if (!$security) return true;
+
+        //check spacenames security
+        if (isset($security['spacenames']) && is_array($security['spacenames']) && $security['spacenames']) {
+            if (!in_array(str_replace('_dev', '', $this->spacename), $security['spacenames'])) {
+                if ($sendAPIError) return ($this->setErrorFromCodelib('not-allowed', 'Your spacename [' . $this->spacename . '] in not included in security'));
+                else return false;
             }
-        } elseif ($this->checkCloudFrameWorkSecurity(600)) {
-            // if checkCloudFrameWorkSecurity has been passed we can get the array stored in setConf('CLOUDFRAMEWORK-ID-'.$id);
-            $info = $this->getCloudFrameWorkSecurityInfo();
-            $org = $info['org_id'];
-            $org_name = $info['org_name'];
-            if (!$this->error && !strlen($org)) $this->setError('Missing org_id in conf-var array: CLOUDFRAMEWORK-ID-XX', 503);
-            if (!$this->error && !strlen($org_name)) $this->setError('Missing org_name in conf-var array: CLOUDFRAMEWORK-ID-XX', 503);
-            $this->updateReturnResponse(['security'=>'X-CLOUDFRAMEWORK-SECURITY']);
         }
-        if(!$this->error) $this->checkMandatoryFormParams('dbproxy_id');
-        if(!$this->error) $this->checkMandatoryFormParams('dbproxy_passw');
 
-        if(!$this->error && (!is_array($info['dbproxy']) || !is_array($info['dbproxy'][$this->formParams['dbproxy_id']]) ||!strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['passw']))) $this->setError('No dbproxy not configured for that id');
-        if(!$this->error && !$this->core->system->checkPassword($this->formParams['dbproxy_passw'],$info['dbproxy'][$this->formParams['dbproxy_id']]['passw']))  $this->setError('Wrong dbproxy credentials',401);
+        //check user_spacenames security
+        if (isset($security['user_spacenames']) && $security['user_spacenames']) {
+            $user_spacenames = (is_array($security['user_spacenames'])) ? $security['user_spacenames'] : explode(',', $security['user_spacenames']);
+            if (!in_array($this->returnData['user_spacename'], $user_spacenames)) {
+                if ($sendAPIError) return ($this->setErrorFromCodelib('not-allowed', 'Your user_spacename does not have rights to access this CFO'));
+                else return false;
+            }
+        }
 
+        //check user_privileges security
+        $sec_error = '';
+        if (isset($security['user_privileges']) && $security['user_privileges'] && is_array($security['user_privileges'])) {
 
-        // Copy values for the diffeerent environments
-        if(!$this->error) {
-            if ($this->core->is->development()) {
-                if (isset($info['dbproxy'][$this->formParams['dbproxy_id']]['development:'])) {
-                    foreach ($info['dbproxy'][$this->formParams['dbproxy_id']]['development:'] as $key => $value) {
-                        $info['dbproxy'][$this->formParams['dbproxy_id']][$key] = $value;
-                    }
+            $match = false;
+            if (isset($this->dstoken_data['User']['UserPrivileges']) && is_array($this->dstoken_data['User']['UserPrivileges']))
+                foreach ($this->dstoken_data['User']['UserPrivileges'] as $userPrivilege) {
+                    if (in_array($userPrivilege, $security['user_privileges'])) $match = true;
                 }
+            if (isset($this->dstoken_data['User']['UserSuperAdmin']) && $this->dstoken_data['User']['UserSuperAdmin'] && in_array("_superadmin_", $security['user_privileges'])) $match = true;
+
+            if (!$match) {
+                $sec_error = 'user_privileges';
+                //if($sendAPIError) return($this->setErrorFromCodelib('not-allowed','Your privileges does not match with privileges app: '.json_encode($security['user_privileges'])));
+                //else return false;
             } else {
-                if (isset($info['dbproxy'][$this->formParams['dbproxy_id']]['production:'])) {
-                    foreach ($info['dbproxy'][$this->formParams['dbproxy_id']]['production:'] as $key => $value) {
-                        $info['dbproxy'][$this->formParams['dbproxy_id']][$key] = $value;
-                    }
-                }
+                return true;
             }
         }
 
-        if(!$this->error && !strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['db_server']) && !strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['db_socket'])) $this->setError('Missing db_server or db_socket field in dbproxy connection: '.$this->formParams['dbproxy_id'],503);
-        if(!$this->error && !strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['db_name'])) $this->setError('Missing db_server or db_socket field in dbproxy connection: '.$this->formParams['dbproxy_id'],503);
-        if(!$this->error && !strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['db_user'])) $this->setError('Missing db_user  field in dbproxy connection: '.$this->formParams['dbproxy_id'],503);
-        if(!$this->error && !isset($info['dbproxy'][$this->formParams['dbproxy_id']]['db_password'])) $this->setError('Missing db_password  field in dbproxy connection: '.$this->formParams['dbproxy_id'],503);
-        if(!$this->error) {
-            if(strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['db_socket']))
-                $this->core->config->set('dbSocket', $info['dbproxy'][$this->formParams['dbproxy_id']]['db_socket']);
+        //check user_organizations security
+        if (isset($security['user_organizations']) && $security['user_organizations'] && is_array($security['user_organizations'])) {
 
-            if(strlen($info['dbproxy'][$this->formParams['dbproxy_id']]['db_server']))
-                $this->core->config->set('dbServer',$info['dbproxy'][$this->formParams['dbproxy_id']]['db_server']);
-            $this->core->config->set('dbUser', $info['dbproxy'][$this->formParams['dbproxy_id']]['db_user']);
-            $this->core->config->set('dbPassword', $info['dbproxy'][$this->formParams['dbproxy_id']]['db_password']);
-            $this->core->config->set('dbName', $info['dbproxy'][$this->formParams['dbproxy_id']]['db_name']);
+            $match = false;
+            if (isset($this->dstoken_data['User']['UserOrganizations']) && is_array($this->dstoken_data['User']['UserOrganizations']))
+                foreach ($this->dstoken_data['User']['UserOrganizations'] as $userOrganization) {
+                    if (in_array($userOrganization, $security['user_organizations'])) $match = true;
+                }
 
-            $this->db = $this->core->loadClass('CloudSQL');
+            if (!$match) {
+                $sec_error = 'user_organizations';
+                // if($sendAPIError) return($this->setErrorFromCodelib('not-allowed','Your privileges does not match with privileges app: '.json_encode($security['user_organizations'])));
+                // else return false;
+            } else {
+                return true;
+            }
+
         }
+
+        if ($sec_error) {
+            if ($sendAPIError) return ($this->setErrorFromCodelib('not-allowed', 'Your privileges does not match with ' . $sec_error . ' privilege app: ' . json_encode($security)));
+            else return false;
+        }
+
+        return true;
+    }
+
+    protected function dbSettings()
+    {
+        if($this->core->config->get('core.gcp.secrets.env_vars') && !isset($this->core->config->data['env_vars']) && !$this->core->config->readEnvVarsFromGCPSecrets())
+            return($this->setErrorFromCodelib('system-error','Error reading env_vars from GCP Secrets'));
+
+        $this->db = $this->core->loadClass('CloudSQL');
+        $config_vars = ["dbServer","dbUser", "dbPassword", "dbName", "dbPort", "dbSocket","dbCharset"];
+        foreach ($config_vars as $config_var) {
+            if(isset($this->proxy[$config_var])) {
+                if(!isset($this->core->config->data['env_vars'][$this->proxy[$config_var]])) return($this->setErrorFromCodelib('system-error','Missing config_var: '.$this->proxy[$config_var]));
+                $this->db->setConf($config_var,$this->core->config->data['env_vars'][$this->proxy[$config_var]]);
+            }
+        }
+
+        return true;
+
+    }
+
+    /**
+     * Check if the query has any delete, trucate, drop etc.. forbidden string
+     * @param $q
+     * @return bool|void
+     */
+    protected function secureQuery($q)
+    {
+
+        $risk = ['DELETE ','TRUNCATE ','DROP '];
+        foreach ($risk as $item) {
+            if(stripos($q,$item)!==false) return($this->setErrorFromCodelib('not-allowed','your query has not allowed strings: '.$item));
+        }
+
+        return true;
 
     }
 }
