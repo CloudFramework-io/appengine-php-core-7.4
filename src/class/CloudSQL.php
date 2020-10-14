@@ -411,7 +411,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 if(strpos($value,'\\')) {
                     $value = str_replace('\\','\\\\',$value);
                 }
-                $joins[] = $this->_db->real_escape_string($value);
+                $joins[] = $this->scapeValue($value);
             }
 
             // Execute replacements
@@ -423,8 +423,14 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             return($q);
         }
 
+        /*
+         * apply $this->_db->real_escape_string or addslashes if there is not db objext
+         */
         function scapeValue($value) {
-            return($this->_db->real_escape_string($value));
+            if(is_object($this->_db))
+                return($this->_db->real_escape_string($value));
+            else
+                return(addslashes($value));
         }
 
         function getQueryFromSearch ($search,$fields=false,$joints="=",$operators="AND") {

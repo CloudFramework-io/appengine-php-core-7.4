@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10142';
+        var $_version = 'v73.10143';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3596,6 +3596,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function getCurl($route, $data = null, $verb = 'GET', $extra_headers = null, $raw = false)
         {
+
             $this->core->__p->add('Request->getCurl: ', "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             $route = $this->getServiceUrl($route);
             $this->responseHeaders = null;
@@ -3803,6 +3804,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function call($route, $data = null, $verb = 'GET', $extra_headers = null, $raw = false)
         {
+            $_time = microtime(TRUE);
             $route = $this->getServiceUrl($route);
             $this->responseHeaders = null;
 
@@ -3968,8 +3970,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->addError(error_get_last());
                 $this->addError($e->getMessage());
             }
-            if($this->sendSysLogs)
-                $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'),(($this->error)?'debug':'info'));
+            if($this->sendSysLogs) {
+                $_time = round(microtime(TRUE) -$_time,4);
+                $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." {$_time} secs",(($this->error)?'debug':'info'));
+
+            }
+
             //syslog(($this->error)?LOG_DEBUG:LOG_INFO,"end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
             $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
