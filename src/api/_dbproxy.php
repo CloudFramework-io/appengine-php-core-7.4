@@ -179,6 +179,10 @@ class API extends RESTful
         return true;
     }
 
+    /**
+     * Set DB parameter from the proxy
+     * @return bool|void
+     */
     protected function dbSettings()
     {
         if($this->core->config->get('core.gcp.secrets.env_vars') && !isset($this->core->config->data['env_vars']) && !$this->core->config->readEnvVarsFromGCPSecrets())
@@ -188,8 +192,8 @@ class API extends RESTful
         $config_vars = ["dbServer","dbUser", "dbPassword", "dbName", "dbPort", "dbSocket","dbCharset"];
         foreach ($config_vars as $config_var) {
             if(isset($this->proxy[$config_var])) {
-                if(!isset($this->core->config->data['env_vars'][$this->proxy[$config_var]])) return($this->setErrorFromCodelib('system-error','Missing config_var: '.$this->proxy[$config_var]));
-                $this->db->setConf($config_var,$this->core->config->data['env_vars'][$this->proxy[$config_var]]);
+                $value = (isset($this->core->config->data['env_vars'][$this->proxy[$config_var]]))?$this->core->config->data['env_vars'][$this->proxy[$config_var]]:$this->proxy[$config_var];
+                $this->db->setConf($config_var,$value);
             }
         }
 

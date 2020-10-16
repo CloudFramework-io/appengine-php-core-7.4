@@ -229,7 +229,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     $ret = $this->core->request->post($this->_dbProxy,['q'=>$_q],$this->_dbProxyHeaders);
                     if($this->core->request->error) {
                         $this->core->__p->add('getDataFromQueryProxy ','','endnote');
-                        $this->setError('QueryProxy Error [$q]: ' . json_encode($this->core->request->errorMsg));
+                        $this->setError($this->core->request->errorMsg);
                         $this->core->request->reset();
                         return(false);
                     }
@@ -316,7 +316,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         function tableExists($table) {
 
             // Check if a db connection exists
-            if(!$this->_dblink) {
+            if(!$this->_dbProxy && !$this->_dblink) {
                 $this->setError('connection with db not stablished');
                 return false;
             }
@@ -1072,6 +1072,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
          * @return array where array['model'] is the JSON model if array['table_exists]===true
          */
         function getModelFromTable($table) {
+
+
             if($this->tableExists($table)) {
                 $tmp['explain'] = $this->getDataFromQuery("SHOW FULL COLUMNS FROM %s", $table);
                 $tmp['index'] = $this->getDataFromQuery('SHOW INDEX FROM %s;',array($table));
