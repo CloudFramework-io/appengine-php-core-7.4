@@ -100,7 +100,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10161';
+        var $_version = 'v73.10231';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2467,6 +2467,23 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
+        /*
+         * Return and EnvVar: if(getenv($var)) return getenv($var) else if($this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
+         */
+        public function getEnvVar($var) {
+            // By default returns a getenv var if it exists
+            if(getenv($var)) return($var);
+
+            // Else try to read from $this->data['env_vars'] and read it from readEnvVarsFromGCPSecrets
+            if(!isset($this->data['env_vars']) && $this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
+
+            // Return $this->data['env_vars'][$var] if it exists
+            if(isset($this->data['env_vars'][$var])) return $this->data['env_vars'][$var];
+
+            return null;
+
+        }
+
         /**
          * Reset Cache of the module
          */
@@ -4240,14 +4257,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * Read models from CloudFramework
          * @param $models string Models separated by ,
          * @param $api_key string API Key of the licence
-         * @param int $cache integer By default the result is cached (-1). If you want to expire cache then it hast to be >= 0 (seconds to expire the cache)
          * @return boolean|void
          */
-        function readModelsFromCloudFramework($models,$api_key,$cache_time=-1) {
+        function readModelsFromCloudFramework($models,$api_key) {
 
+            // To reset cache they have to call $this->resetCache();
             $ret_models = $this->getCache($models);
-            //$ret_models = [];
-            //if($cache_time) $ret_models = $this->core->cache->get('readModelsFromCloudFramework_'.$models,$cache_time);
 
             if(!$ret_models || isset($ret_models['Unknown'])) {
                 $ret_models =  $this->core->request->get_json_decode('https://api7.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
