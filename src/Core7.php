@@ -87,10 +87,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     {
         __print(array_merge(func_get_args(), array('exit')));
     }
-
-    //_printe($_SERVER);
-    //_printe(php_sapi_name());
-
     //endregion
 
     /**
@@ -100,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10241';
+        var $_version = 'v73.10251';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -158,7 +154,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Config objects based in config
             $this->cache->setSpaceName($this->config->get('cacheSpacename'));
-            if($this->config->get('core.cache.cache_path')) $this->cache->activateCacheFile($this->config->get('core.cache.cache_path'));
 
             // If the $this->system->app_path ends in / delete the char.
             $this->system->app_path = preg_replace('/\/$/','',$this->system->app_path);
@@ -1131,7 +1126,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->debug = true === $debug;
             // If we are in localhost then activate
             else
-                if($this->core->is->development()) $this->debug = true;
+                if($this->core->is->development()) {
+                    if(!$path && $this->core->config->get('core.cache.cache_path')) $path = $this->core->config->get('core.cache.cache_path');
+                    $this->debug = true;
+                }
 
             // Activate CacheInDirectory
             if (null !== $path) {
@@ -1159,6 +1157,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function activateCacheFile($path, $spacename = '')
         {
+            // Avoid to activate the same Cache Path
+            if($this->dir == $path && is_object($this->cache) ) return true;
+
             if (isset($_SESSION['Core_CacheFile_' . $path]) || is_dir($path) || @mkdir($path)) {
                 $this->type = 'directory';
                 $this->dir = $path;
