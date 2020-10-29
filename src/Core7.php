@@ -96,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.10251';
+        var $_version = 'v73.10291';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2473,7 +2473,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function getEnvVar($var) {
             // By default returns a getenv var if it exists
-            if(getenv($var)) return($var);
+            if(getenv($var)) return(getenv($var));
 
             // Else try to read from $this->data['env_vars'] and read it from readEnvVarsFromGCPSecrets
             if(!isset($this->data['env_vars']) && $this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
