@@ -13,8 +13,8 @@ use Google\Cloud\SecretManager\V1\SecretPayload;
  * Based on: https://cloud.google.com/secret-manager/docs/reference/libraries#client-libraries-usage-php
  */
 
-if (!defined ("_Google_CLASS_") ) {
-    define("_Google_CLASS_", TRUE);
+if (!defined ("_GoogleSecrets_CLASS_") ) {
+    define("_GoogleSecrets_CLASS_", TRUE);
 
     class GoogleSecrets
     {
