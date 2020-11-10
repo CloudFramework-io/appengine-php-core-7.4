@@ -96,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.11061';
+        var $_version = 'v73.11101';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3869,7 +3869,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if (stripos($options['http']['header'], 'Content-type') === false) {
                     if ($raw) {
                         $options['http']['header'] .= 'Content-type: application/json' . "\r\n";
-                    } if(($verb == 'POST' || $verb == 'PUT' || $verb == 'PATCH') && is_array($data) && key_exists('__files', $data) && $data['__files']){
+                    }elseif(($verb == 'POST' || $verb == 'PUT' || $verb == 'PATCH') && is_array($data) && key_exists('__files', $data) && $data['__files']){
                         $options['http']['header'] .= 'Content-Type: multipart/form-data; boundary='.$MULTIPART_BOUNDARY;
                     } else {
                         $options['http']['header'] .= 'Content-type: application/x-www-form-urlencoded' . "\r\n";
