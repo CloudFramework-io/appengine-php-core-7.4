@@ -96,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.11101';
+        var $_version = 'v73.11202';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4665,7 +4665,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 ,'http_referer'=> $fingerprint['http_referer']
                 ,'data'=>$json
                 ,'fingerprint'=>$fingerprint
-                ,'slack_url'=>$slack_url
+                ,'slack_url'=>($slack_url)?'*****'.substr($slack_url,-4):null
             ];
             //endregion
 
