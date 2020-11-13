@@ -96,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.11202';
+        var $_version = 'v73.11203';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4718,6 +4718,34 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return true;
         }
 
+        /**
+         * Add a LOG entry in CloudFrameWorkLogs
+         * @param $app
+         * @param $action string 'ok', 'error', 'check'..
+         * @param $title
+         * @param $method
+         * @param $user
+         * @param $data
+         * @param $platform
+         * @param $api_key
+         */
+        public function sendToCFService($app, $action, $title, $method, $user, $data,$platform,$api_key) {
+            //region SET $entity
+            $entity = ["App"=>$app];
+            $entity["Method"]=$method;
+            $entity["User"]=$user;
+            $entity["Action"]=$action;
+            $entity["Title"]=$title;
+            $entity["Data"]=$data;
+            //endregion
+
+            $this->core->request->reset();
+            $this->core->request->post_json_decode('https://api.cloudframework.io/core/logs/'.$platform,$entity,['X-WEB-KEY'=>$api_key]);
+            if($this->core->request->error) return($this->addError($this->core->request->errorMsg));
+
+            return true;
+        }
+
         /*
          *  Add an error in the class
          */
@@ -4886,6 +4914,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache_secret_iv = '';
         var $cache_data = null;
         var $vars = [];
+        var $sendTerminal=[];
+        var $time = null;
 
         /**
          * Scripts constructor.
@@ -4906,6 +4936,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
             }
             $this->cache = &$this->core->cache;
+            $this->time = microtime(true);
 
         }
 
@@ -4920,6 +4951,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function sendTerminal($info='') {
             if(is_string($info)) echo $info."\n";
             else print_r($info);
+            if($info)
+                $this->sendTerminal[] = "[ ".(round(microtime(true)-$this->time,4))." ms] ".((is_string($info))?$info:json_encode($info));
         }
 
         function readCache() {
