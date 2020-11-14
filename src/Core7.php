@@ -4669,7 +4669,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             ];
             //endregion
 
-            // If slack integration. Send the post to slack_url
+            // If slack_url. Send the post to slack_url
             if($slack_url) {
                 $data = ['text'=>"[$user]{$method}:{$app}: {$action}. {$title}"];
                 $ret = $this->core->request->post_json_decode($slack_url,$data,['Content-type'=> 'application/json'],true);
@@ -4714,7 +4714,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->core->model->processModels(['DataStoreEntities'=>['CloudFrameWorkLogs'=>['model'=>$model]]]);
             if($this->core->model->error) return($this->addError($this->core->model->errorMsg));
 
-            $this->dsLogs = $this->core->model->getModelObject('CloudFrameWorkLogs');$this->dsLogs = $this->core->model->getModelObject('CloudFrameWorkLogs');
+            $this->dsLogs = $this->core->model->getModelObject('CloudFrameWorkLogs');
             return true;
         }
 
