@@ -96,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.11203';
+        var $_version = 'v73.11204';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4665,7 +4665,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 ,'http_referer'=> $fingerprint['http_referer']
                 ,'data'=>$json
                 ,'fingerprint'=>$fingerprint
-                ,'slack_url'=>($slack_url)?'*****'.substr($slack_url,-4):null
             ];
             //endregion
 
@@ -4699,7 +4698,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         private function initDSLogs() {
 
-            if(is_object($this->dsLogs)) return;
+            if(is_object($this->dsLogs)) return true;
             $model = json_decode('{
                     "Host": ["string","index"],
                     "App": ["string","index"],
