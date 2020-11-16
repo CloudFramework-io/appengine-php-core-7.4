@@ -96,7 +96,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.11204';
+        var $_version = 'v73.11205';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4639,16 +4639,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $title
          * @param $method
          * @param $user
-         * @param null $json
-         * @param null $slack_url
+         * @param null|array $data
+         * @param null|string $slack_url
+         * @param null|array $rewrite_fingerprint if you want to rewrite the default fingerprint send it here
          */
-        public function add($app, $action, $title, $method, $user, $json=null,$slack_url=null) {
+        public function add($app, $action, $title, $method, $user, $data=null, $slack_url=null, $rewrite_fingerprint=null) {
             if(!$this->initDSLogs()) return;
 
-            //region SET $fingerprint
+            //region SET $rewrite_fingerprint
             $fingerprint = $this->core->system->getRequestFingerPrint();
             if(!isset($fingerprint['ip'])) $fingerprint['ip'] = $this->core->system->ip;
             if(!isset($fingerprint['http_referer'])) $fingerprint['http_referer'] = 'unknown';
+            if($rewrite_fingerprint && is_array($rewrite_fingerprint)){
+                if(!isset($rewrite_fingerprint['ip'])) $rewrite_fingerprint['ip'] = 'X.X.X.X';
+                if(!isset($rewrite_fingerprint['http_referer'])) $rewrite_fingerprint['http_referer'] = 'unknown';
+                $rewrite_fingerprint['local_fingerprint'] = $fingerprint;
+            } else {
+                $rewrite_fingerprint = $fingerprint;
+            }
             //endregion
 
             //region SET $entity
@@ -4657,21 +4665,21 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $entity["Method"]=$method;
             $entity["DateInsertion"]="now";
             $entity["User"]=$user;
-            $entity["Ip"]=$fingerprint['ip'];
+            $entity["Ip"]=$rewrite_fingerprint['ip'];
             $entity["Action"]=$action;
             $entity["Title"]=$title;
             $entity["JSON"]=[
                 'url'=>(array_key_exists('REQUEST_URI',$_SERVER))?$_SERVER['REQUEST_URI']:''
-                ,'http_referer'=> $fingerprint['http_referer']
-                ,'data'=>$json
-                ,'fingerprint'=>$fingerprint
+                ,'http_referer'=> $rewrite_fingerprint['http_referer']
+                ,'data'=>$data
+                ,'fingerprint'=>$rewrite_fingerprint
             ];
             //endregion
 
             // If slack_url. Send the post to slack_url
             if($slack_url) {
-                $data = ['text'=>"[$user]{$method}:{$app}: {$action}. {$title}"];
-                $ret = $this->core->request->post_json_decode($slack_url,$data,['Content-type'=> 'application/json'],true);
+                $data_slack = ['text'=>"[$user]{$method}:{$app}: {$action}. {$title}"];
+                $ret = $this->core->request->post_json_decode($slack_url,$data_slack,['Content-type'=> 'application/json'],true);
                 if($this->core->request->error) {
                     $entity["JSON"]['slack_url_error'] = $this->core->request->errorMsg;
                     $this->core->logs->add($this->core->request->errorMsg,'slack_error');
@@ -4728,7 +4736,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $platform
          * @param $api_key
          */
-        public function sendToCFService($app, $action, $title, $method, $user, $data,$platform,$api_key) {
+        public function sendToCFService($app, $action, $title, $method, $user, $data,$platform,$api_key,$rewrite_fingerprint=false) {
             //region SET $entity
             $entity = ["App"=>$app];
             $entity["Method"]=$method;
@@ -4736,6 +4744,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $entity["Action"]=$action;
             $entity["Title"]=$title;
             $entity["Data"]=$data;
+
+            // Send the fingerprint from the call to rewrite in the recepcion  of the service
+            if($rewrite_fingerprint)
+                $entity["Fingerprint"]=$this->core->system->getRequestFingerPrint();
             //endregion
 
             $this->core->request->reset();
