@@ -4735,6 +4735,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $data
          * @param $platform
          * @param $api_key
+         * @param true|false $rewrite_fingerprint  // send the fingerprint of the current call
          */
         public function sendToCFService($app, $action, $title, $method, $user, $data,$platform,$api_key,$rewrite_fingerprint=false) {
             //region SET $entity
