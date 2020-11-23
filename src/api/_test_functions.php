@@ -6,6 +6,7 @@ class API extends RESTful
         $this->sendCorsHeaders('GET,POST');
         $this->addReturnData([
             '$this->core->_version'=> $this->core->_version,
+            '$this->>sendCorsHeaders("GET,POST")'=> $this->sendCorsHeaders("GET,POST")===false,
             '$this->core->is->development()'=> $this->core->is->development(),
             '$this->core->is->production()'=> $this->core->is->production(),
             '$this->getHeaders()'=> $this->getHeaders(),
