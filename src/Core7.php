@@ -1043,12 +1043,22 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return (array_key_exists('GAE_SERVICE',$_SERVER) );
         }
 
+        function localEnvironment()
+        {
+            return (!(array_key_exists('GAE_SERVICE',$_SERVER)));
+        }
+
+        function GCPEnvironment()
+        {
+            return (array_key_exists('GAE_SERVICE',$_SERVER) );
+        }
+
         function script()
         {
             return (isset($_SERVER['PWD']) && !isset($_SERVER['GAE_SERVICE']));
         }
 
-        function dirReadble($dir)
+        function dirReadable($dir)
         {
             if (strlen($dir)) return (is_dir($dir));
         }
