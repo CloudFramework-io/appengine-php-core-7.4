@@ -578,7 +578,12 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $entities_keys = [];
             try {
                 foreach ($keys as $key) {
-                    $entities_keys[] = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
+                    // force type TYPE_NAME if there is a field KeyName
+                    if(isset($this->schema['data']['model']['KeyName'])) {
+                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
+                    } else {
+                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
+                    }
                 }
                 $result = $this->datastore->lookupBatch($entities_keys);
                 // $result['found'] is an array of entities.
@@ -784,7 +789,12 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $entities_keys = [];
             try {
                 foreach ($keys as $key) {
-                    $entities_keys[] = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
+                    // force type TYPE_NAME if there is a field KeyName
+                    if(isset($this->schema['data']['model']['KeyName'])) {
+                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
+                    } else {
+                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
+                    }
                 }
                 $ret = $this->datastore->deleteBatch($entities_keys);
             } catch (Exception $e) {
