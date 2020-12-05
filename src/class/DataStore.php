@@ -102,11 +102,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         $schema_key = preg_replace('/[^0-9]/', '', $value);
                         if (!strlen($schema_key)) $this->setError('wrong Key value');
 
-                    } elseif ($this->schema['props'][$i][1] == 'keyname') {
+                    }
+                    elseif ($this->schema['props'][$i][1] == 'keyname') {
                         $schema_keyname = $value;
 
                         // else explore the data.
-                    } else {
+                    }
+                    else {
                         if (is_string($value)) {
                             // date & datetime values
                             if ($this->schema['props'][$i][1] == 'date' || $this->schema['props'][$i][1] == 'datetime' || $this->schema['props'][$i][1] == 'datetimeiso') {
@@ -166,7 +168,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             $key = $this->datastore->key($this->entity_name, $schema_key,['namespaceId'=>$this->namespace]);
                             $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
                         } elseif (null !== $schema_keyname) {
-                            $key = $this->datastore->key($this->entity_name, $schema_keyname,['namespaceId'=>$this->namespace]);
+                            $key = $this->datastore->key($this->entity_name, $schema_keyname,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME, 'namespaceId'=>$this->namespace]);
                             $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
                         } else {
                             $key = $this->datastore->key($this->entity_name, null,['namespaceId'=>$this->namespace]);
@@ -181,6 +183,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     return ($this->setError($this->entity_name . ': Structure of the data does not match with schema'));
                 }
             }
+
 
             // Bulk insertion
             if (!$this->error && count($entities)) try {
@@ -426,6 +429,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         }
         function fetch($type = 'one', $fields = '*', $where = null, $order = null, $limit = null)
         {
+
             if ($this->error) return false;
             $this->core->__p->add('fetch: ', $type . ' fields:' . $fields . ' where:' . $this->core->jsonEncode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
             $ret = [];
@@ -603,7 +607,14 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             if(!$key) return;
             $this->core->__p->add('ds:fetchOneByKey: ',  ' key:' . $key,'note');
             try {
-                $key_entity = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
+
+                // force type TYPE_NAME if there is a field KeyName
+                if(isset($this->schema['data']['model']['KeyName'])) {
+                    $key_entity = $this->datastore->key($this->entity_name, $key,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
+                } else {
+                    $key_entity = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
+                }
+
                 $result = $this->datastore->lookup($key_entity);
                 // $result['found'] is an array of entities.
                 if ($result) {
