@@ -31,6 +31,8 @@ if (!defined("_RESTfull_CLASS_")) {
         var $serviceParam = '';
         var $org_id = '';
         var $rewrite = [];
+        /** @var DataValidation $dv */
+        var $dv;
         /** @var Core7|null  */
         var $core = null;
 
@@ -208,6 +210,34 @@ if (!defined("_RESTfull_CLASS_")) {
             }
             return ($this->error === 0);
 
+        }
+
+        /**
+         * @param string $field
+         * @param mix $value
+         * @param string $type
+         * @param string $validation
+         * @param string $msg_error
+         */
+        function validateValue($field, $value, $type, $validation = '', $msg_error='')
+        {
+            if(!is_object($this->dv)) $this->dv = $this->core->loadClass('DataValidation');
+            $data = [$field=>$value];
+            $model = [$field=>['type'=>$type,'validation'=>$validation]];
+            $dictionaries =  [];
+
+
+            if (!$this->dv->validateModel($model, $data, $dictionaries, true)) {
+                if ($this->dv->typeError == 'field') {
+                        $this->setError($this->dv->field . ': ' . $msg_error.' ['.$this->dv->errorMsg.']', 400);
+                } else {
+                        $this->setError($this->dv->field . ': ' . $msg_error.' ['.$this->dv->errorMsg.']', 503);
+                }
+                if (count($this->dv->errorFields))
+                    $this->core->errors->add($this->dv->errorFields);
+                return false;
+            }
+            return true;
         }
 
         /**
