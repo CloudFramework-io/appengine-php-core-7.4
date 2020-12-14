@@ -20,7 +20,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
      */
     function __print($args)
     {
-        $ret = "";
         if (key_exists('PWD', $_SERVER)) echo "\n";
         else echo "<pre>";
         for ($i = 0, $tr = count($args); $i < $tr; $i++) {
@@ -662,7 +661,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Clas to interacto with with the System variables
+     * Class to interacto with with the System variables
      * @package Core
      */
     class CoreSystem
@@ -839,6 +838,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
         }
 
+        /**
+         * Generate a fingerprint from the Request
+         * @param string $extra if it is =='geodata' it includes the Geodata as part of the hash
+         * @return array
+         */
         function getRequestFingerPrint($extra = '')
         {
             // Return the fingerprint coming from a queue
@@ -4218,7 +4222,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
     /**
-     * Class to manage HTTP requests
+     * Class to manage Data Models
      * @package Core
      */
     Class CoreModel
@@ -4240,6 +4244,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->core = $core;
         }
 
+        /**
+         * Read models from specific Path
+         * @param $path
+         * @return bool
+         */
         function readModels($path) {
 
             try {
