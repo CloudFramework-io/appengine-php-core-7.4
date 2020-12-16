@@ -246,7 +246,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         $this->setError('Schema of ' . $entity . ' with empty key');
                         return false;
                     } elseif ($key == '__model') {
-                        $this->setError('Schema of ' . $entity . ' with not allowd key: __model');
+                        $this->setError('Schema of ' . $entity . ' with not allowed key: __model');
                         return false;
                     }
                     if (!is_array($props)) $props = ['string', ''];
