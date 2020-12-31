@@ -706,6 +706,74 @@ if (!defined("_RESTfull_CLASS_")) {
         }
 
 
+        function getHeader($str)
+        {
+            $str = strtoupper($str);
+            $str = str_replace('-', '_', $str);
+            return ((isset($_SERVER['HTTP_' . $str])) ? $_SERVER['HTTP_' . $str] : '');
+        }
+
+        function getHeaders()
+        {
+            $ret = array();
+            foreach ($_SERVER as $key => $value) if (strpos($key, 'HTTP_') === 0) {
+                $ret[str_replace('HTTP_', '', $key)] = $value;
+            }
+            return ($ret);
+        }
+
+        function getHeadersToResend($extra_headers=null)
+        {
+            $ret = array();
+            foreach ($_SERVER as $key => $value) if (strpos($key, 'HTTP_X_') === 0) {
+                $ret[str_replace('_','-',str_replace('HTTP_', '', $key))] = $value;
+            }
+
+            if($extra_headers) {
+                $extra_headers = explode(',',$extra_headers);
+                foreach ($extra_headers as $extra_header) {
+                    $header = 'HTTP_'.str_replace('-','_',strtoupper($extra_header));
+                    $ret[$extra_header] = (isset($_SERVER[$header]))?$_SERVER[$header]:'';
+                }
+            }
+            return ($ret);
+        }
+
+        /**
+         * Return the value of  $this->formParams[$var]. Return null if $var does not exist
+         * @param string $var
+         * @retun null|mixed
+         */
+        public function getFormParamater($var) {
+            if(!isset($this->formParams[$var])) return null;
+            return $this->formParams[$var];
+        }
+
+        /**
+         * Return the value of  $this->params[$var]. Return null if $var does not exist
+         * @param integer $var
+         * @retun null|mixed
+         */
+        public function getUrlPathParamater($var) {
+            if(!isset($this->params[$var])) return null;
+            return $this->params[$var];
+        }
+
+        /**
+         * Execute a method if $method is defined.
+         * @param string $method name of the method
+         * @return bool
+         */
+        function useFunction($method) {
+            if(method_exists($this,$method)) {
+                $this->$method();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+
         /**
          * Echo the result
          * @param bool $pretty if true, returns the JSON string with JSON_PRETTY_PRINT
@@ -718,13 +786,14 @@ if (!defined("_RESTfull_CLASS_")) {
             // Close potential open connections
             $this->core->model->dbClose();
 
-            // Prepare the return data
+            //region Prepare success,status,code and optionally message return vards
             $ret = array();
             $ret['success'] = ($this->error) ? false : true;
             $ret['status'] = $this->getReturnStatus();
             $ret['code'] = $this->getReturnCode();
             if($this->message) $ret['message'] = $this->message;
-            
+            //endregion
+
             if($this->core->is->terminal())
                 $ret['exec'] = '['.$_SERVER['PWD']. '] php '.implode(' ',$argv);
 
@@ -824,72 +893,6 @@ if (!defined("_RESTfull_CLASS_")) {
             }
         }
 
-        function getHeader($str)
-        {
-            $str = strtoupper($str);
-            $str = str_replace('-', '_', $str);
-            return ((isset($_SERVER['HTTP_' . $str])) ? $_SERVER['HTTP_' . $str] : '');
-        }
-
-        function getHeaders()
-        {
-            $ret = array();
-            foreach ($_SERVER as $key => $value) if (strpos($key, 'HTTP_') === 0) {
-                $ret[str_replace('HTTP_', '', $key)] = $value;
-            }
-            return ($ret);
-        }
-
-        function getHeadersToResend($extra_headers=null)
-        {
-            $ret = array();
-            foreach ($_SERVER as $key => $value) if (strpos($key, 'HTTP_X_') === 0) {
-                $ret[str_replace('_','-',str_replace('HTTP_', '', $key))] = $value;
-            }
-
-            if($extra_headers) {
-                $extra_headers = explode(',',$extra_headers);
-                foreach ($extra_headers as $extra_header) {
-                    $header = 'HTTP_'.str_replace('-','_',strtoupper($extra_header));
-                    $ret[$extra_header] = (isset($_SERVER[$header]))?$_SERVER[$header]:'';
-                }
-            }
-            return ($ret);
-        }
-
-        /**
-         * Return the value of  $this->formParams[$var]. Return null if $var does not exist
-         * @param string $var
-         * @retun null|mixed
-         */
-        public function getFormParamater($var) {
-            if(!isset($this->formParams[$var])) return null;
-            return $this->formParams[$var];
-        }
-
-        /**
-         * Return the value of  $this->params[$var]. Return null if $var does not exist
-         * @param integer $var
-         * @retun null|mixed
-         */
-        public function getUrlPathParamater($var) {
-            if(!isset($this->params[$var])) return null;
-            return $this->params[$var];
-        }
-
-        /**
-         * Execute a method if $method is defined.
-         * @param string $method name of the method
-         * @return bool
-         */
-        function useFunction($method) {
-            if(method_exists($this,$method)) {
-                $this->$method();
-                return true;
-            } else {
-                return false;
-            }
-        }
 
     } // Class
 }

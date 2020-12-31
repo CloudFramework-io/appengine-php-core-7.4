@@ -1,0 +1,17 @@
+{
+  "name": "company-name/project-name",
+  "description": "Your description. More info https://www.notion.so/cloudframework/appengine-php-core20-74c573448dc94ebba7e51fc86b8ad9cb",
+  "require": {
+    "cloudframework-io/appengine-php-core-7.3": "^v73.12311"
+  },
+  "scripts": {
+    "develop": [
+      "[ -d ./local_data ] && echo \"installing ./local_data\" || mkdir  ./local_data ",
+      "[ -d ./local_data/cache ] && echo \"cleaning ./local_data_cache\"  || mkdir  ./local_data/cache ",
+      "php -S 0.0.0.0:9999 vendor/cloudframework-io/appengine-php-core-7.3/src/dispatcher.php"
+    ]
+  },
+  "config": {
+    "process-timeout": 0
+  }
+}

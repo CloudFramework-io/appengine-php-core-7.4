@@ -95,7 +95,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.12071';
+        var $_version = 'v73.12311';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1302,7 +1302,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if ('' != $hash && $hash != $info['_hash_']) {
                     $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('$key',$expireTime,'$hash') failed (beacause hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+                        $this->log->add("get('$key',$expireTime,'$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
                     $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
                     return null;
@@ -1826,9 +1826,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $menu = [];
         var $cache = null;
         // takes the secret_id  from: $this->core->config->get('core.gcp.secrets.env_vars') if it is not set from local_config
-        var $cache_secret_key = '';
-        // openssl rand -base64 24
-        var $cache_secret_iv = '';
+        var $cache_secret_key = ''; // openssl rand -base64 32
+        var $cache_secret_iv = ''; // openssl rand -base64 24
         protected $lang = 'en';
 
 
@@ -2370,28 +2369,33 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          *   - core.gcp.secrets.cache_encrypt_iv: To encryt the data in cache you can define a config-var iv
          *   - @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
          *   - @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache         *
-         * @param $secret_id string secre id in gcp.secrets. if empty it will take $this->get('core.gcp.secrets.env_vars')
+         * @param $gpc_secret_id string secre id in gcp.secrets. if empty it will take $this->get('core.gcp.secrets.env_vars')
          * @param $reload boolean false by default. if true, force to read it from gcp.secrets
-
+         * @return boolean
          */
-        function readEnvVarsFromGCPSecrets($secret_id='',$reload=false) {
+        function readEnvVarsFromGCPSecrets($gpc_secret_id = '', $reload=false) {
 
+            //region CHECK $gpc_secret_id
+            if(!$gpc_secret_id) $gpc_secret_id = $this->get('core.gcp.secrets.env_vars');
+            if(!$gpc_secret_id) {
+                $this->core->logs->add('Missing $secret_id and core.gcp.secrets.env_vars config var','error_readEnvVarsFromGCPSecrets');
+                return false;
+            }
+            //endregion
+
+            //region CHECK local_config.json if this.core.is.development to avoid read from secret_id
             if($this->core->is->development()
                 && is_file($this->core->system->root_path.'/local_config.json')
                 && isset($this->data['env_vars'] )) {
                 $this->core->logs->add('readEnvVarsFromGCPSecrets avoided because local_config.json exists');
                 return true;
             }
+            //endregion
 
-            if(!$secret_id) $secret_id = $this->get('core.gcp.secrets.env_vars');
 
+            //region INIT $this->data['env_vars'] and CHECK $this->core->gc_project_id, $this->core->gc_project_service
             if(!isset($this->data['env_vars']) || !is_array($this->data['env_vars']))
                 $this->data['env_vars'] = [];
-
-            if(!$secret_id) {
-                $this->core->logs->add('Missing $secret_id and core.gcp.secrets.env_vars config var','error_readEnvVarsFromGCPSecrets');
-                return false;
-            }
 
             if(!$this->core->gc_project_id) {
                 $this->core->logs->add('Missing $this->core->gc_project_id','error_readEnvVarsFromGCPSecrets');
@@ -2402,8 +2406,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->logs->add('Missing $this->core->gc_project_service','error_readEnvVarsFromGCPSecrets');
                 return false;
             }
+            //endregion
 
-            // read data from cache and enrypt data
+            // read data from cache and encrypt data
             $key ="{$this->core->gc_project_id}_{$this->core->gc_project_service}_core.gcp.secrets.env_vars";
             $env_vars = $this->getCache($key);
 
@@ -2412,13 +2417,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $reload=true;
             }
 
-            // if the cache is empty or $reload then read from gcp secrets
+            //region READ env_vars data from cache or from GPC Secret service
             if($reload || !$env_vars || !isset($env_vars['env_vars:']) || !$env_vars['env_vars:']) {
 
                 // performance init
-                $this->core->__p->add('GoogleSecrets', $secret_id, 'note');
+                $this->core->__p->add('GoogleSecrets', $gpc_secret_id, 'note');
 
                 // INSTANCE OF GoogleSecrets init
+                /** @var GoogleSecrets $gs */
                 $gs = $this->core->loadClass('GoogleSecrets');
                 if($gs->error) {
                     $this->core->logs->add($gs->errorMsg,'error_readEnvVarsFromGCPSecrets');
@@ -2473,10 +2479,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->logs->add('Core7.CoreConfig data cached');
 
             }
+            //endregion
 
+
+            //region Merge this->data['env_vars'] with env_vars['env_vars:']
             if($env_vars && isset($env_vars['env_vars:']) && $env_vars['env_vars:']) {
                 $this->data['env_vars'] = array_merge($this->data['env_vars'],$env_vars['env_vars:']);
             }
+            //endregion
 
             return true;
 
@@ -3009,8 +3019,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * based on: https://gist.github.com/joashp/a1ae9cb30fa533f4ad94
          *
          * @param string $text: string to encrypt
-         * @param string $secret_key  optional secret key. If empty it will take it from config-vars: EncryptKey
-         * @param string $secret_iv  optional secret key. If empty it will take it from config-vars: EncryptSecret
+         * @param string $secret_key  optional secret key. If empty it will take it from config-vars: core.security.encrypt_key
+         * @param string $secret_iv  optional secret key. If empty it will take it from config-vars: core.security.encrypt_secret
          * @return string in base64
          */
         function encrypt($text,$secret_key='',$secret_iv='') {
@@ -3020,10 +3030,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $encrypt_method = "AES-256-CBC";
 
             if(!$secret_key)
-                $secret_key = ($this->core->config->get('EncryptKey'))?:'XWER$T;(6tg';
+                $secret_key = ($this->core->config->get('core.security.encrypt_key'))?:'ybdqfG3MTPfzct3jR28qbix/yvbodtT0';
 
             if(!$secret_iv)
-                $secret_iv = ($this->core->config->get('EncryptSecret'))?:'sadf&$sad_dkuYWER$T__6ttre';
+                $secret_iv = ($this->core->config->get('core.security.encrypt_secret'))?:'sadf&$sad_dkuYWER$T__6ttre';
 
             // hash
             $key = hash('sha256', $secret_key);
@@ -3039,8 +3049,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * Decrypt Encrypted Text
          *
          * @param string $encrypted_text base64 string
-         * @param string $secret_key  optional secret key. If empty it will take it from config-vars: EncryptKey
-         * @param string $text  optional secret key. If empty it will take it from config-vars: EncryptSecret
+         * @param string $secret_key  optional secret key. If empty it will take it from config-vars: core.security.encrypt_key
+         * @param string $text  optional secret key. If empty it will take it from config-vars: core.security.encrypt_secret
          *
          */
         function decrypt($encrypted_text,$secret_key='',$secret_iv='') {
@@ -3050,10 +3060,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $encrypt_method = "AES-256-CBC";
 
             if(!$secret_key)
-                $secret_key = ($this->core->config->get('EncryptKey'))?:'XWER$T;(6tg';
+                $secret_key = ($this->core->config->get('core.security.encrypt_key'))?:'ybdqfG3MTPfzct3jR28qbix/yvbodtT0';
 
             if(!$secret_iv)
-                $secret_iv = ($this->core->config->get('EncryptSecret'))?:'sadf&$sad_dkuYWER$T__6ttre';
+                $secret_iv = ($this->core->config->get('core.security.encrypt_secret'))?:'sadf&$sad_dkuYWER$T__6ttre';
 
             // hash
             $key = hash('sha256', $secret_key);

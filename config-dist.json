@@ -1,0 +1,8 @@
+{
+  "core.api.urls": ["/"],
+  "core.datastore.on": false,
+  "core.datastorage.on": false,
+  "development: Vars to work in development": {
+    "core.cache.cache_path": "{{rootPath}}/local_data/cache"
+  }
+}
