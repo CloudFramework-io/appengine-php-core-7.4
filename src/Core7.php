@@ -95,7 +95,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.12311';
+        var $_version = 'v73.13031';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -181,24 +181,36 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if (!strlen($this->system->url['parts'][$this->system->url['parts_base_index']])) $this->errors->add('missing api end point');
                 else {
 
+                    // $apifile will be by default the first element of the end-point url
                     $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']];
 
-                    // -----------------------
-                    // Evaluating tests API cases
-                    // path to file
+                    // if $apifile starts with '_' character or start with queue the look into the framework
                     if ($apifile[0] == '_' || $apifile == 'queue') {
                         $pathfile = __DIR__ . "/api/{$apifile}.php";
                         if (!file_exists($pathfile)) $pathfile = '';
-                    } else {
-                        // Every End-point inside the app has priority over the apiPaths
+                    }
+                    // else look into user api structure.
+                    else {
+
+                        // $apifile is a directory and there are more than one parameter
+                        // then $apifile will be the firts_parameter/sencond_parameter
+                        if(isset($this->system->url['parts'][$this->system->url['parts_base_index']+1])
+                            && is_dir($this->system->app_path . "/api/{$apifile}")
+                            && !file_exists($this->system->app_path . "/api/{$apifile}.php")
+                        ) {
+                            $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']].'/'.$this->system->url['parts'][$this->system->url['parts_base_index']+1];
+                        }
+
+                        // $pathfile is the path where the php file has to be created
                         $pathfile = $this->system->app_path . "/api/{$apifile}.php";
+
                         if (!file_exists($pathfile)) {
                             $pathfile = '';
                             if (strlen($this->config->get('core.api.extra_path')))
                                 $pathfile = $this->config->get('core.api.extra_path') . "/{$apifile}.php";
-
                         }
                     }
+
 
                     // IF NOT EXIST
                     include_once __DIR__ . '/class/RESTful.php';
