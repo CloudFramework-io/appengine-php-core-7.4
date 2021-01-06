@@ -256,14 +256,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         $index = (stripos($props[1], 'index') !== false);
                     else $index = false;
                     switch ($props[0]) {
-                        case "integer":
                         case "key":
                         case "keyname":
                         case "date":
                         case "datetime":
                         case "datetimeiso":
-                        case "datetimeiso":
                         case "float":
+                        case "integer":
                         case "boolean":
                         case "bool":
                         case "list":
