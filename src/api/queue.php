@@ -3,6 +3,7 @@
 // activate API at: https://console.developers.google.com/apis/api/cloudtasks.googleapis.com/overview?project={{PROJECT-ID}}
 // Task to use in background
 use Google\Cloud\Tasks\V2\AppEngineHttpRequest;
+use Google\Cloud\Tasks\V2\AppEngineRouting;
 use Google\Cloud\Tasks\V2\CloudTasksClient;
 use Google\Cloud\Tasks\V2\HttpMethod;
 use Google\Cloud\Tasks\V2\Task;
@@ -124,6 +125,15 @@ class API extends RESTful
             }
 
             $httpRequest->setHeaders($this->getHeadersToResend((isset($this->formParams['_extra_headers']))?$this->formParams['_extra_headers']:null));
+
+            // Route to the service:
+            $_appengine_service = (isset($this->formParams['_appengine_service']))?$this->formParams['_appengine_service']:null;
+            if($_appengine_service) {
+                $appEngineRouting = new AppEngineRouting();
+                $appEngineRouting->setService($_appengine_service);
+                $httpRequest->setAppEngineRouting($appEngineRouting);
+                $this->formParams['cloudframework_queued_service'] = $_appengine_service;
+            }
 
             // Create a Cloud Task object.
             $task = new Task();
