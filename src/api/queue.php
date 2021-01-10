@@ -19,7 +19,7 @@ class API extends RESTful
         if(isset($this->formParams['_raw_input_'])) unset($this->formParams['_raw_input_']);
 
         // CALL URL and wait until the response is received
-        if (isset($this->formParams['interactive'])) {
+        if (isset($this->formParams['_interactive'])) {
 
             //Delete variable
             unset($this->formParams['interactive']);
@@ -29,8 +29,15 @@ class API extends RESTful
 
             // Requires to create a complete URL
             $value['url_queued'] = $_url;
+            $value['method'] = $this->method;
             $value['interative'] = true;
             $value['headers'] = $this->getHeadersToResend((isset($this->formParams['_extra_headers']))?$this->formParams['_extra_headers']:null);
+
+            // Add formParms to be send deleteing special parameters
+            unset($this->formParams['_interactive']);
+            unset($this->formParams['_extra_headers']);
+            $value['formParams'] = $this->formParams;
+
 
             // Avoid to send automatica Headers.
             $this->core->request->automaticHeaders = false;
@@ -126,7 +133,7 @@ class API extends RESTful
 
             $httpRequest->setHeaders($this->getHeadersToResend((isset($this->formParams['_extra_headers']))?$this->formParams['_extra_headers']:null));
 
-            // Route to the service:
+            // Route to the service when _appengine_service form params is sent.
             $_appengine_service = (isset($this->formParams['_appengine_service']))?$this->formParams['_appengine_service']:null;
             if($_appengine_service) {
                 $appEngineRouting = new AppEngineRouting();
