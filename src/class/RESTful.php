@@ -821,7 +821,8 @@ if (!defined("_RESTfull_CLASS_")) {
                     $this->ok = 200;
                 }
             } elseif ($this->core->errors->lines) {
-                $ret['errors'] = $this->core->errors->data;
+                $error_var = ($this->core->config->get('core.api.errors.var_name'))?$this->core->config->get('core.api.errors.var_name'):'errors';
+                $ret[$error_var] = $this->core->errors->data;
                 $this->core->errors->sendToSysLog('CloudFramework RESTFul: '. json_encode($this->core->errors->data,JSON_FORCE_OBJECT),'error');
             }
 

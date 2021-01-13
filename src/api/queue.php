@@ -1,6 +1,24 @@
 <?php
-// based on: https://github.com/GoogleCloudPlatform/php-docs-samples/blob/master/appengine/php72/tasks/snippets/src/create_task.php
-// activate API at: https://console.developers.google.com/apis/api/cloudtasks.googleapis.com/overview?project={{PROJECT-ID}}
+/**
+ * QUEUE calls end-points
+ * This feature allows in a very easy way to queue calls to end-points adding /queue at the beginning of the url
+ * It uses GCP Task Manager as engine to queue your calls.
+ *
+ * More info:
+ *  - https://cloud.google.com/tasks/docs/creating-appengine-tasks
+ *  - https://github.com/GoogleCloudPlatform/php-docs-samples/blob/master/appengine/php72/tasks/snippets/src/create_task.php
+ *  - https://console.developers.google.com/apis/api/cloudtasks.googleapis.com/overview?project={{PROJECT-ID}}
+ *
+ * Headers sent by a task:
+ *  - X-CloudTasks-QueueName	The name of the queue.
+ *  - X-CloudTasks-TaskName	The "short" name of the task, or, if no name was specified at creation, a unique system-generated id. This is the my-task-id value in the complete task name, ie, task_name = projects/my-project-id/locations/my-location/queues/my-queue-id/tasks/my-task-id.
+ *  - X-CloudTasks-TaskRetryCount	The number of times this task has been retried. For the first attempt, this value is 0. This number includes attempts where the task failed due to 5XX error codes and never reached the execution phase.
+ *  - X-CloudTasks-TaskExecutionCount	The total number of times that the task has received a response from the handler. Since Cloud Tasks deletes the task once a successful response has been received, all previous handler responses were failures. This number does not include failures due to 5XX error codes.
+ *  - X-CloudTasks-TaskETA	The schedule time of the task, specified in seconds since January 1st 1970.
+ *
+ * Last-update: 2021-01
+ * @type {RESTFul}
+ */
 // Task to use in background
 use Google\Cloud\Tasks\V2\AppEngineHttpRequest;
 use Google\Cloud\Tasks\V2\AppEngineRouting;
@@ -63,6 +81,7 @@ class API extends RESTful
         } // RUN THE TASK
         else {
 
+            //region VERIFY PROJECT_ID,LOCATION_ID,QUEUE_ID or return error if they can not be set
             if(!getenv('PROJECT_ID')) return($this->setErrorFromCodelib('system-error','missing PROJECT_ID env_var'));
 
             // use: gcloud tasks locations list to get valid locations
@@ -70,21 +89,26 @@ class API extends RESTful
 
             // default if empty
             if(!getenv('QUEUE_ID')) return($this->setErrorFromCodelib('system-error','missing QUEUE_ID env_var'));
+            //endregion
 
-            $client = new CloudTasksClient();
-            $queueName = $client->queueName(getenv('PROJECT_ID'),getenv('LOCATION_ID'),getenv('QUEUE_ID'));
-
-            $_url = str_replace('/queue/', '/', urldecode($this->core->system->url['url_uri']));
-
-            // Create an App Engine Http Request Object.
-            $httpRequest = new AppEngineHttpRequest();
-
-
-            // adding forms params
+            //region ADD in formParams cloudframework_queued variables to be include in the task call
             $this->formParams['cloudframework_queued'] = true;
             $this->formParams['cloudframework_queued_id'] = uniqid('queue', true);
             $this->formParams['cloudframework_queued_ip'] = $this->core->system->ip;
             $this->formParams['cloudframework_queued_fingerprint'] = json_encode($this->core->system->getRequestFingerPrint(), JSON_PRETTY_PRINT);
+            //endregion
+
+            //region SET '$_url'
+            $_url = str_replace('/queue/', '/', urldecode($this->core->system->url['url_uri']));
+            //endregion
+
+            //region CREATE $client, $queueName and $task to be queued
+            $client = new CloudTasksClient();
+            $queueName = $client->queueName(getenv('PROJECT_ID'),getenv('LOCATION_ID'),getenv('QUEUE_ID'));
+
+            // Create an App Engine Http Request Object.
+            $httpRequest = new AppEngineHttpRequest();
+
 
             // Add special vars to the url if the method is not POST,PUT,PATCH
             if(!in_array($this->method,["POST","PUT","PATCH"])) {
@@ -145,14 +169,19 @@ class API extends RESTful
             // Create a Cloud Task object.
             $task = new Task();
             $task->setAppEngineHttpRequest($httpRequest);
+            //endregion
 
-            // Send request and print the task name.
+            //region CALL $client->createTask($queueName, $task)
             $response = $client->createTask($queueName, $task);
             $this->core->logs->add('Task created: '.$response->getName(),'task_created');
+            //endregion
 
+            //region SET $value to be returned
             $value['url_queued'] = $_url;
             $value['method'] = $this->method;
+            $value['interative'] = false;
             $value['data_sent'] = $this->formParams;
+            //endregion
 
         }
 
