@@ -1331,8 +1331,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
 
                 // unserialize vars
+                $ret = null;
                 try {
-                    $ret = ($info['_data_'])?@unserialize(@gzuncompress($info['_data_'])):null;
+                    if(isset($info['_data_']) && $info['_data_'])
+                        $ret = ($info['_data_'])?@unserialize(@gzuncompress($info['_data_'])):null;
                 } catch (Exception $e) {
                     $ret = null;
                 }
