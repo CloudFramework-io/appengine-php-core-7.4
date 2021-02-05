@@ -95,7 +95,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.13131';
+        var $_version = 'v73.14051';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -178,102 +178,102 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // API end points. By default $this->config->get('core_api_url') is '/'
             if ($this->isApiPath()) {
 
-                if (!strlen($this->system->url['parts'][$this->system->url['parts_base_index']])) $this->errors->add('missing api end point');
+                // Extract $apifile route
+                $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']];
+                // If empty by default it will be index
+                if(!$apifile) {
+                    $apifile='index';
+                }
+
+                // if $apifile starts with '_' character or start with queue the look into the framework
+                if ($apifile[0] == '_' || $apifile == 'queue') {
+                    $pathfile = __DIR__ . "/api/{$apifile}.php";
+                    if (!file_exists($pathfile)) $pathfile = '';
+                }
+                // else look into user api structure.
                 else {
 
-                    // $apifile will be by default the first element of the end-point url
-                    $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']];
-
-                    // if $apifile starts with '_' character or start with queue the look into the framework
-                    if ($apifile[0] == '_' || $apifile == 'queue') {
-                        $pathfile = __DIR__ . "/api/{$apifile}.php";
-                        if (!file_exists($pathfile)) $pathfile = '';
-                    }
-                    // else look into user api structure.
-                    else {
-
-                        // $apifile is a directory and there are more than one parameter
-                        // then $apifile will be the firts_parameter/sencond_parameter
-                        if(isset($this->system->url['parts'][$this->system->url['parts_base_index']+1])
-                            && is_dir($this->system->app_path . "/api/{$apifile}")
-                            && !file_exists($this->system->app_path . "/api/{$apifile}.php")
-                        ) {
-                            $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']].'/'.$this->system->url['parts'][$this->system->url['parts_base_index']+1];
-                        }
-
-                        // $pathfile is the path where the php file has to be created
-                        $pathfile = $this->system->app_path . "/api/{$apifile}.php";
-
-                        if (!file_exists($pathfile)) {
-                            $pathfile = '';
-                            if (strlen($this->config->get('core.api.extra_path')))
-                                $pathfile = $this->config->get('core.api.extra_path') . "/{$apifile}.php";
-                        }
+                    // $apifile is a directory and there are more than one parameter
+                    // then $apifile will be the firts_parameter/sencond_parameter
+                    if(isset($this->system->url['parts'][$this->system->url['parts_base_index']+1])
+                        && is_dir($this->system->app_path . "/api/{$apifile}")
+                        && !file_exists($this->system->app_path . "/api/{$apifile}.php")
+                    ) {
+                        $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']].'/'.$this->system->url['parts'][$this->system->url['parts_base_index']+1];
                     }
 
+                    // $pathfile is the path where the php file has to be created
+                    $pathfile = $this->system->app_path . "/api/{$apifile}.php";
 
-                    // IF NOT EXIST
-                    include_once __DIR__ . '/class/RESTful.php';
+                    if (!file_exists($pathfile)) {
+                        $pathfile = '';
+                        if (strlen($this->config->get('core.api.extra_path')))
+                            $pathfile = $this->config->get('core.api.extra_path') . "/{$apifile}.php";
+                    }
+                }
 
-                    try {
-                        // Include the external file $pathfile
-                        if (strlen($pathfile)) {
-                            // init data storage client wrapper if filepath starts with gs://
-                            $this->__p->add('Loaded $pathfile', __METHOD__,'note');
-                            @include_once $pathfile;
-                            $this->__p->add('Loaded $pathfile', __METHOD__,'endnote');
 
-                        }
+                // IF NOT EXIST
+                include_once __DIR__ . '/class/RESTful.php';
 
-                        // By default the ClassName will be called API.. if the include set $api_class var, we will use that class name
-                        if(!isset($api_class)) $api_class = 'API';
+                try {
+                    // Include the external file $pathfile
+                    if (strlen($pathfile)) {
+                        // init data storage client wrapper if filepath starts with gs://
+                        $this->__p->add('Loaded $pathfile', __METHOD__,'note');
+                        @include_once $pathfile;
+                        $this->__p->add('Loaded $pathfile', __METHOD__,'endnote');
 
-                        if (class_exists($api_class)) {
-                            /** @var RESTful $api */
-                            $api = new $api_class($this,$this->system->url['parts_base_url']);
-                            if (array_key_exists(0,$api->params) && $api->params[0] == '__codes') {
-                                $__codes = $api->codeLib;
-                                foreach ($__codes as $key => $value) {
-                                    $__codes[$key] = $api->codeLibError[$key] . ', ' . $value;
-                                }
-                                $api->addReturnData($__codes);
-                            } else {
-                                $api->main();
+                    }
+
+                    // By default the ClassName will be called API.. if the include set $api_class var, we will use that class name
+                    if(!isset($api_class)) $api_class = 'API';
+
+                    if (class_exists($api_class)) {
+                        /** @var RESTful $api */
+                        $api = new $api_class($this,$this->system->url['parts_base_url']);
+                        if (array_key_exists(0,$api->params) && $api->params[0] == '__codes') {
+                            $__codes = $api->codeLib;
+                            foreach ($__codes as $key => $value) {
+                                $__codes[$key] = $api->codeLibError[$key] . ', ' . $value;
                             }
-                            $api->send();
-
+                            $api->addReturnData($__codes);
                         } else {
-                            $api = new RESTful($this);
-                            if(is_file($pathfile)) {
-                                $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
-                            } else {
-                                $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
+                            $api->main();
+                        }
+                        $api->send();
 
-                            }
-                            $api->send();
-                        }
-                    } catch (Exception $e) {
-                        // ERROR CONTROL WHERE $api is not an object
-                        if(!is_object($api)) {
-                            $api = new RESTful($this);
-                            if(is_file($pathfile)) {
-                                $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
-                            } else {
-                                $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
-                            }
-                        }
-                        // If $api is an object then an exception has been captured
-                        else {
-                            $api->setError("the code in '{$apifile}' has produced an exception ", 503);
+                    } else {
+                        $api = new RESTful($this);
+                        if(is_file($pathfile)) {
+                            $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
+                        } else {
+                            $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
 
                         }
-
-                        $this->errors->add(error_get_last());
-                        $this->errors->add($e->getMessage());
                         $api->send();
                     }
-                    $this->__p->add("API including RESTfull.php and {$apifile}.php: ", 'There are ERRORS');
+                } catch (Exception $e) {
+                    // ERROR CONTROL WHERE $api is not an object
+                    if(!is_object($api)) {
+                        $api = new RESTful($this);
+                        if(is_file($pathfile)) {
+                            $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
+                        } else {
+                            $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
+                        }
+                    }
+                    // If $api is an object then an exception has been captured
+                    else {
+                        $api->setError("the code in '{$apifile}' has produced an exception ", 503);
+
+                    }
+
+                    $this->errors->add(error_get_last());
+                    $this->errors->add($e->getMessage());
+                    $api->send();
                 }
+                $this->__p->add("API including RESTfull.php and {$apifile}.php: ", 'There are ERRORS');
                 return false;
             } // Take a LOOK in the menu
             elseif ($this->config->inMenuPath()) {
@@ -3650,6 +3650,16 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return ($ret);
         }
 
+        /**
+         * CURL METHOD
+         * @param $route
+         * @param null $data
+         * @param string $verb
+         * @param null $extra_headers
+         * @param false $raw
+         * @return false|string
+         * @throws Exception
+         */
         function getCurl($route, $data = null, $verb = 'GET', $extra_headers = null, $raw = false)
         {
 
@@ -3752,6 +3762,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
 
+        /**
+         * GET CALL expecting a json response
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool[]|mixed|string[]
+         */
         function get_json_decode($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             $this->rawResult = $this->get($route, $data, $extra_headers, $send_in_json);
@@ -3763,6 +3781,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $ret;
         }
 
+        /**
+         * POST CALL expecting a json response
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool[]|mixed|string[]
+         */
         function post_json_decode($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             $this->rawResult = $this->post($route, $data, $extra_headers, $send_in_json);
@@ -3774,6 +3800,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $ret;
         }
 
+        /**
+         * PUT CALL expecting a json response
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool[]|mixed|string[]
+         */
         function put_json_decode($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             $this->rawResult = $this->put($route, $data, $extra_headers, $send_in_json);
@@ -3786,6 +3820,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
 
+        /**
+         * PATCH
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool[]|mixed|string[]
+         */
         function patch_json_decode($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             $this->rawResult = $this->patch($route, $data, $extra_headers, $send_in_json);
@@ -3797,9 +3839,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $ret;
         }
 
-        function delete_json_decode($route, $extra_headers = null, $data = null)
+        /**
+         * DELETE
+         * @param $route
+         * @param null $extra_headers
+         * @param null $data
+         * @param false $send_in_json
+         * @return bool[]|mixed|string[]
+         */
+        function delete_json_decode($route, $extra_headers = null, $data = null, $send_in_json = false)
         {
-            $this->rawResult = $this->delete($route, $extra_headers, $data);
+            $this->rawResult = $this->delete($route, $extra_headers, $data, $send_in_json);
             $ret = json_decode($this->rawResult, true);
             if (JSON_ERROR_NONE === json_last_error()) $this->rawResult = '';
             else {
@@ -3808,24 +3858,68 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $ret;
         }
 
+        /**
+         * GET
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool|string
+         */
         function get($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             return $this->call($route, $data, 'GET', $extra_headers, $send_in_json);
         }
 
+        /**
+         * POST
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool|string
+         */
         function post($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             return $this->call($route, $data, 'POST', $extra_headers, $send_in_json);
         }
 
+        /**
+         * PUT
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool|string
+         */
         function put($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             return $this->call($route, $data, 'PUT', $extra_headers, $send_in_json);
         }
 
+        /**
+         * @param $route
+         * @param null $data
+         * @param null $extra_headers
+         * @param false $send_in_json
+         * @return bool|string
+         */
         function patch($route, $data = null, $extra_headers = null, $send_in_json = false)
         {
             return $this->call($route, $data, 'PATCH', $extra_headers, $send_in_json);
+        }
+
+        /**
+         * DELETE
+         * @param $route
+         * @param null $extra_headers
+         * @param null $data
+         * @param false $send_in_json
+         * @return bool|string
+         */
+        function delete($route, $extra_headers = null, $data = null, $send_in_json = false)
+        {
+            return $this->call($route, $data, 'DELETE', $extra_headers, $send_in_json);
         }
 
         /**
@@ -4038,10 +4132,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return ($ret);
         }
 
-        function delete($route, $extra_headers = null, $data = null)
-        {
-            return $this->call($route, $data, 'DELETE', $extra_headers);
-        }
 
         /*
          * Returns the status number of the last call
