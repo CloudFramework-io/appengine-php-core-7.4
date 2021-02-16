@@ -662,13 +662,15 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 if($this->transformReadedEntities)
                 foreach ($row as $key => $value) {
                     // Update Types: Geppoint, JSON, Datetime
-                    if(!isset($this->schema['props'][$key]))
+                    if (!isset($this->schema['props'][$key]))
                         $row[$key] = $value;
                     elseif ($value instanceof Geopoint)
                         $row[$key] = $value->getLatitude() . ',' . $value->getLongitude();
-                    elseif ($key == 'JSON' || $this->schema['props'][$key][1] == 'json')
-                        $row[$key] = json_decode($value, true);
-                    elseif ($this->schema['props'][$key][1] == 'zip')
+                    elseif ($key == 'JSON' || $this->schema['props'][$key][1] == 'json') {
+                        // if is_array($value) then it is an EMBEDED ENTITY
+                        if(is_array($value)) $row[$key] = $value;
+                        else $row[$key] = json_decode($value, true);
+                    }elseif ($this->schema['props'][$key][1] == 'zip')
                         $row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(utf8_decode($value)) : $value;
                     elseif ($this->schema['props'][$key][1] == 'txt')
                         $row[$key] = $value;
