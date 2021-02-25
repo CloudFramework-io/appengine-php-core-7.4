@@ -12,6 +12,9 @@ use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
 if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
 
+    //2021-02-25: Fix to force rest transport instead of grpc because it crash for certain content.
+    if(isset($_GET['_fix_datastore_transport'])) $core->config->set('core.datastore.transport','rest');
+
     // grpc or rest
     if($core->is->development()) {
         $transport = ($core->config->get('core.datastore.transport'))?:'rest';
