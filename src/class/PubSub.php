@@ -1,6 +1,17 @@
 <?php
 
+/**
+ * PubSub CloudFramework Class
+ * https://cloud.google.com/pubsub/docs/quickstart-client-libraries
+ * It requires to execute for testing:
+ * gcloud pubsub topics create cloudframework-pubsub-test --project={your-project}
+ * gcloud pubsub subscriptions create cloudframework-pubsub-test-sub --topic cloudframework-pubsub-test --project={your-project}
+ * https://console.cloud.google.com/cloudpubsub/topic/list?folder=&organizationId=&project={your-project}
+ * It requires: Pub/Sub Admin
+ * last-update: 2021-03
+ */
 use Google\Cloud\PubSub\PubSubClient;
+use Google\Cloud\PubSub\Subscription;
 
 class PubSub
 {
@@ -10,7 +21,13 @@ class PubSub
     var $client = null;
     /** @var $topic \Google\Cloud\PubSub\Topic|null  */
     var $topic = null;
+    var $topicName = '';
     /** @var $subscription \Google\Cloud\PubSub\Subscription|null  */
+
+    var $lastMessages = null;
+    /** @var Subscription $lastSubscription */
+    var $lastSubscription = null;
+
     var $subscription = null;
     var $error = false;
     var $errorMsg = null;
@@ -19,120 +36,204 @@ class PubSub
      * DataSQL constructor.
      * @param Core $core
      */
-    function __construct(Core7 &$core)
+    function __construct(Core7 &$core, $options=[])
     {
+
 
         // Get core function
         $this->core = $core;
-        $projectId = $this->core->config->get('GoogleProjectId');
+        $projectId = $this->core->gc_project_id;
+        if(isset($options['projectId'])) $projectId = $options['projectId'];
+
         if(!$projectId) return($this->addError('Missing GoogleProjectId config var'));
-
-
-        require_once $this->core->system->root_path . '/vendor/autoload.php';
         try {
-            if($this->core->is->development()) {
-                $projectId = 'localhost';
-                // gcloud beta emulators pubsub start
-                putenv('PUBSUB_EMULATOR_HOST=http://localhost:8826');
-                $this->client = new PubSubClient([
-                    'projectId' => $projectId
-                ]);
-            } else {
-                $this->client = new PubSubClient([
-                    'projectId' => $projectId
-                ]);
+            $this->core->__p->add('init PubSub',__CLASS__,'note');
+            $this->client = new PubSubClient([
+                'projectId' => $projectId,
+            ]);
+            $this->core->__p->add('init PubSub',__CLASS__,'endnote');
+        } catch (Exception $error) {
+            $this->core->__p->add('init PubSub',__CLASS__,'endnote');
+            return($this->addError($error->getCode().': '.$error->getMessage()));
+
+        }
+    }
+
+    /**
+     * Return the current subscriptions for the Application
+     * @return array|void
+     */
+    public function getTopics() {
+        if(!is_object($this->client)) return($this->addError('missing pubsub client'));
+
+        //region SET $ret from $topics = $this->client->topics();
+        try {
+            $this->core->__p->add('getTopics','PubSub','note');
+            /** @var Google\Cloud\Core\Iterator\ItemIterator $topics */
+            $topics = $this->client->topics();
+            $ret = [];
+            if(is_object($topics))
+                foreach ($topics as $topic) {
+                    $ret[] = $topic->info();
+                }
+        } catch(Exception $e) {
+            $this->core->__p->add('getTopics','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
+        }
+        //endregion
+
+        $this->core->__p->add('getTopics','PubSub','endnote');
+        return $ret;
+    }
+
+    /**
+     * Return the current subscriptions for the Application
+     * @return array|void
+     */
+    public function getSubscriptions() {
+        if(!is_object($this->client)) return($this->addError('missing pubsub client'));
+        $this->core->__p->add('getSubscriptions','PubSub','note');
+        //region SET $ret from  $subscriptions = $this->client->subscriptions();
+        try {
+            $subscriptions = $this->client->subscriptions();
+            $ret = [];
+            if(is_object($subscriptions))
+                foreach ($subscriptions as $subscription) {
+                    $ret[] = $subscription->info();
+                }
+
+        } catch(Exception $e) {
+            $this->core->__p->add('getSubscriptions','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
+        }
+        //endregion
+
+        $this->core->__p->add('getSubscriptions','PubSub','endnote');
+        return $ret;
+    }
+
+    /**
+     * Create a subscripion
+     * https://cloud.google.com/pubsub/docs/samples/pubsub-create-pull-subscription
+     * @param $subscription
+     * @param $topic
+     * @return \Google\Cloud\PubSub\Subscription|null
+     */
+    public function subscribeTo($subscriptionName,$topicName) {
+        if(!is_object($this->client)) return;
+
+        try {
+            $this->core->__p->add('subscribeTo','PubSub','note');
+            $subscription = $this->client->subscription($subscriptionName,$topicName);
+            if(!$subscription->exists()) {
+                $subscription = $this->client->subscribe($subscriptionName,$topicName);
             }
-        } catch (Exception $e) {
-            $this->addError($e->getCode().': '.$e->getMessage());
+        } catch(Exception $e) {
+            $this->core->__p->add('subscribeTo','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
         }
 
+        $this->core->__p->add('subscribeTo','PubSub','endnote');
+        return $subscription->info();
+
+    }
+
+    /**
+     * Publish a message in a TopicName
+     * @param $message
+     * @param array $attributes
+     * @param null $topicName
+     * @return array|void
+     */
+    public function pushMessage($message,$attributes=[],$topicName=null) {
+
+        if(!is_object($this->client)) return;
+        $this->core->__p->add('pushMessage','PubSub','note');
+        //region SET $this->topic. If error return;
+        if($topicName && $topicName != $this->topicName) {
+            try {
+                $this->topic = $this->client->topic($topicName);
+                $this->topicName = $topicName;
+            } catch (Exception $e) {
+                $this->core->__p->add('pushMessage','PubSub','endnote');
+                return $this->addError($e->getCode().': '.$e->getMessage());
+            }
+        }
+        if(!is_object($this->topic)) {
+            $this->core->__p->add('pushMessage','PubSub','endnote');
+            return $this->addError('Missing topic: '.$this->topicName);
+        }
+        //endregion
+
+        //region SET $message_ids  = publishing $message and $attributes in $this->topic
+        $topicData = ['data'=>$message];
+        if($attributes) {
+            $topicData['attributes'] = $attributes;
+        }
+
+        try {
+            $message_ids = $this->topic->publish($topicData);
+        } catch (Exception $e) {
+            $this->core->__p->add('pushMessage','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
+        }
+        //endregion
+
+        $this->core->__p->add('pushMessage','PubSub','endnote');
+        return($message_ids);
     }
 
     /**
      * @param $topic
      * @return \Google\Cloud\PubSub\Topic|null
      */
-    public function getTopic($topic) {
+    public function pullMessages($subscriptionName,$topicName=null,$acknowledge=false) {
+
         if(!is_object($this->client)) return($this->addError('missing pubsub client'));
-
-        $this->topic = $this->client->topic($topic);
-        try {
-            $this->topic->info();
-            return $this->topic;
-        } catch(Exception $e) {
-            try {
-                $this->topic = $this->client->createTopic($topic);
-                return $this->topic;
-            } catch(Exception $e) {
-                $this->addError($e->getCode().': '.$e->getMessage());
-            }
-        }
-        return null;
-    }
-
-    /**
-     * @param $subscription
-     * @param $topic
-     * @return \Google\Cloud\PubSub\Subscription|null
-     */
-    public function getSubscription($subscription,$topic) {
-        try {
-            $this->subscription = $this->client->subscription($subscription.$topic);
-            if(!$this->subscription->exists()) {
-                $this->subscription = $this->client->subscribe($subscription.$topic,$topic);
-            }
-            return $this->subscription;
-        } catch(Exception $e) {
-            $this->addError($e->getCode().': '.$e->getMessage());
-        }
-        return null;
-    }
-
-    /**
-     * @param $subscription
-     * @param $topic
-     * @return \Google\Cloud\PubSub\Subscription|null
-     */
-    public function getSubscriptionMessages($subscription=null) {
-        if(!is_object($subscription)) $subscription = $this->subscription;
-
-        try {
-            $messages = $subscription->pull();
-            /** @var $message \Google\Cloud\PubSub\Message */
-            if(is_object($messages))
-                foreach ($messages as $message) {
-
-                    $ret[] = $message->info();
-                }
-            return $ret;
-
-        } catch(Exception $e) {
-            $this->addError($e->getCode().': '.$e->getMessage());
-        }
-        return null;
-    }
-
-
-    public function publish($message,$data=[],$topic=null) {
-        if(!is_object($topic)) $topic = &$this->topic;
-        try {
-            $message_ids = $topic->publish(['data'=>$message,'attributes'=>$data]);
-            return($message_ids);
-        } catch (Exception $e) {
-            $this->addError($e->getCode().': '.$e->getMessage());
-        }
-    }
-
-    public function getSubscriptions() {
         $ret = [];
-        $subscriptions = $this->client->subscriptions();
-        if(is_array($subscriptions))
-        foreach ($subscriptions as $subscription) {
-            $ret[] = $subscription->info();
+        try {
+            $this->core->__p->add('pullMessages','PubSub','note');
+            $subscription = $this->client->subscription($subscriptionName,$topicName);
+            $this->lastMessages = [];
+            $this->lastSubscription = ($acknowledge)?null:$subscription;
+            foreach ($subscription->pull() as $message) {
+                $ret[]=$message->info();
+                // $acknowledge or keepit to acknowledge in $this->acknowledgeLastMessages
+                if($acknowledge) {
+                    $subscription->acknowledge($message);
+                } else {
+                    $this->lastMessages[] = $message;
+                }
+            }
+        } catch(Exception $e) {
+            $this->core->__p->add('pullMessages','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
         }
+
+        $this->core->__p->add('pullMessages','PubSub','endnote');
         return $ret;
     }
 
+    /**
+     * @param $topic
+     * @return \Google\Cloud\PubSub\Topic|null
+     */
+    public function acknowledgeLastMessages() {
+        if(!$this->lastMessages) return true;
+        if(!is_object($this->lastSubscription)) return $this->addError('missing lastSubscription object');
+        try {
+            $this->core->__p->add('acknowledgeLastMessages','PubSub','note');
+            $this->lastSubscription->acknowledgeBatch($this->lastMessages);
+            $this->lastMessages=[];
+            $this->lastSubscription=null;
+        } catch(Exception $e) {
+            $this->core->__p->add('acknowledgeLastMessages','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
+        }
+
+        $this->core->__p->add('acknowledgeLastMessages','PubSub','endnote');
+        return true;
+    }
 
     /**
      * Add Error message
@@ -142,7 +243,5 @@ class PubSub
         $this->error = true;
         $this->errorMsg[] = $err;
     }
-
-
 
 }
