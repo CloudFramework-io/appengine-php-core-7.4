@@ -5,6 +5,7 @@
 # https://googleapis.github.io/google-cloud-php/#/docs/google-cloud/v0.121.0/datastore/datastoreclient
 # https://github.com/GoogleCloudPlatform/php-docs-samples/blob/master/datastore/api/src/functions/concepts.php
 use Google\Cloud\Datastore\DatastoreClient;
+use Google\Cloud\Datastore\Key;
 use Google\Cloud\Datastore\Transaction;
 
 if (!defined ("_DATASTORECLIENT_CLASS_") ) {
@@ -168,7 +169,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             $key = $this->datastore->key($this->entity_name, $schema_key,['namespaceId'=>$this->namespace]);
                             $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
                         } elseif (null !== $schema_keyname) {
-                            $key = $this->datastore->key($this->entity_name, $schema_keyname,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME, 'namespaceId'=>$this->namespace]);
+                            $key = $this->datastore->key($this->entity_name, $schema_keyname,['identifierType' => Key::TYPE_NAME, 'namespaceId'=>$this->namespace]);
                             $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
                         } else {
                             $key = $this->datastore->key($this->entity_name, null,['namespaceId'=>$this->namespace]);
@@ -579,7 +580,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 foreach ($keys as $key) {
                     // force type TYPE_NAME if there is a field KeyName
                     if(isset($this->schema['data']['model']['KeyName'])) {
-                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
+                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['identifierType' => Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
                     } else {
                         $entities_keys[] = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
                     }
@@ -614,7 +615,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
                 // force type TYPE_NAME if there is a field KeyName
                 if(isset($this->schema['data']['model']['KeyName'])) {
-                    $key_entity = $this->datastore->key($this->entity_name, $key,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
+                    $key_entity = $this->datastore->key($this->entity_name, $key,['identifierType' => Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
                 } else {
                     $key_entity = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
                 }
@@ -648,8 +649,17 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             if(!is_array($result) && !is_object($result)) return;
 
             $ret = [];
+            $i=0;
+
+            // Security control to avoid more than 10K entities
+            if($this->limit>10000) $this->limit=10000;
+
             /** @var Google\Cloud\Datastore\Entity $entity */
             foreach ($result as $entity) {
+
+                // assure we do not return more than $this->limit records.
+                if($this->limit && $i++>=$this->limit) break;
+
                 $row =  $entity->get();
                 $this->last_cursor = base64_encode($entity->cursor());
                 if(isset($entity->key()->path()[0]['id'])) {
@@ -792,7 +802,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 foreach ($keys as $key) {
                     // force type TYPE_NAME if there is a field KeyName
                     if(isset($this->schema['data']['model']['KeyName'])) {
-                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['identifierType' => \Google\Cloud\Datastore\Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
+                        $entities_keys[] = $this->datastore->key($this->entity_name, $key,['identifierType' => Key::TYPE_NAME,'namespaceId'=>$this->namespace]);
                     } else {
                         $entities_keys[] = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
                     }

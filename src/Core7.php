@@ -6,6 +6,8 @@
  */
 
 
+use Google\Cloud\Logging\Logger;
+use Google\Cloud\Logging\PsrLogger;
 use Google\Cloud\Storage\StorageClient;
 
 
@@ -95,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.15051';
+        var $_version = 'v73.15251';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -911,7 +913,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $lines = 0;
         var $data = [];
         var $syslog_type = 'info';  //error, info, warning, notice, debug, critical, alert, emergency
-        /** @var \Google\Cloud\Logging\Logger|\Google\Cloud\Logging\PsrLogger  */
+        /** @var Logger|PsrLogger  */
         var $logger = null;
         var $is_development;
 
@@ -2857,7 +2859,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->logs->add('conf-var CLOUDFRAMEWORK-ID-' . $id . ' missing.');
             } else {
                 if (!strlen($time)) $time = microtime(true);
-                $date = new \DateTime(null, new \DateTimeZone('UTC'));
+                $date = new DateTime(null, new DateTimeZone('UTC'));
                 $time += $date->getOffset();
                 $ret = $id . '__UTC__' . $time;
                 $ret .= '__' . hash_hmac('sha1', $ret, $secret);
@@ -4166,7 +4168,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->logs->add('conf-var CLOUDFRAMEWORK-ID-' . $id . ' missing.');
             } else {
                 if (!strlen($time)) $time = microtime(true);
-                $date = new \DateTime(null, new \DateTimeZone('UTC'));
+                $date = new DateTime(null, new DateTimeZone('UTC'));
                 $time += $date->getOffset();
                 $ret = $id . '__UTC__' . $time;
                 $ret .= '__' . hash_hmac('sha1', $ret, $secret);
@@ -4572,7 +4574,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         if(is_array($type)) $type=$type[0];
                         if(strpos($type,'int')===0 || strpos($type,'bit')===0 ) $number_types[$field] = 'int';
                         else if(strpos($type,'number')===0 || strpos($type,'decimal')===0 || strpos($type,'float')===0) $number_types[$field] = 'float';
-                    };
+                    }
 
                     if($number_types)
                         foreach ($ret as $i=>$row) {
