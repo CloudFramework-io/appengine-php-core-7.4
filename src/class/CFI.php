@@ -2,6 +2,7 @@
 
 /**
  * Class CFI to handle CFO app for CloudFrameworkInterface
+ * https://www.notion.so/cloudframework/CFI-PHP-Class-c26b2a1dd2254ddd9e663f2f8febe038
  * last_update: 20200502
  */
 class CFI
@@ -163,6 +164,8 @@ class CFIField {
      * Set if the field to type texarea
      * @return CFIField $this
      */
+    public function textarea() { $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea'; return $this;}
+    // Deprecated by error
     public function texarea() { $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea'; return $this;}
 
     /**
