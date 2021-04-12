@@ -1198,7 +1198,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $fields['model'][$field][1] = (preg_match('/(varchar|varbinary|char|json)/',$values['type']))?'string':
                     ((preg_match('/(timestamp|datetime)/',$values['type']))?'datetime':
                         ((preg_match('/(date)/',$values['type']))?'date':
-                            ((preg_match('/(decimal)/',$values['type']))?'float':
+                            ((preg_match('/(decimal|float)/',$values['type']))?'float':
                                 'integer')));
 
                 if(isset($values['key']) && $values['key']) {
