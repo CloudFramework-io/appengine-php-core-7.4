@@ -416,7 +416,13 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
             // Execute replacements
             if($joins)foreach ($joins as $join) {
-                $q = preg_replace('/%s/',$join,$q,1);
+                if(strpos($join,'$0')!=false) {
+                    $join = str_replace('$0','__dollar_cero__',$join);
+                    $q = preg_replace('/%s/',$join,$q,1);
+                    $q = str_replace('__dollar_cero__','$0',$q);
+                } else {
+                    $q = preg_replace('/%s/',$join,$q,1);
+                }
             }
 
             //return string with replacements

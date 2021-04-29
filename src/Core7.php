@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.16121';
+        var $_version = 'v73.16291';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -5204,8 +5204,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
 
+        /**
+         * Add an error in the script. This method exist to be compatible with RESTFull class
+         * @param $code
+         * @param $msg
+         */
         function setErrorFromCodelib($code,$msg) {
+            $this->sendTerminal('ERROR: '.$code);
             $this->sendTerminal([$code=>$msg]);
+            $this->addError([$code=>$msg]);
         }
 
         /**
