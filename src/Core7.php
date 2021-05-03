@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.16291';
+        var $_version = 'v73.17021';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3273,6 +3273,37 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $input .= str_repeat('=', $padlen);
             }
             return base64_decode(strtr($input, '-_', '+/'));
+        }
+
+        /**
+         * Check if myip is allowed in the pattern described in $allowed_ips
+         * Example: $allowed_ips="127.0.0.1,234.45.23.123,10.0.0.0/24"
+         * @param string $allowed_ips  Here You describe the IPs or subnets separated by ','. '*' value means any IP
+         * @param null $myip  Optional. By default it is $this->core->system->ip
+         * @return boolean
+         */
+        public function checkAllowedIPs($allowed_ips,$myip=null) {
+            if(!$myip) $myip=$this->core->system->ip;
+            if($allowed_ips && $allowed_ips!='*' && $allowed_ips!=$myip) {
+                if(strpos($allowed_ips,',')!==false) {
+                    $allows = explode(',',$allowed_ips);
+                    foreach ($allows as $allow) if(trim($allow)) {
+                        if($allow=='*' || $allow==$myip) return true;
+                        if(strpos($allow,'/')!==false) {
+                            $myip_local = ($myip=='localhost')?'127.0.0.1':$myip;
+                            list ($net, $mask) = explode("/", trim($allow),2);
+                            $ip_net = ip2long ($net);
+                            $ip_mask = ~((1 << (32 - $mask)) - 1);
+                            $ip_ip = ip2long ($myip_local);
+                            $ip_ip_net = $ip_ip & $ip_mask;
+
+                            if(strval($ip_ip_net) == strval($ip_net)) return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            return true;
         }
 
         /**
