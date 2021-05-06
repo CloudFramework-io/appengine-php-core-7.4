@@ -136,6 +136,9 @@ if (!defined("_RESTfull_CLASS_")) {
             $this->addCodeLib('conflict','There are conflicts.',409);
             $this->addCodeLib('gone','The resource is not longer available.',410);
             $this->addCodeLib('unsupported-media','Unsupported Media Type.',415);
+            $this->addCodeLib('server-error', 'Generic server error',500);
+            $this->addCodeLib('not-implemented', 'There is something in the server not implemented yet',501);
+            $this->addCodeLib('service-unavailable','The service is unavailable.',503);
             $this->addCodeLib('system-error','There is a problem in the platform.',503);
             $this->addCodeLib('datastore-error','There is a problem with the DataStore.',503);
             $this->addCodeLib('db-error','There is a problem in the DataBase.',503);
@@ -161,7 +164,7 @@ if (!defined("_RESTfull_CLASS_")) {
             header("Access-Control-Allow-Origin: $origin");
             header("Access-Control-Allow-Methods: $methods");
 
-            $allow_headers='Content-Type,Authorization,X-CloudFrameWork-AuthToken,X-CLOUDFRAMEWORK-SECURITY,X-DS-TOKEN,X-REST-TOKEN,X-EXTRA-INFO,X-WEB-KEY,X-SERVER-KEY,X-REST-USERNAME,X-REST-PASSWORD,X-APP-KEY';
+            $allow_headers='Content-Type,Authorization,X-CloudFrameWork-AuthToken,X-CLOUDFRAMEWORK-SECURITY,X-DS-TOKEN,X-REST-TOKEN,X-EXTRA-INFO,X-WEB-KEY,X-SERVER-KEY,X-REST-USERNAME,X-REST-PASSWORD,X-APP-KEY,X-DATA-ENV';
             if($allow_extra_headers && is_string($allow_extra_headers)) $allow_headers.=','.strtoupper($allow_extra_headers);
 
             header("Access-Control-Allow-Headers: {$allow_headers}");

@@ -10,12 +10,9 @@ $core = new Core7($rootPath);
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
-if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
-    if($core->is->development()) {
-        $datastore = new DatastoreClient(['transport'=>'rest']);
-    } else {
-        $datastore = new DatastoreClient(['transport'=>'grpc']);
-    }
+if((getenv('PROJECT_ID') || $core->config->get("core.gcp.datastore.project_id")) && $core->config->get('core.datastore.on')) {
+    $transport = ($core->config->get('core.datastore.transport'))?:'rest';
+    $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID')]);
 }
 
 use Google\Cloud\Logging\LoggingClient;

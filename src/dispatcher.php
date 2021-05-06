@@ -10,7 +10,7 @@ $core = new Core7();
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
-if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
+if((getenv('PROJECT_ID') || $core->config->get("core.gcp.datastore.project_id")) && $core->config->get('core.datastore.on')) {
 
     //2021-02-25: Fix to force rest transport instead of grpc because it crash for certain content.
     if(isset($_GET['_fix_datastore_transport'])) $core->config->set('core.datastore.transport','rest');
@@ -18,10 +18,10 @@ if(getenv('PROJECT_ID') && $core->config->get('core.datastore.on')) {
     // grpc or rest
     if($core->is->development()) {
         $transport = ($core->config->get('core.datastore.transport'))?:'rest';
-        $datastore = new DatastoreClient(['transport'=>$transport]);
+        $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID')]);
     } else {
         $transport = ($core->config->get('core.datastore.transport'))?:'grpc';
-        $datastore = new DatastoreClient(['transport'=>$transport]);
+        $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID')]);
     }
 }
 
