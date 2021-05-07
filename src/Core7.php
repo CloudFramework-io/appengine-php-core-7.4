@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.17061';
+        var $_version = 'v73.17071';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4467,10 +4467,19 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * @param string $model         We expect a '(db|ds):model_name' or just 'model_name'
-         * @return mixed|null|void
+         * @param string $model  We expect a '(db|ds):model_name' or just 'model_name'
+         * @param array $options  optional options
+         *    string $namespace says what namespace to use for datastore objects
+         *    string $cf_models_api_key is the API-KEY to use for CloudFrameworkDataModels and read the structure remotelly
+         * @return DataStore|DataSQL|void
          */
-        public function getModelObject($model) {
+        public function getModelObject($model,$options=[]) {
+
+            //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
+            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] && !isset($this->models['db:'.$model]) && !isset($this->models['ds:'.$model]) && !isset($this->models[$model])) {
+                if(!$this->readModelsFromCloudFramework($model,$options['cf_models_api_key'])) return;
+            }
+            //endregion
 
             // If the model does not include the '(ds|db):' we add it.
             if(!strpos($model,':')) {
@@ -4512,7 +4521,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                 case "ds":
                     list($type,$entity) = explode(':',$model,2);
-                    if(empty($this->core->config->get('DataStoreSpaceName'))) return($this->addError('Missing DataStoreSpaceName config var'));
+                    $namespace = (isset($options['namespace']))?$options['namespace']:$this->core->config->get('DataStoreSpaceName');
+                    if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] paramater'));
 
                     if(isset($this->models[$model]['data']['extends'])) {
                         // look for the model
@@ -4533,12 +4543,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     }
                     if(isset($this->models[$model]['data']['entity'])) $entity = $this->models[$model]['data']['entity'];
 
-                    if(!is_object($object = $this->core->loadClass('DataStore',[$entity,$this->core->config->get('DataStoreSpaceName'),$this->models[$model]['data']]))) return;
+                    if(!is_object($object = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$model]['data']]))) return;
                     return($object);
                     break;
             }
             return null;
         }
+
 
         /**
          * Returns the array keys of the models
