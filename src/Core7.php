@@ -1285,8 +1285,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $key
          * @param int $expireTime The default value es -1. If you want to expire, you can use a value in seconds.
          * @param string $hash if != '' evaluate if the $hash match with hash stored in cache.. If not, delete the cache and return false;
-         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
-         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache
+         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data in cache
+         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data in cache
          * @return bool|mixed|null
          */
         function get($key, $expireTime = -1, $hash = '',$cache_secret_key='',$cache_secret_iv='')

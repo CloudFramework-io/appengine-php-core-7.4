@@ -559,14 +559,30 @@ if (!defined("_RESTfull_CLASS_")) {
         }
 
 
-
-
+        /**
+         * Return the structure of $code in $this->codeLib if it exists
+         * @param $code
+         * @return mixed
+         */
         function getCodeLib($code) {
             return (isset($this->codeLib[$code]))?$this->codeLib[$code]:$code;
         }
+
+        /**
+         * Return the structure of $code in $this->codeLibError if it exists
+         * @param $code
+         * @return int|mixed
+         */
         function getCodeLibError($code) {
             return (isset($this->codeLibError[$code]))?$this->codeLibError[$code]:400;
         }
+
+        /**
+         * Set an error using $code
+         * @param $code
+         * @param string $extramsg
+         * @retun void
+         */
         function setErrorFromCodelib($code,$extramsg='') {
             $formatted_message =$extramsg;
             if(is_array($formatted_message)) $formatted_message = json_encode($formatted_message,JSON_PRETTY_PRINT);
