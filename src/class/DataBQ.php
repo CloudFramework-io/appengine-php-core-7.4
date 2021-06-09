@@ -114,10 +114,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             try {
                 $this->_last_query = $q;
+
+                /*
                 $jobConfig = $this->client->query($q);
                 $job = $this->client->startQuery($jobConfig);
 
-                $backoff = new ExponentialBackoff(10);
+                $backoff = new ExponentialBackoff(20);
                 $backoff->execute(function () use ($job) {
                     $job->reload();
                     if (!$job->isComplete()) {
@@ -125,6 +127,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                     }
                 });
                 $queryResults = $job->queryResults();
+                */
+                $jobConfig = $this->client->query($q);
+                $queryResults = $this->client->runQuery($jobConfig);
                 $i = 0;
                 $ret=[];
                 //_printe($queryResults->rows()->current());
