@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.17112';
+        var $_version = 'v73.18091';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -854,10 +854,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Generate a fingerprint from the Request
-         * @param string $extra if it is =='geodata' it includes the Geodata as part of the hash
          * @return array
          */
-        function getRequestFingerPrint($extra = '')
+        function getRequestFingerPrint()
         {
             // Return the fingerprint coming from a queue
             if (isset($_REQUEST['cloudframework_queued_fingerprint'])) {
@@ -868,17 +867,21 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $ret['host'] = (isset($_SERVER['HTTP_HOST']))?$_SERVER['HTTP_HOST']:null;
             $ret['software'] = (isset($_SERVER['GAE_RUNTIME']))?('GAE_RUN_TIME:'.$_SERVER['GAE_RUNTIME'].'/'.$_SERVER['GAE_VERSION']):((isset($_SERVER['SERVER_SOFTWARE']))?$_SERVER['SERVER_SOFTWARE']:'Unknown');
 
-            if ($extra == 'geodata') {
-                $ret['geoData'] = $this->core->getGeoData();
-                unset($ret['geoData']['source_ip']);
-                unset($ret['geoData']['credit']);
-            }
-            $ret['hash'] = sha1(implode(",", $ret));
 
+            $ret['hash'] = sha1(implode(",", $ret));
             $ret['ip'] = $this->ip;
+
+            if(isset($_SERVER['HTTP_X_APPENGINE_CITY'])) $ret['getData']['city'] = $_SERVER['HTTP_X_APPENGINE_CITY'];
+            if(isset($_SERVER['HTTP_X_APPENGINE_COUNTRY'])) $ret['getData']['country'] = $_SERVER['HTTP_X_APPENGINE_COUNTRY'];
+            if(isset($_SERVER['HTTP_X_APPENGINE_REGION'])) $ret['getData']['region'] = $_SERVER['HTTP_X_APPENGINE_REGION'];
+            if(isset($_SERVER['HTTP_X_APPENGINE_CITYLATLONG'])) $ret['getData']['latlong'] = $_SERVER['HTTP_X_APPENGINE_CITYLATLONG'];
+
             $ret['http_referer'] = (array_key_exists('HTTP_REFERER',$_SERVER))?$_SERVER['HTTP_REFERER']:'unknown';
             $ret['time'] = date('Ymdhis');
             $ret['uri'] = (isset($_SERVER['REQUEST_URI']))?$_SERVER['REQUEST_URI']:null;
+
+
+
             return ($ret);
         }
 
@@ -4459,6 +4462,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 foreach ($models['DataStoreEntities'] as $model=>$dsEntity) {
                     $this->models['ds:'.$model] = ['type'=>'ds','data'=>$dsEntity];
                 }
+            if(array_key_exists('BigqueryDataSets',$models) && is_array($models['BigqueryDataSets']))
+                foreach ($models['BigqueryDataSets'] as $model=>$bqDataset) {
+                    $this->models['bq:'.$model] = ['type'=>'bq','data'=>$bqDataset];
+                }
+            if(array_key_exists('MongoDBCollections',$models) && is_array($models['MongoDBCollections']))
+                foreach ($models['MongoDBCollections'] as $model=>$mongoDBColletion) {
+                    $this->models['mongodb:'.$model] = ['type'=>'mongodb','data'=>$mongoDBColletion];
+                }
             if(array_key_exists('JSONTables',$models) && is_array($models['JSONTables']))
                 foreach ($models['JSONTables'] as $model=>$dsEntity) {
                     $this->models['json:'.$model] = ['type'=>'json','data'=>$dsEntity];
@@ -4544,6 +4555,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if(isset($this->models[$model]['data']['entity'])) $entity = $this->models[$model]['data']['entity'];
 
                     if(!is_object($object = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$model]['data']]))) return;
+                    return($object);
+                    break;
+
+                case "bq":
+                    list($type,$table) = explode(':',$model,2);
+
+
+                    // rewrite name of the table
+                    if(isset($this->models[$model]['data']['interface']['object'])) $dataset = $this->models[$model]['data']['interface']['object'];
+
+                    // Object creation
+                    if(!is_object($object = $this->core->loadClass('DataBQ',[$dataset,$this->models[$model]['data']]))) return;
                     return($object);
                     break;
             }
