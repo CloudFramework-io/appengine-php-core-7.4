@@ -114,7 +114,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             try {
                 $this->_last_query = $q;
-
                 /*
                 $jobConfig = $this->client->query($q);
                 $job = $this->client->startQuery($jobConfig);
@@ -696,7 +695,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                         $value = str_replace('!=','',$value);
                                     }
 
-                                    $where.="{$this->dataset_name}.{$key} {$op} '%s'";
+                                    $where.="`{$this->dataset_name}`.{$key} {$op} '%s'";
                                 }
                                 $params[] = $value;
                             }
@@ -709,7 +708,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             // Search into Joins queries
             foreach ($this->joins as $join) {
-                /** @var DataSQL $object */
+                /** @var DataBQ $object */
                 $object = $join[1];
                 list($joinWhere,$joinParams) = $object->getQuerySQLWhereAndParams();
                 if($joinWhere) {
@@ -733,7 +732,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             foreach ($this->joins as $i=>$join) {
 
-                /** @var DataSQL $object */
+                /** @var DataBQ $object */
                 $object = $join[1];
                 $ret.=','.str_replace('`'.$object->dataset_name.'`.',"_j{$i}.",$object->getQuerySQLFields());
 
@@ -745,7 +744,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         function getQuerySQLFroms() {
             $from = "`{$this->dataset_name}`";
             foreach ($this->joins as $i=>$join) {
-                /** @var DataSQL $object */
+                /** @var DataBQ $object */
                 $object = $join[1];
                 $from.=" {$join[0]}  JOIN `{$object->dataset_name}` _j{$i} ON (`{$this->dataset_name}`.{$join[2]} = _j{$i}.{$join[3]})";
             }
@@ -769,12 +768,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
         /**
          * @param $type Could be inner or left
-         * @param DataSQL $object
+         * @param DataBQ $object
          * @param $first_field string field of the local object to join with
          * @param $join_field string field of the join object to match
          * @param $extraon string any other extra condition
          */
-        function join ($type, DataSQL &$object, $first_field, $join_field,$extraon=null) {
+        function join ($type, DataBQ &$object, $first_field, $join_field,$extraon=null) {
             $this->joins[] = [$type,$object, $first_field, $join_field,$extraon];
         }
 
@@ -810,7 +809,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $this->error = true;
             if(!is_array($this->errorMsg)) $this->errorMsg = [$this->errorMsg];
             $this->errorMsg[] = $value;
-            $this->core->errors->add(['DataSQL'=>$value]);
+            $this->core->errors->add(['DataBQ'=>$value]);
         }
 
         function getDBQuery() {
