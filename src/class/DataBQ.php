@@ -230,7 +230,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
                     if($this->view && (!isset($this->entity_schema['mapping'][$fieldMapped]['views']) || !in_array($this->view,$this->entity_schema['mapping'][$fieldMapped]['views']))) continue;
                     if($ret) $ret.=',';
-                    $ret .= "{$this->dataset_name}.{$field} AS {$fieldMapped}";
+                    $ret .= "`{$this->dataset_name}`.{$field} AS {$fieldMapped}";
                 }
                 return $ret;
             }
@@ -573,7 +573,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
                 if(isset($this->fields[$field]))  {
                     if(strlen($this->order)) $this->order.=', ';
-                    $this->order.= $this->dataset_name.'.'.$field.((strtoupper(trim($type))=='DESC')?' DESC':' ASC');
+                    $this->order.= '`'.$this->dataset_name.'`.'.$field.((strtoupper(trim($type))=='DESC')?' DESC':' ASC');
                 } else {
                     $this->addError($field.' does not exist to order by');
                 }
@@ -629,22 +629,22 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
                     switch (strval($value)) {
                         case "__null__":
-                            $where.="{$this->dataset_name}.{$key} IS NULL";
+                            $where.="`{$this->dataset_name}`.{$key} IS NULL";
                             break;
                         case "__notnull__":
-                            $where.="{$this->dataset_name}.{$key} IS NOT NULL";
+                            $where.="`{$this->dataset_name}`.{$key} IS NOT NULL";
                             break;
                         case "__empty__":
-                            $where.="{$this->dataset_name}.{$key} = ''";
+                            $where.="`{$this->dataset_name}`.{$key} = ''";
                             break;
                         case "__noempty__":
-                            $where.="{$this->dataset_name}.{$key} != ''";
+                            $where.="`{$this->dataset_name}`.{$key} != ''";
                             break;
                         default:
                             // IN
                             if(is_array($value)) {
                                 if($this->fields[$key]=='int') {
-                                    $where.="{$this->dataset_name}.{$key} IN (%s)";
+                                    $where.="`{$this->dataset_name}`.{$key} IN (%s)";
                                     $params[] = implode(',',$value);
                                 }
                                 else {
@@ -654,7 +654,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                     }, $value);
 
                                     // Add an IN
-                                    $where.="{$this->dataset_name}.{$key} IN ('".implode("','",$value)."')";
+                                    $where.="`{$this->dataset_name}`.{$key} IN ('".implode("','",$value)."')";
                                     //$params[] = implode("','",$value);
 
                                 }
@@ -680,7 +680,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                         $op='!=';
                                         $value = str_replace('!=','',$value);
                                     }
-                                    $where.="{$this->dataset_name}.{$key} {$op} %s";
+                                    $where.="`{$this->dataset_name}`.{$key} {$op} %s";
                                 }
                                 else {
                                     if(strpos($value,'%')!==false) {
