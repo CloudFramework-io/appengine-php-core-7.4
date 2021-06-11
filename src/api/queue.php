@@ -169,6 +169,12 @@ class API extends RESTful
             // Create a Cloud Task object.
             $task = new Task();
             $task->setAppEngineHttpRequest($httpRequest);
+            if(isset($this->formParams['_at_seconds']) && is_numeric($this->formParams['_at_seconds'])){
+                $timestamp = new Google\Protobuf\Timestamp();
+                $timestamp->setSeconds(time() + $this->formParams['_at_seconds']);
+                $timestamp->setNanos(0);
+                $task->setScheduleTime($timestamp);
+            }
             //endregion
 
             //region CALL $client->createTask($queueName, $task)
