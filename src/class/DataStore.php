@@ -167,13 +167,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     try {
                         if (null !== $schema_key) {
                             $key = $this->datastore->key($this->entity_name, $schema_key,['namespaceId'=>$this->namespace]);
-                            $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
+                            $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>(isset($this->schema['excludeFromIndexes']))?$this->schema['excludeFromIndexes']:[]]);
                         } elseif (null !== $schema_keyname) {
                             $key = $this->datastore->key($this->entity_name, $schema_keyname,['identifierType' => Key::TYPE_NAME, 'namespaceId'=>$this->namespace]);
-                            $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
+                            $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>(isset($this->schema['excludeFromIndexes']))?$this->schema['excludeFromIndexes']:[]]);
                         } else {
                             $key = $this->datastore->key($this->entity_name, null,['namespaceId'=>$this->namespace]);
-                            $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>$this->schema['excludeFromIndexes']]);
+                            $entity = $this->datastore->entity($key,$record,['excludeFromIndexes'=>(isset($this->schema['excludeFromIndexes']))?$this->schema['excludeFromIndexes']:[]]);
                         }
                         $entities[] = $entity;
                     } catch (Exception $e) {
