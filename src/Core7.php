@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.19061';
+        var $_version = 'v73.19191';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3981,6 +3981,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          *
          *
          * Extra info: https://stackoverflow.com/questions/4003989/upload-a-file-using-file-get-contents
+         * For extra headers you can get further information in: https://www.php.net/manual/de/context.http.php
          * @param $route
          * @param null $data
          * @param string $verb
@@ -4001,6 +4002,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->core->__p->add("Request->{$verb}: ", "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             // Performance for connections
             $options = array('ssl' => array('verify_peer' => false));
+            $options['http']['protocol_version'] = '1.1';
             $options['http']['ignore_errors'] = '1';
             $options['http']['header'] = 'Connection: close' . "\r\n";
             $options['http']['header'] = 'Accept: */*' . "\r\n";
