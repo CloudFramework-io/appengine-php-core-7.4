@@ -4476,6 +4476,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 foreach ($models['JSONTables'] as $model=>$dsEntity) {
                     $this->models['json:'.$model] = ['type'=>'json','data'=>$dsEntity];
                 }
+
+            if(array_key_exists('APIUrls',$models) && is_array($models['APIUrls']))
+                foreach ($models['APIUrls'] as $model=>$apiUrl) {
+                    $this->models['api:'.$model] = ['type'=>'api','data'=>$apiUrl];
+                }
             return true;
         }
 
