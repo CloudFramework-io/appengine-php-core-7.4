@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.19191';
+        var $_version = 'v73.19271';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3727,8 +3727,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
             }
             // Build contents received in $data as an array
-            if (is_array($data)) {
+            if (is_array($data) ) {
                 if ($verb == 'GET') {
+                    // Add the parameter ? or & to add new variable
+                    $route .= (strpos($route,'?'))?'&':'?';
+                    //explore variable by variable
                     foreach ($data as $key => $value) {
                         if (is_array($value)) {
                             // This could be improved becuase the coding will produce 1738 format and 3986 format
@@ -3781,7 +3784,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             if (!curl_errno($ch)) {
                 $header_len = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-                $this->responseHeaders = substr($ret, 0, $header_len);
+                $this->responseHeaders = explode("\n",substr($ret, 0, $header_len));
                 $ret = substr($ret, $header_len);
             } else {
                 $this->addError(error_get_last());
