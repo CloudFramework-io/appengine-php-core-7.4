@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.19271';
+        var $_version = 'v73.19272';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3699,6 +3699,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function getCurl($route, $data = null, $verb = 'GET', $extra_headers = null, $raw = false)
         {
 
+            $_time = microtime(TRUE);
+            if($this->sendSysLogs)
+                $this->core->logs->sendToSysLog("curl request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+
             $this->core->__p->add('Request->getCurl: ', "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             $route = $this->getServiceUrl($route);
             $this->responseHeaders = null;
@@ -3782,6 +3786,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             curl_setopt_array($ch, $curl_options);
             $ret = curl_exec($ch);
 
+
+
             if (!curl_errno($ch)) {
                 $header_len = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
                 $this->responseHeaders = explode("\n",substr($ret, 0, $header_len));
@@ -3793,6 +3799,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $ret = false;
             }
             curl_close($ch);
+
+            if($this->sendSysLogs) {
+                $_time = round(microtime(TRUE) -$_time,4);
+                $this->core->logs->sendToSysLog("end curl request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." {$_time} secs",(($this->error)?'debug':'info'));
+            }
 
             $this->core->__p->add('Request->getCurl: ', '', 'endnote');
             return $ret;
@@ -4164,7 +4175,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if($this->sendSysLogs) {
                 $_time = round(microtime(TRUE) -$_time,4);
                 $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." {$_time} secs",(($this->error)?'debug':'info'));
-
             }
 
             //syslog(($this->error)?LOG_DEBUG:LOG_INFO,"end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
