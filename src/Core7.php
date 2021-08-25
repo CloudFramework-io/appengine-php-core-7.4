@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.19272';
+        var $_version = 'v73.20251';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3786,12 +3786,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             curl_setopt_array($ch, $curl_options);
             $ret = curl_exec($ch);
 
-
-
             if (!curl_errno($ch)) {
                 $header_len = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
                 $this->responseHeaders = explode("\n",substr($ret, 0, $header_len));
                 $ret = substr($ret, $header_len);
+                if($this->getLastResponseCode()>=400) {
+                    $this->addError('Error code returned: ' . $this->getLastResponseCode());
+                    $this->addError($this->responseHeaders);
+                    $this->addError($ret);
+                }
             } else {
                 $this->addError(error_get_last());
                 $this->addError([('Curl error ' . curl_errno($ch)) => curl_error($ch)]);
