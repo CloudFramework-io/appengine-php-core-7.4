@@ -113,6 +113,35 @@ class PubSub
     }
 
     /**
+     * Return the $subscription subscriptions for the Application
+     * @params $subscription string subscription to be returned
+     * @params $topic string optionally $topic
+     * @return array|void
+     */
+    public function getSubscription($subscription,$topic=null) {
+        if(!is_object($this->client)) return($this->addError('missing pubsub client'));
+        $this->core->__p->add('getSubscription','PubSub','note');
+        //region SET $ret from  $subscriptions = $this->client->subscriptions();
+        try {
+            $subscription = $this->client->subscription($subscription,$topic);
+            _printe($subscription);
+            $ret = [];
+            if(is_object($subscriptions))
+                foreach ($subscriptions as $subscription) {
+                    $ret[] = $subscription->info();
+                }
+
+        } catch(Exception $e) {
+            $this->core->__p->add('getSubscription','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
+        }
+        //endregion
+
+        $this->core->__p->add('getSubscription','PubSub','endnote');
+        return $ret;
+    }
+
+    /**
      * Create a subscripion
      * https://cloud.google.com/pubsub/docs/samples/pubsub-create-pull-subscription
      * @param $subscription
@@ -136,6 +165,32 @@ class PubSub
         $this->core->__p->add('subscribeTo','PubSub','endnote');
         return $subscription->info();
 
+    }
+
+    /**
+     * DELETE a subscripion
+     * https://cloud.google.com/pubsub/docs/samples/pubsub-delete-subscription
+     * @param $subscription
+     * @param $topic
+     * @return \Google\Cloud\PubSub\Subscription|null
+     */
+    public function unsubscribeTo($subscriptionName,$topicName) {
+        if(!is_object($this->client)) return;
+        $info = ['name'=>$subscriptionName,'topic'=>$topicName,'status'=>'does-not-exist'];
+        try {
+            $this->core->__p->add('unsubscribeTo','PubSub','note');
+            $subscription = $this->client->subscription($subscriptionName,$topicName);
+            if($subscription->exists()) {
+                $info = $subscription->info();
+                $subscription->delete();
+            }
+        } catch(Exception $e) {
+            $this->core->__p->add('unsubscribeTo','PubSub','endnote');
+            return $this->addError($e->getCode().': '.$e->getMessage());
+        }
+
+        $this->core->__p->add('unsubscribeTo','PubSub','endnote');
+        return $info;
     }
 
     /**
@@ -197,12 +252,13 @@ class PubSub
             $this->lastMessages = [];
             $this->lastSubscription = ($acknowledge)?null:$subscription;
             foreach ($subscription->pull() as $message) {
-                $ret[]=$message->info();
+                $info =$message->info();
+                $ret[]=$info['message'];
                 // $acknowledge or keepit to acknowledge in $this->acknowledgeLastMessages
                 if($acknowledge) {
                     $subscription->acknowledge($message);
                 } else {
-                    $this->lastMessages[] = $message;
+                    $this->lastMessages[$info['message']['messageId']] = $message;
                 }
             }
         } catch(Exception $e) {
@@ -215,15 +271,20 @@ class PubSub
     }
 
     /**
-     * @param $topic
+     * @param $id null optional param to acknowledge a specific message
      * @return \Google\Cloud\PubSub\Topic|null
      */
-    public function acknowledgeLastMessages() {
+    public function acknowledgeLastMessages($id=null) {
         if(!$this->lastMessages) return true;
         if(!is_object($this->lastSubscription)) return $this->addError('missing lastSubscription object');
         try {
             $this->core->__p->add('acknowledgeLastMessages','PubSub','note');
-            $this->lastSubscription->acknowledgeBatch($this->lastMessages);
+            if($id) {
+                if(!isset($this->lastMessages[$id])) return($this->addError('acknowledgeLastMessages($id=null) has received a $id that does not exist: '.$id));
+                $this->lastSubscription->acknowledge($this->lastMessages[$id]);
+            } else {
+                $this->lastSubscription->acknowledgeBatch(array_values($this->lastMessages));
+            }
             $this->lastMessages=[];
             $this->lastSubscription=null;
         } catch(Exception $e) {
