@@ -1,19 +1,16 @@
 <?php
 /*
- *  CloudFramwork Mongo Class
- * https://github.com/mongodb/mongo-php-library
+ * CloudFramework Mongo Class
  * https://www.php.net/manual/en/mongodb.installation.homebrew.php
- * only compatible with 1.4.3 version
- * composer require mongodb/mongodb:1.4.3
- * https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-find/
- * https://docs.mongodb.com/manual/tutorial/project-fields-from-query-results/
+ * https://www.mongodb.com/developer/quickstart/php-setup/
+ * Mac:
+ *     pecl install mongodb
+ *     php -i | grep mongodb
+ *     composer require mongodb/mongodb:^1.9
  */
 
-// CloudSQL Class v10
-if (!defined ("_MONGO_CLASS_") ) {
-    define("_MONGO_CLASS_", TRUE);
-
-
+if (!defined ("_MONGODB_CLASS_") ) {
+    define("_MONGODB_CLASS_", TRUE);
 
     class DataMongo
     {
@@ -115,6 +112,52 @@ if (!defined ("_MONGO_CLASS_") ) {
         }
 
         /**
+         * Execute a insertion of one or multiple documents
+         * https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-insertOne/
+         * @param $db
+         * @param $collection
+         * @param $documents
+         * @param array $options [projection=>array,sort=array,skip=>integer,limit=>integer,comment=>string,returnKey=>boolean,]. More info in https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-find/
+         * @return array|void
+         */
+        public function insert($db,$collection,$documents) {
+            if(!$documents || !is_array($documents)) return ($this->addError(' insert($db,$collection,$document) $document is empty or not an array'));
+            $db = $this->_client->selectDatabase($db);
+            $collection = $db->selectCollection($collection,[
+                'typeMap' => [
+                    'root' => 'array',
+                    'document' => 'array',
+                    'array' => 'array',
+                ]]);
+
+            // if $documents is not an array 0..n convert into it
+            if(!isset($documents[0])) $documents = [$documents[0]];
+
+            //Evaluate _id fields and datefields to be converted in MongoDB\BSON\ObjectId or MongoDB\BSON\UTCDateTime
+            foreach ($documents as $i=>$document) {
+                if(isset($document['_id']) && is_string($document['_id'])) $documents[$i]['_id'] = new MongoDB\BSON\ObjectId($document['_id']);
+                foreach ($document as $field=>$data) {
+                    if(is_string($data) && preg_match('/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z$/',$data)) {
+                        $documents[$i][$field] = new MongoDB\BSON\UTCDateTime(new DateTime($data));
+                    }
+                }
+            }
+
+            // Insert documents
+            $insertManyResults =$collection->insertMany($documents);
+            $ids = $insertManyResults->getInsertedIds();
+
+            // Transform the results of the insertions
+            foreach ($ids as $i=>$id) {
+                $documents[$i]['_id'] = $id->jsonSerialize()['$oid'];
+                $documents[$i] = $this->transformTypes($documents[$i]);
+            }
+
+            return($documents);
+
+        }
+
+        /**
          * Transform Mongo objects in arrays, strings , numbers
          * @param array $entity
          * @param int $level
@@ -125,7 +168,7 @@ if (!defined ("_MONGO_CLASS_") ) {
             $ret = [];
             foreach ($entity as $i=>$item) {
                 if(is_array($item)) {
-                     $item = $this->transformTypes($item,$level+1);
+                    $item = $this->transformTypes($item,$level+1);
                 }
                 elseif(is_object($item)) {
                     switch (get_class($item)) {
