@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.22071';
+        var $_version = 'v73.22141';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4400,8 +4400,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $errorCode = null;
         /** @var CloudSQL $db  */
         var $db = null;
-        /** @var DataMongo $db  */
-        var $mongo = null;
+        /** @var DataMongoDB $mongoDB  */
+        var $mongoDB = null;
         var $cache = null;
 
         protected $core;
@@ -4612,12 +4612,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function mongoInit($uri='') {
 
-            if(null === $this->mongo) {
-                $this->mongo = $this->core->loadClass('DataMongo',$uri);
-                if(!$this->mongo->connect()) $this->addError($this->mongo->errorMsg);
+            if(null === $this->mongoDB) {
+                $this->mongoDB = $this->core->loadClass('DataMongoDB',$uri);
+                if(!$this->mongoDB->connect()) $this->addError($this->mongoDB->errorMsg);
 
             }
-            return !$this->mongo->error;
+            return !$this->mongoDB->error;
         }
 
         /**
