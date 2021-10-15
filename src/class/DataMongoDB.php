@@ -21,9 +21,11 @@ if (!defined ("_MONGODB_CLASS_") ) {
         var $errorMsg=[];                      // Holds the last error
 
         /** @var MongoDB\Client $_client */
-        protected $_client = null;                // Database Connection Link
+        protected $_client = null;              // Database Connection Link
+        var $uri = '';                          // uri to connect
         var $_debug = false;
         var $_collections = [];
+        var $_lastQuery = null;
 
         // Query Variables
         var $limit = 100;
@@ -173,6 +175,20 @@ if (!defined ("_MONGODB_CLASS_") ) {
         }
 
         /**
+         * Execute a find action over a $id
+         * @param $db
+         * @param $collection
+         * @param $id String
+         * @param array $options [projection=>array,sort=array,skip=>integer,limit=>integer,comment=>string,returnKey=>boolean,]. More info in https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-find/
+         * @return array|null
+         */
+        public function getById($db,$collection,$id) {
+            $ret= $this->find($db,$collection,['_id'=>new MongoDB\BSON\ObjectID($id)]);
+            if($ret) return $ret[0];
+            else return null;
+        }
+
+        /**
          * Execute a find action over a collection and return only the keys
          * @param $db
          * @param $collection
@@ -187,17 +203,11 @@ if (!defined ("_MONGODB_CLASS_") ) {
         }
 
         /**
-         * Execute a find action over a $id
-         * @param $db
-         * @param $collection
-         * @param $id String
-         * @param array $options [projection=>array,sort=array,skip=>integer,limit=>integer,comment=>string,returnKey=>boolean,]. More info in https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-find/
-         * @return array|void
+         * Return the last query value set in a find o update operation
+         * @return null|strig
          */
-        public function findById($db,$collection,$id) {
-            $ret= $this->find($db,$collection,['_id'=>new MongoDB\BSON\ObjectID($id)]);
-            if($ret) return $ret[0];
-            else return null;
+        public function getLastQuery() {
+            return $this->_lastQuery;
         }
 
         /**
@@ -236,11 +246,12 @@ if (!defined ("_MONGODB_CLASS_") ) {
 
             //region EXECUTE $ret = $mongo_collection->find($filter,$options)->toArray();
             $ret = $mongo_collection->find($filter,$options)->toArray();
+            $this->_lastQuery = "{$db}.{$collection} where ".json_encode($filter);
             //endregion
 
             //region TRANSFORM $ret the result into a simple array
-            foreach ($ret as $i=>$item) {
-                $ret[$i] = $this->transformTypes($item);
+            foreach ($ret as $i=>$foo) {
+                $this->transformTypes($ret[$i]);
             }
             //endregion
 
@@ -256,15 +267,14 @@ if (!defined ("_MONGODB_CLASS_") ) {
         }
 
         /**
-         * Execute a insertion of one or multiple documents
+         * Execute an insertion of one or multiple documents
          * https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-insertOne/
          * @param $db
          * @param $collection
          * @param $documents
-         * @param array $options [projection=>array,sort=array,skip=>integer,limit=>integer,comment=>string,returnKey=>boolean,]. More info in https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-find/
          * @return array|void
          */
-        public function insert($db,$collection,$documents) {
+        public function insertDocuments($db,$collection,$documents) {
 
             //region VERIFY $documents and transform it into an array[0..n]
             if(!$documents || !is_array($documents)) return ($this->addError(' insert($db,$collection,$document) $document is empty or not an array'));
@@ -275,18 +285,13 @@ if (!defined ("_MONGODB_CLASS_") ) {
             //region INIT Logs
             $_time = microtime(TRUE);
             if($this->sendSysLogs)
-                $this->core->logs->sendToSysLog("DataMongoDB->insert {$db}.{$collection} ".(count($documents) . ' documents'));
-            $this->core->__p->add('DataMongoDB->insert: ', "{$db}.{$collection} " .(count($documents) . ' documents'), 'note');
+                $this->core->logs->sendToSysLog("DataMongoDB->insertDocuments {$db}.{$collection} ".(count($documents) . ' documents'));
+            $this->core->__p->add('DataMongoDB->insertDocuments: ', "{$db}.{$collection} " .(count($documents) . ' document(s)'), 'note');
             //endregion
 
             //region TRANSFORM _id fields and datefields into MongoDB\BSON\ObjectId or MongoDB\BSON\UTCDateTime
-            foreach ($documents as $i=>$document) {
-                if(isset($document['_id']) && is_string($document['_id'])) $documents[$i]['_id'] = new MongoDB\BSON\ObjectId($document['_id']);
-                foreach ($document as $field=>$data) {
-                    if(is_string($data) && preg_match('/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z$/',$data)) {
-                        $documents[$i][$field] = new MongoDB\BSON\UTCDateTime(new DateTime($data));
-                    }
-                }
+            foreach ($documents as $i=>$foo) {
+                $this->prepareTypes($documents[$i]);
             }
             //endregion
 
@@ -303,20 +308,75 @@ if (!defined ("_MONGODB_CLASS_") ) {
             //region INSERT $ids in $documents
             foreach ($ids as $i=>$id) {
                 $documents[$i]['_id'] = $id->jsonSerialize()['$oid'];
-                $documents[$i] = $this->transformTypes($documents[$i]);
+                $this->transformTypes($documents[$i]);
             }
             //endregion
 
             //region END Logs
             if($this->sendSysLogs){
                 $_time = round(microtime(TRUE) -$_time,4);
-                $this->core->logs->sendToSysLog("end DataMongoDB->insert: {$_time} secs");
+                $this->core->logs->sendToSysLog("end DataMongoDB->insertDocuments: {$_time} secs");
             }
-            $this->core->__p->add('DataMongoDB->insert: ', "{$db}.{$collection} " .(count($documents) . 'documents'), 'note');
+            $this->core->__p->add('DataMongoDB->insertDocuments: ', null, 'endnote');
             //endregion
 
             //region RETURN $documents inserted with their ids
             return($documents);
+            //endregion
+
+        }
+
+
+        /**
+         * Execute an update of one document. This document requires a _id field
+         * https://docs.mongodb.com/php-library/current/reference/method/MongoDBCollection-insertOne/
+         * @param $db
+         * @param $collection
+         * @param $update_info
+         * @return array|void
+         */
+        public function updateDocumentWithId($db,$collection,$update_info) {
+
+            //region VERIFY $update_info and transform it into an array[0..n]
+            if(!$update_info || !is_array($update_info) || !isset($update_info['_id']) || count($update_info)<2) return ($this->addError(' update($db,$collection,$update_info) $update_info is empty or not an array or it does not have a _id field or does not have more than one attribute'));
+            //endregion
+
+            //region INIT Logs
+            $_time = microtime(TRUE);
+            if($this->sendSysLogs)
+                $this->core->logs->sendToSysLog("DataMongoDB->updateDocumentWithId {$db}.{$collection}({$update_info['_id']}) with ".((count($update_info)-1) . ' field(s)'));
+            $this->core->__p->add('DataMongoDB->updateDocumentWithId: ', "{$db}.{$collection}({$update_info['_id']}) with " .((count($update_info)-1) . ' field(s)'), 'note');
+            //endregion
+
+            //region SET $id, extract _id from $update_info and transform date fields
+            $id = new MongoDB\BSON\ObjectId($update_info['_id']);
+            unset($update_info['_id']);
+            $this->prepareTypes($update_info);
+            //endregion
+
+            //region SET $mongo_collection
+            /** @var \MongoDB\Collection $mongo_collection */
+            $mongo_collection = $this->connectWithCollection($db,$collection);
+            //endregion
+
+            //region UPDATE $update_info with _id=$id
+            $updateResult =$mongo_collection->updateOne(['_id'=>$id],['$set' =>$update_info]);
+            $total_modified = $updateResult->getModifiedCount();
+            $total_matched = $updateResult->getMatchedCount();
+            $this->_lastQuery = "{$db}.{$collection} where ".json_encode(['_id'=>$id]);
+
+            //endregion
+
+            //region END Logs
+            if($this->sendSysLogs){
+                $_time = round(microtime(TRUE) -$_time,4);
+                $this->core->logs->sendToSysLog("end DataMongoDB->updateDocumentWithId, total_matched: {$total_matched},  total_modified: {$total_modified} in {$_time} secs");
+            }
+            $this->core->__p->add('DataMongoDB->updateDocumentWithId: ', "total_matched: {$total_matched},  total_modified: {$total_modified}", 'endnote');
+            //endregion
+
+            //region RETURN true
+            return true;
             //endregion
 
         }
@@ -350,44 +410,60 @@ if (!defined ("_MONGODB_CLASS_") ) {
                 $_time = round(microtime(TRUE) -$_time,4);
                 $this->core->logs->sendToSysLog("end DataMongoDB->deleteById: {$_time} secs");
             }
-            $this->core->__p->add('DataMongoDB->deleteById: ', null, 'note');
+            $this->core->__p->add('DataMongoDB->deleteById: ', null, 'endnote');
             //endregion
 
             return $deleteResult->getDeletedCount();
 
         }
 
+         /**
+         * Transform _id fields and date contents into MongoDB objects
+         * @param array $entity
+         * @param int $level
+         * @return void
+         */
+        private function prepareTypes(&$entity,$level=0) {
+            if(!is_array($entity)) return $entity;
+            foreach ($entity as $i=>$item) {
+                if(is_array($item)) {
+                    $this->prepareTypes($entity[$i],$level+1);
+                }
+                elseif(is_string($item) && $i==='_id') {
+                    $entity[$i] = new MongoDB\BSON\ObjectId($item);
+                }
+                elseif(is_string($item) && preg_match('/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]Z$/',$item)) {
+                    $entity[$i] = new MongoDB\BSON\UTCDateTime(new DateTime($item));
+                }
+            }
+        }
+
         /**
          * Transform Mongo objects in arrays, strings , numbers
          * @param array $entity
          * @param int $level
-         * @return array
+         * @return void
          */
-        private function transformTypes($entity,$level=0) {
+        private function transformTypes(&$entity,$level=0) {
             if(!is_array($entity)) return $entity;
             $ret = [];
             foreach ($entity as $i=>$item) {
                 if(is_array($item)) {
-                    $item = $this->transformTypes($item,$level+1);
+                    $this->transformTypes($entity[$i],$level+1);
                 }
                 elseif(is_object($item)) {
                     switch (get_class($item)) {
                         case "MongoDB\BSON\ObjectId":
                             /** @var  MongoDB\BSON\ObjectId $item */
-                            $item = $item->jsonSerialize()['$oid'];
+                            $entity[$i] = $item->jsonSerialize()['$oid'];
                             break;
                         case "MongoDB\BSON\UTCDateTime":
                             /** @var  MongoDB\BSON\UTCDateTime $item */
-                            $item = $item->toDateTime()->format('Y-m-d\TH:i:s\Z');
-                            break;
-                        default:
-                            $item = $item;
+                            $entity[$i] = $item->toDateTime()->format('Y-m-d\TH:i:s.v\Z');
                             break;
                     }
                 }
-                $ret[$i] = $item;
             }
-            return $ret;
         }
 
         /**
