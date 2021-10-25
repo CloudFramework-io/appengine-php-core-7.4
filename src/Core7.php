@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.22141';
+        var $_version = 'v73.22251';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4836,7 +4836,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to Manage Datastore Logs
+     * Class to Manage Datastore Logs and Bitacora Entries
      * @package Core
      */
     class CFILog
@@ -4846,6 +4846,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /** @var DataStore $dsLogs */
         var $dsLogs;
+
+        /** @var DataStore $dsBitacora */
+        var $dsBitacora;
 
         var $error = false;
         var $errorMsg = null;
@@ -4941,10 +4944,22 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     "Action": ["string","index"],
                     "JSON": ["json","allownull"]
                   }',true);
-            $this->core->model->processModels(['DataStoreEntities'=>['CloudFrameWorkLogs'=>['model'=>$model]]]);
+            $model_bitacora = json_decode('{
+                    "Solution": ["string","index"],
+                    "App": ["string","index"],
+                    "AppId": ["string","index|allowNull"],
+                    "DateInsertion": ["datetime","index|forcevalue:now"],
+                    "User": ["string","index"],
+                    "Action": ["string","index"],
+                    "Title": ["string","index"],
+                    "Ip": ["string","index"],
+                    "JSON": ["json","allownull"]
+                  }',true);
+            $this->core->model->processModels(['DataStoreEntities'=>['CloudFrameWorkLogs'=>['model'=>$model],'CloudFrameWorkBitacora'=>['model'=>$model_bitacora]]]);
             if($this->core->model->error) return($this->addError($this->core->model->errorMsg));
 
             $this->dsLogs = $this->core->model->getModelObject('CloudFrameWorkLogs');
+            $this->dsBitacora = $this->core->model->getModelObject('CloudFrameWorkBitacora');
             return true;
         }
 
@@ -4979,6 +4994,61 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if($this->core->request->error) return($this->addError($this->core->request->errorMsg));
 
             return true;
+        }
+
+        /**
+         * Add a LOG entry in CloudFrameWorkBitacora
+         * @param $user
+         * @param $action string 'inserted'',updated', 'deleted', 'accessed'.. Try to add a past verb over a Solution/App
+         * @param $solution
+         * @param $app
+         * @param $app_id string Id of the app to which receive and action
+         * @param $title
+         * @param $data null|mixed values to add in bitacora if it is necessary
+         */
+        public function bitacora($user, $action,$solution, $app, $app_id=null, $title=null, $data=null) {
+            if(!$this->initDSLogs()) return;
+
+            //region SET $rewrite_fingerprint
+            $fingerprint = $this->core->system->getRequestFingerPrint();
+            if(!isset($fingerprint['ip'])) $fingerprint['ip'] = $this->core->system->ip;
+            //endregion
+            if(!$title) {
+                $title = "The user {$user} has {$action}";
+                if($app_id) $title.=" [Id: {$app_id}]";
+                $title .= " in {$solution}/{$app}";
+            }
+
+            //region SET $entity
+            $entity = [];
+            $entity["User"]=$user;
+            $entity["Action"]=$action;
+            $entity["Solution"]=$solution;
+            $entity["App"]=$app;
+            $entity["AppId"]=$app_id;
+            $entity["DateInsertion"]="now";
+            $entity["Ip"]=$fingerprint['ip'];
+            $entity["Title"]=$title;
+            $entity["JSON"]=[
+                'url'=>(array_key_exists('REQUEST_URI',$_SERVER))?$_SERVER['REQUEST_URI']:''
+                ,'http_referer'=> $fingerprint['http_referer']
+
+            ];
+            if($data) {
+                $entity['JSON']['data'] = $data;
+            }
+            //endregion
+
+            //region $this->dsBitacora->createEntities($entity)
+            $this->dsBitacora->createEntities($entity);
+            if ($this->dsBitacora->error) {
+                $this->addError($this->dsBitacora->errorMsg);
+                return($this->core->logs->add(['data'=>$entity,'error'=>$this->dsLogs->errorMsg],'CFILog_bitacora_error'));
+            } else {
+                $this->core->logs->add('CFILog_bitacora_ok');
+                return true;
+            }
+            //endregion
         }
 
         /*
