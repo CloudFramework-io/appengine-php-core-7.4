@@ -4022,7 +4022,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $options['http']['protocol_version'] = '1.1';
             $options['http']['ignore_errors'] = '1';
             $options['http']['header'] = 'Connection: close' . "\r\n";
-            $options['http']['header'] = 'Accept: */*' . "\r\n";
+            if(!is_array($extra_headers) || !isset($extra_headers['Accept']))
+                $options['http']['header'] = 'Accept: */*' . "\r\n";
+
 
             if($this->automaticHeaders) {
                 // Automatic send header for X-CLOUDFRAMEWORK-SECURITY if it is defined in config
@@ -4046,6 +4048,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $options['http']['header'] .= $key . ': ' . $value . "\r\n";
                 }
             }
+
 
             // Method
             $options['http']['method'] = $verb;
