@@ -463,7 +463,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
                         }
                     } else {
-                        $idkey = null;
+                            $idkey = null;
                     }
                     $fieldname = $key;
 
@@ -521,10 +521,27 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
                             else $_q .= " AND $fieldname {$comp} @{$key}";
                         }
-                    } else {
-                        $key = $key . $idkey;
-                        if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
-                        else $_q .= " AND $fieldname {$comp} @{$key}";
+                    }
+                    else {
+                        //region IF SPECIAL SEARCH for values ending in % let's emulate a like string search
+                        if(is_string($value) && preg_match('/\%$/',$value) && strlen(trim($value))>1) {
+                            $value = preg_replace('/\%$/','',$value);
+                            $bindings[$key.'_from']=$value;
+                            if ($i == 0) $_q .= " WHERE $fieldname >= @{$key}_from AND $fieldname <= @{$key}_to";
+                            else $_q .= " AND $fieldname >= @{$key}_from AND $fieldname < @{$key}_to";
+                            $key .= '_to';
+                            $where[$key] = chr(ord($value[0])+1);  // Get the next char to set a <
+
+                        }
+                        //endregion
+                        //region ELSE set normal to search
+                        else {
+                            $key = $key . $idkey;
+                            if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
+                            else $_q .= " AND $fieldname {$comp} @{$key}";
+                        }
+                        //endregion
+
                     }
 
                     $i++;
