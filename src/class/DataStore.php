@@ -427,10 +427,30 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             else $limit = intval($limit);
             return $this->fetch('all', $fields, $where, $order, $limit);
         }
+
+        /**
+         * Execute a Datastore Query taking the following parameters
+         * @param string $type
+         * @param string $fields
+         * @param null $where
+         * @param null $order
+         * @param null $limit
+         * @return array|false|void
+         * @throws Exception
+         */
         function fetch($type = 'one', $fields = '*', $where = null, $order = null, $limit = null)
         {
 
+            //If the class has any error just return
             if ($this->error) return false;
+
+            //region sanetize params: $type , $fields, $where, $order, $limit
+            if(!is_string($type)) return($this->addError('fetch($type = "one", $fields = "*", $where = null, $order = null, $limit = null) has received $type as not string'));
+            if(!is_string($fields)) return($this->addError('fetch($type = "one", $fields = "*", $where = null, $order = null, $limit = null) has received $fields as not string'));
+            if(is_array($order))  $order = implode(', ',$order);
+            if($limit) $limit = intval($limit);
+            //endregion
+
             $this->core->__p->add('fetch: ', $type . ' fields:' . $fields . ' where:' . $this->core->jsonEncode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
             $ret = [];
             if (!is_string($fields) || !strlen($fields)) $fields = '*';

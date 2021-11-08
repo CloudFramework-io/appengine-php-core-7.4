@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23051';
+        var $_version = 'v73.23081';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3641,7 +3641,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $rawResult = '';
         var $automaticHeaders = true; // Add automatically the following headers if exist on config: X-CLOUDFRAMEWORK-SECURITY, X-SERVER-KEY, X-SERVER-KEY, X-DS-TOKEN,X-EXTRA-INFO
         var $sendSysLogs = true;
-
+        var $default_options = array('ssl' => array('verify_peer' => false),'http'=>['protocol_version'=>'1.1','ignore_errors'=>'1','follow_location'=>true]);
+        var $cookies = [];
         function __construct(Core7 &$core)
         {
             $this->core = $core;
@@ -4018,9 +4019,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $this->core->__p->add("Request->{$verb}: ", "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             // Performance for connections
-            $options = array('ssl' => array('verify_peer' => false));
-            $options['http']['protocol_version'] = '1.1';
-            $options['http']['ignore_errors'] = '1';
+            $options = $this->default_options;
             $options['http']['header'] = 'Connection: close' . "\r\n";
             if(!is_array($extra_headers) || !isset($extra_headers['Accept']))
                 $options['http']['header'] = 'Accept: */*' . "\r\n";
@@ -4157,6 +4156,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if(isset($http_response_header)) $this->responseHeaders = $http_response_header;
                 else $this->responseHeaders = ['$http_response_header'=>'undefined'];
 
+                // Process response Headers
+                $this->processResponseHeaders();
+
                 // If we have an error
                 if ($ret === false) {
                     $this->addError(['route_error'=>$route,'reponse_headers'=>$this->responseHeaders,'system_error'=>error_get_last()]);
@@ -4187,6 +4189,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
             return ($ret);
+        }
+
+        private function processResponseHeaders() {
+            if(is_array($this->responseHeaders)) foreach ($this->responseHeaders as $responseHeader) {
+                if(strpos($responseHeader,'Set-Cookie: ')===0) {
+                    list($var,$attributes) = explode(';',$responseHeader,2);
+                    list($var,$value) = explode('=',$var);
+                    $var  = str_replace('Set-Cookie: ','',$var);
+                    $this->cookies[$var][] = ['value'=>$value,'path'=>$attributes];
+                }
+            }
         }
 
 
