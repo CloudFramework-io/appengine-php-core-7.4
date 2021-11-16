@@ -137,9 +137,16 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                     foreach ($row as $key => $value) {
                         if(is_object($value)) {
                             if(get_class($value)=='Google\Cloud\BigQuery\Timestamp') {
-                                /** @var Timestamp $value */
+                                /** @var Google\Cloud\BigQuery\Timestamp $row[$key] */
                                 $row[$key] = $value->formatAsString();
-                            } else {
+                            }elseif(get_class($value)=='Google\Cloud\BigQuery\Date') {
+                                /** @var Google\Cloud\BigQuery\Date $row[$key] */
+                                $row[$key] = $value->formatAsString();
+                            }elseif(get_class($value)=='Google\Cloud\BigQuery\Numeric') {
+                                /** @var Google\Cloud\BigQuery\Numeric $row[$key] */
+                                $row[$key] = $value->get();
+                            }
+                            else {
                                 return($this->addError($key.' field is of unknown class: '.get_class($value)));
                             }
                         } elseif(is_array($value)) {
