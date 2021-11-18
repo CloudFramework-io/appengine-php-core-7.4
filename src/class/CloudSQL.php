@@ -1,8 +1,8 @@
 <?php
-/*
-*  ADNBP Mysql Class
+/**
+*  CLOUDRAMEWORK Mysql Class
 *  Feel free to use a distribute it. 
- * last-update 2020-09-01
+*  last-update 2021-11-17
 */
 
 class CloudSQLError extends Exception {
@@ -39,6 +39,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         var $_error=[];                      // Holds the last error
         var $_lastRes=false;                                        // Holds the last result set
         var $_lastQuery='';                                        // Holds the last result set
+        var $_lastExecutionMicrotime = 0;
         var $_lastInsertId='';                                        // Holds the last result set
         var $_affectedRows=null;
         var $result;                                                // Holds the MySQL query result
@@ -70,6 +71,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         var $cfmode = true;
         var $_dbProxy = null;
         var $_dbProxyHeaders = null;
+        var $_onlyCreateQuery = false;
 
         protected $core = null;
 
@@ -216,7 +218,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
          * Execute a Query
          */
         function getDataFromQuery() {
+
+            $this->_lastExecutionMicrotime = 0;
             $_q = $this->_buildQuery(func_get_args());
+            if($this->_onlyCreateQuery) return [];
+            $start_global_time = microtime(true);
 
             if($this->error()) {
                 return(false);
@@ -235,6 +241,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     }
                     $ret = unserialize(gzuncompress($ret));
                     $this->core->__p->add('getDataFromQueryProxy ','','endnote');
+                    $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                     return $ret;
                 }
                 // Do a call Directly to DB connection
@@ -256,10 +263,12 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                             $this->setError('Query Error [$q]: ' . $this->_db->error);
                         }
                         $this->core->__p->add('getDataFromQuery ','','endnote');
+                        $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                         return($ret);
                     } catch (Exception $e) {
                         $this->core->__p->add('getDataFromQuery ','','endnote');
                         $this->setError('Query Error [$q]: ' . $e->getMessage());
+                        $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                         return(false);
                     }
                 }
@@ -268,7 +277,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
         // It requires at least query argument
         function command() {
+            $this->_lastExecutionMicrotime = 0;
             $_q = $this->_buildQuery(func_get_args());
+            if($this->_onlyCreateQuery) return true;
+            $start_global_time = microtime(true);
+
             $this->core->__p->add('command ',$_q,'note');
             if($this->error()) {
                 return(false);
@@ -286,6 +299,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     }
                     $ret = unserialize(gzuncompress($ret));
                     $this->core->__p->add('commandProxy ','','endnote');
+                    $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                     return $ret;
                 }
                 else {
@@ -302,6 +316,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                         $this->setError('Query Error [$q]: ' .  $this->_db->error);
                     }
                     $this->core->__p->add('command ','','endnote');
+                    $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                     return($_ok);
                 }
 
@@ -320,7 +335,12 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $this->setError('connection with db not stablished');
                 return false;
             }
+
+            $this->_lastExecutionMicrotime = 0;
             $_q = $this->_buildQuery(array("SELECT 1 FROM %s",$table));
+            if($this->_onlyCreateQuery) return true;
+            $start_global_time = microtime(true);
+
             if($this->_dbProxy) {
                 $this->core->__p->add('tableExistsProxy ',$_q,'note');
                 $ret = $this->core->request->post($this->_dbProxy,['q'=>$_q],$this->_dbProxyHeaders);
@@ -332,6 +352,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 }
                 $ret = unserialize(gzuncompress($ret));
                 $this->core->__p->add('tableExistsProxy ','','endnote');
+                $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                 if( $ret ) {
                     return true;
                 } else {
@@ -340,8 +361,10 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             }
             else {
                 if( ($this->_lastRes = $this->_db->query($_q)) ) {
+                    $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                     return true;
                 } else {
+                    $this->_lastExecutionMicrotime = round(microtime(true)-$start_global_time,4);
                     return false;
                 }
             }
@@ -354,7 +377,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
         }
 
-        // Scape Query arguments
+        /**
+         * Build a Query receiving a string with %s as first parameter and an array of values as second paramater
+         * @param $args
+         * @return array|false|mixed|string|string[]|null
+         */
         function _buildQuery($args) {
 
             if(!$this->_dbProxy && !$this->_dblink ) {
@@ -401,7 +428,12 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             return($qreturn);
         }
 
-        // substitue %s by values in a string
+        /**
+         * Join $values array with $q string wich contains %s elements
+         * @param $q
+         * @param $values
+         * @return array|mixed|string|string[]|null
+         */
         function joinQueryValues($q,$values) {
             if(!is_array($values)) $values = array($values);
             if(count($values)==0) return($q); // Empty array to join.
@@ -429,8 +461,10 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             return($q);
         }
 
-        /*
-         * apply $this->_db->real_escape_string or addslashes if there is not db objext
+        /**
+         * Apply $this->_db->real_escape_string or addslashes if there is not db objext
+         * @param $value
+         * @return string
          */
         function scapeValue($value) {
             if(is_object($this->_db))
@@ -439,6 +473,14 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 return(addslashes($value));
         }
 
+        /**
+         * Return a safe query taking the following fields:
+         * @param $search
+         * @param false $fields
+         * @param string $joints
+         * @param string $operators
+         * @return array|false|mixed|string|string[]|null
+         */
         function getQueryFromSearch ($search,$fields=false,$joints="=",$operators="AND") {
             $ret = '1=1';
             if( strlen($search) && $fields !== false )  {
@@ -474,23 +516,44 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             return($ret);
         }
 
-
+        /**
+         * Close the opened connection
+         */
         function close() {
             if($this->_dblink )  $this->_db->close();
             $this->_dblink = false;
         }
 
+        /**
+         * Return true if there is any error
+         * @return bool
+         */
         function error() {return(count($this->_error)>0);}
+
+        /** Return the last error produced. It will be an array */
         function getError() {return($this->_error);}
+
+        /** Assign an error */
         function setError($err) {
             $this->_error[] = $err;
             $this->core->errors->add($err);
             if($this->_debug) _print($err);
 
         }
+
+        /**
+         * Asssign the Database to work with
+         * @param $db
+         */
         function setDB($db) {$this->_dbdatabase = $db;}
+
+        /** Return last query executed */
         function getQuery() {return( $this->_lastQuery);}
+
+        /** Return last id of the inserted record */
         function getInsertId() {return( $this->_lastInsertId);}
+
+        /** Return the number of affected rows in the las query */
         function getAffectedRows() {return( $this->_affectedRows);}
 
 
@@ -503,6 +566,16 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             $this->_qObject[$id]['mixValue'] = $mixValue;
         }
 
+        /**
+         * Define When I want to build a query but I do not want to be executed I call this method with true value
+         * @param $boolean
+         */
+        function onlyCreateQuery($boolean) {$this->_onlyCreateQuery = $boolean;}
+
+        /**
+         * Return $this->_qObject[$id]
+         * @param $id
+         */
         function getQueryObject($id) {$this->_qObject[$id];}
 
         function setQueryObjectSelectFields($id,$value) {
@@ -861,7 +934,6 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                         //echo($action." into $key (".$value['insertFields'].") values  (".$value['insertPercents'].")");
                         return($this->command($act." into $key (".$value['insertFields'].") values  (".$value['insertPercents'].")",$value['values']));
                         break;
-
                     case 'getRecords':
                     case 'getDistinctRecords':
                     case 'getPagedRecords':
@@ -874,7 +946,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                         if(!strlen($table)) $table = $key;
                         if(strlen($order)) $order = " ORDER BY ".$order;
                         // case 'getPagedRecords':
-                        // case 'getPagedDistinctRecords':                        
+                        // case 'getPagedDistinctRecords':
                         if($action == "getPagedRecords" || $action == "getPagedDistinctRecords" ) {
 
                             $_q = "select count(*) TOTAL from (select ".(($action == "getPagedDistinctRecords")?'distinct ':'')."$selectFields from $table main where ".$value['selectWhere'].$order;
@@ -900,7 +972,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                             return($ret);
                         }
                         // case 'getRecords':
-                        // case 'getDistinctRecords':                        
+                        // case 'getDistinctRecords':
                         elseif($action == "getRecords" || $action == "getDistinctRecords") {
                             $_q = "select ".(($action == "getDistinctRecords")?'distinct ':'')."$selectFields from $table main where ".$value['selectWhere'].$order;
                             if($this->_limit) $_q .=" limit ".$this->_limit;
@@ -908,7 +980,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                         }
                         // case 'getRecordsForEdit':
-                        // case 'getRecordsToExplore':                           
+                        // case 'getRecordsToExplore':
                         else {
 
                             // Eplore types evaluting to cache
@@ -1037,7 +1109,6 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                             return($_ret);
                         }
                         break;
-
                     case 'updateRecord':
                     case 'update':
 
@@ -1265,4 +1336,3 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
     }
 }
-?>

@@ -288,8 +288,8 @@ class DataSQL
     }
     /**
      * Return records [0..n][record_structure] from the db object
-     * @param array $keysWhere
-     * @param null $fields
+     * @param array|string $keysWhere where condition can be a string or array [key=>value, key=>value]
+     * @param null $fields fields to be returned
      * @return array|void
      */
     function fetch($keysWhere=[], $fields=null, $params=[]) {
@@ -494,6 +494,11 @@ class DataSQL
     }
 
 
+    /**
+     * Build a query taking $keysWhere and applying rules depending of each field type
+     * @param array $keysWhere
+     * @return array|void
+     */
     function getQuerySQLWhereAndParams($keysWhere=[]) {
         if(!is_array($keysWhere) ) return($this->addError('getQuerySQLWhereAndParams($keysWhere) $keyWhere has to be an array with key->value'));
 
@@ -725,11 +730,27 @@ class DataSQL
         $this->core->errors->add(['DataSQL'=>$value]);
     }
 
+    /**
+     * Return the last query executed
+     * @return string|null
+     */
     function getDBQuery() {
         if(!is_object($this->core->model->db)) return null;
-        
+
         return($this->core->model->db->getQuery());
     }
+
+    /**
+     * Return last time spent y last query
+     * @return int|null
+     */
+    function getDBQueryTime() {
+        if(!is_object($this->core->model->db)) return null;
+
+        return($this->core->model->db->_lastExecutionMicrotime);
+    }
+
+
 
     /**
      * Return an array of the mapped fields ready to insert or update Validating the info

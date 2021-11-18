@@ -28,6 +28,8 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         var $offset = 0;
         var $order = '';
         var $_last_query=null;
+        var $_last_query_time=0;
+        var $_only_create_query = false;
         private $joins = [];
         private $queryFields = '';
         private $queryWhere = [];
@@ -61,7 +63,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                     || stripos($item[0],'number')!== false
                 )?'int':'char';
             }
-            if(!count($this->keys)) return($this->addError('Missing Keys in the schema: '.$this->dataset_name));
 
             $options = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
             $this->project_id = $this->core->gc_project_id;
@@ -94,6 +95,25 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
         }
 
+
+
+        /**
+         * Define When I want to build a query but I do not want to be executed I call this method with true value
+         * @param $boolean
+         */
+        function onlyCreateQuery($boolean) {$this->_only_create_query = $boolean;}
+
+        /**
+         * Execute a Query with a title
+         * @param $title
+         * @param $_q
+         * @param array $params
+         * @return array|void
+         */
+        public function dbQuery($title,$_q,$params=[]) {
+            return $this->_query($_q,$params);
+        }
+
         /**
          * Execute a query in BigQuery
          * @param $q
@@ -112,8 +132,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 }
             }
 
+            $this->_last_query = $q;
+            if($this->_only_create_query) return [];
+            $start_global_time = microtime(true);
+
             try {
-                $this->_last_query = $q;
+
                 /*
                 $jobConfig = $this->client->query($q);
                 $job = $this->client->startQuery($jobConfig);
@@ -147,6 +171,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                 $row[$key] = $value->get();
                             }
                             else {
+                                $this->_last_query_time = round(microtime(true)-$start_global_time,4);
                                 return($this->addError($key.' field is of unknown class: '.get_class($value)));
                             }
                         } elseif(is_array($value)) {
@@ -157,6 +182,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                     $ret[] = $row;
                 }
                 $this->core->__p->add('DataBQ._query '. substr($q,0,10).'..', '', 'endnote');
+                $this->_last_query_time = round(microtime(true)-$start_global_time,4);
                 return $ret;
             } catch (Exception $e) {
                 return($this->addError($e->getMessage()));
@@ -630,28 +656,33 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                         }
                     }
 
-
-
                     if($where) $where.=' AND ';
+
+                    //region SET $is_date,$field
+                    $is_date = isset($this->entity_schema['model'][$key][0]) && in_array($this->entity_schema['model'][$key][0],['date', 'datetime', 'datetimeiso','timestamp']);
+                    $field = "`{$this->dataset_name}`.{$key}";
+                    //endregion
 
                     switch (strval($value)) {
                         case "__null__":
-                            $where.="`{$this->dataset_name}`.{$key} IS NULL";
+                            $where.="{$field} IS NULL";
                             break;
                         case "__notnull__":
-                            $where.="`{$this->dataset_name}`.{$key} IS NOT NULL";
+                            $where.="{$field} IS NOT NULL";
                             break;
                         case "__empty__":
-                            $where.="`{$this->dataset_name}`.{$key} = ''";
+                            if($is_date) $where.="{$field} IS NULL";
+                            else $where.="{$field} = ''";
                             break;
                         case "__noempty__":
-                            $where.="`{$this->dataset_name}`.{$key} != ''";
+                            if($is_date) $where.="{$field} IS NOT NULL";
+                            $where.="{$field} != ''";
                             break;
                         default:
                             // IN
                             if(is_array($value)) {
                                 if($this->fields[$key]=='int') {
-                                    $where.="`{$this->dataset_name}`.{$key} IN (%s)";
+                                    $where.="{$field} IN (%s)";
                                     $params[] = implode(',',$value);
                                 }
                                 else {
@@ -661,50 +692,98 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                     }, $value);
 
                                     // Add an IN
-                                    $where.="`{$this->dataset_name}`.{$key} IN ('".implode("','",$value)."')";
+                                    $where.="{$field} IN ('".implode("','",$value)."')";
                                     //$params[] = implode("','",$value);
-
                                 }
                             }
                             // =
                             else {
-                                $op = '=';
-                                if($this->fields[$key]=='int') {
-                                    // Add operators
-                                    if(strpos($value,'>=')===0) {
-                                        $op='>=';
-                                        $value = str_replace('>=','',$value);
-                                    }elseif(strpos($value,'<=')===0) {
-                                        $op='<=';
-                                        $value = str_replace('<=','',$value);
-                                    }elseif(strpos($value,'>')===0) {
-                                        $op='>';
-                                        $value = str_replace('>','',$value);
-                                    }elseif(strpos($value,'<')===0) {
-                                        $op='<';
-                                        $value = str_replace('<','',$value);
-                                    }elseif(strpos($value,'!=')===0) {
-                                        $op='!=';
-                                        $value = str_replace('!=','',$value);
-                                    }
-                                    $where.="`{$this->dataset_name}`.{$key} {$op} %s";
-                                }
-                                else {
-                                    if(strpos($value,'%')!==false) {
-                                        if(strpos($value,'!=')===0) {
-                                            $op = 'not like';
-                                            $value = str_replace('!=', '', $value);
-                                        } else {
-                                            $op = 'like';
-                                        }
-                                    } elseif(strpos($value,'!=')===0) {
-                                        $op='!=';
-                                        $value = str_replace('!=','',$value);
+
+                                //region IF $is_date create a special query a continue;
+                                if($is_date) {
+
+                                    // Evaluate a date field
+                                    if(strpos($value,'/')===false) {
+                                        $from = $value;
+                                        $to = null;
+                                    } else {
+                                        list($from,$to) = explode("/",$value,2);
                                     }
 
-                                    $where.="`{$this->dataset_name}`.{$key} {$op} '%s'";
+                                    if(strlen($from) == 4) {
+                                        $field = "FORMAT_DATE('%Y',`{$this->dataset_name}`.{$key})";
+                                    } elseif(strlen($from) == 7) {
+                                        $field = "FORMAT_DATE('%Y-%m',`{$this->dataset_name}`.{$key})";
+                                    } elseif(strlen($from) == 10) {
+                                        $field = "FORMAT_DATE('%Y-%m-%d',`{$this->dataset_name}`.{$key})";
+                                    } else {
+                                        break;
+                                    }
+                                    if($to===null) {
+                                        $where.="{$field} = '%s'";
+                                        $params[] = $from;
+                                    } else {
+                                        $where.="({$field} >= '%s'";
+                                        $params[] = $from;
+                                        if($to) {
+                                            if(strlen($to) == 4) {
+                                                $field = "FORMAT_DATE('%Y',`{$this->dataset_name}`.{$key})";
+                                            } elseif(strlen($to) == 7) {
+                                                $field = "FORMAT_DATE('%Y-%m',`{$this->dataset_name}`.{$key})";
+                                            } elseif(strlen($to) == 10) {
+                                                $field = "FORMAT_DATE('%Y-%m-%d',`{$this->dataset_name}`.{$key})";
+                                            } else {
+                                                break;
+                                            }
+                                            $where.=" AND {$field} <= '%s')";
+                                            $params[] = $to;
+                                        }
+                                    }
+                                    break;
                                 }
-                                $params[] = $value;
+                                //endregion
+                                //region ELSE evaluate operators
+                                else {
+                                    $op = '=';
+                                    if($this->fields[$key]=='int') {
+                                        // Add operators
+                                        if(strpos($value,'>=')===0) {
+                                            $op='>=';
+                                            $value = str_replace('>=','',$value);
+                                        }elseif(strpos($value,'<=')===0) {
+                                            $op='<=';
+                                            $value = str_replace('<=','',$value);
+                                        }elseif(strpos($value,'>')===0) {
+                                            $op='>';
+                                            $value = str_replace('>','',$value);
+                                        }elseif(strpos($value,'<')===0) {
+                                            $op='<';
+                                            $value = str_replace('<','',$value);
+                                        }elseif(strpos($value,'!=')===0) {
+                                            $op='!=';
+                                            $value = str_replace('!=','',$value);
+                                        }
+                                        $where.="{$field} {$op} %s";
+                                    }
+                                    else {
+                                        if(strpos($value,'%')!==false) {
+                                            if(strpos($value,'!=')===0) {
+                                                $op = 'not like';
+                                                $value = str_replace('!=', '', $value);
+                                            } else {
+                                                $op = 'like';
+                                            }
+                                        } elseif(strpos($value,'!=')===0) {
+                                            $op='!=';
+                                            $value = str_replace('!=','',$value);
+                                        }
+
+                                        $where.="{$field} {$op} '%s'";
+                                    }
+                                    $params[] = $value;
+                                }
+                                //endregion
+
                             }
 
                             break;
@@ -819,8 +898,20 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $this->core->errors->add(['DataBQ'=>$value]);
         }
 
+        /**
+         * Return last query executed
+         * @return null|string
+         */
         function getDBQuery() {
             return $this->_last_query;
+        }
+
+        /**
+         * Return last time spent y last query
+         * @return int|null
+         */
+        function getDBQueryTime() {
+            return($this->_last_query_time);
         }
 
         /**

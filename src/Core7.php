@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23161';
+        var $_version = 'v73.23181';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4664,8 +4664,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(!$this->dbInit()) return($this->errorMsg);
 
             // Execute the query
-            $this->core->logs->add($title,'dbQuery');
             $ret = $this->db->getDataFromQuery($SQL,$params);
+            if(!$this->db->_onlyCreateQuery)
+                $this->core->logs->add($title.' -> '.$this->db->getQuery()." [{$this->db->_lastExecutionMicrotime} sec.]",'dbQuery');
+
             if($this->db->error()) return($this->addError($this->db->getError()));
             else {
 
