@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23181';
+        var $_version = 'v73.23241';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1294,8 +1294,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function get($key, $expireTime = -1, $hash = '',$cache_secret_key='',$cache_secret_iv='')
         {
+            $encrypted = ($cache_secret_key && $cache_secret_iv)?'/encrypted':'/no-encrypted';
             if(!$this->init() || !strlen(trim($key))) return null;
-            $this->core->__p->add("CoreCache.get [{$this->type}]", $key, 'note');
+            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", $key, 'note');
 
             if (!strlen($expireTime)) $expireTime = -1;
 
@@ -1312,7 +1313,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if($this->debug)
                         $this->log->add("get('$key',$expireTime,'$hash') failed (because expiration) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
-                    $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
+                    $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                     return null;
                 }
                 // Hash Cache
@@ -1321,16 +1322,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if($this->debug)
                         $this->log->add("get('$key',$expireTime,'$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
-                    $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
+                    $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                     return null;
                 }
                 // Normal return
 
                 if($this->debug)
                     $this->log->add("get('$key',$expireTime,'$hash'). successful returned token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
-
-
-                $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
 
                 // decrypt data if $cache_secret_key and $cache_secret_iv are not empty
                 if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
@@ -1343,13 +1341,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 } catch (Exception $e) {
                     $ret = null;
                 }
-                return $ret;
 
+                $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
+                return $ret;
 
             } else {
                 if($this->debug) $this->log->add("get($key,$expireTime,$hash) failed (beacause it does not exist) token: ".$this->spacename . '-' . $key,'CoreCache');
-
-                $this->core->__p->add("CoreCache.get [{$this->type}]", '', 'endnote');
+                $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", 'error', 'endnote');
                 return null;
             }
         }
@@ -1365,8 +1363,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function set($key, $object, $hash=null, $cache_secret_key='',$cache_secret_iv='')
         {
+            $encrypt = ($cache_secret_key && $cache_secret_iv)?'/encrypt':'/no-encrypt';
             if(!$this->init() || !strlen(trim($key))) return null;
-            $this->core->__p->add("CoreCache.set [{$this->type}]", $key, 'note');
+            $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", $key, 'note');
 
             $info['_microtime_'] = microtime(true);
             $info['_hash_'] = $hash;
@@ -1386,7 +1385,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->log->add("set({$key}). token: ".$this->spacename . '-' . $key.(($hash)?' with hash: '.$hash:''),'CoreCache');
 
             unset($info);
-            $this->core->__p->add("CoreCache.set [{$this->type}]", $key, 'endnote');
+            $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", '', 'endnote');
             return ($this->error)?false:true;
         }
 

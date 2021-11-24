@@ -25,7 +25,11 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $cursor = '';
         var $last_cursor;
         var $time_zone = 'UTC';
+        /** @var CoreCache $cache */
         var $cache = null;
+        var $useCache = false;
+        var $cacheSecretKey = '';
+        var $cacheSecretIV = '';
         var $cache_data = null;
         var $namespace = 'default';
         var $transformReadedEntities = true; // Transform readed entities
@@ -60,6 +64,19 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         }
 
         /**
+         * Set $this->useCache to true or false
+         * @param boolean $activate
+         */
+        function activateCache($activate=true,$secretKey='',$secretIV=''){
+            $this->useCache = ($activate)?true:false;
+            $this->cacheSecretKey = $secretKey;
+            $this->cacheSecretIV = $secretIV;
+            if($this->useCache) $this->initCache();
+            else $this->cache = null;
+        }
+        function deactivateCache($activate=true) { $this->activateCache(false);}
+
+        /**
          * Creating  entities based in the schema
          * @param $data
          * @return array|bool
@@ -83,7 +100,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $schema_key = null;
                 $schema_keyname = null;
 
-                if (!is_array($row)) $this->setError('Wrong data structure');
+                if (!is_array($row)) return $this->setError('Wrong data structure');
                 // Loading info from Data. $i can be numbers 0..n or indexes.
                 foreach ($row as $i => $value) {
 
@@ -451,7 +468,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             if($limit) $limit = intval($limit);
             //endregion
 
-            $this->core->__p->add('fetch: ', $type . ' fields:' . $fields . ' where:' . $this->core->jsonEncode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
+            $this->core->__p->add('fetch: '.$this->entity_name, $type . ' fields:' . $fields . ' where:' . $this->core->jsonEncode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
             $ret = [];
             if (!is_string($fields) || !strlen($fields)) $fields = '*';
             if (!strlen($limit)) $limit = $this->limit;
@@ -597,7 +614,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $this->setError($e->getMessage());
                 $this->addError('fetch');
             }
-            $this->core->__p->add('fetch: ', '', 'endnote');
+            $this->core->__p->add('fetch: '.$this->entity_name, '', 'endnote');
             return $ret;
         }
 
@@ -608,7 +625,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function fetchByKeys($keys)
         {
-            $this->core->__p->add('ds:fetchByKeys: ',  ' keys:' . $this->core->jsonEncode($keys),'note');
+            $this->core->__p->add('ds:fetchByKeys: '.$this->entity_name,  ' keys:' . $this->core->jsonEncode($keys),'note');
             if(!$keys) return;
             $ret = [];
             if (!is_array($keys)) $keys = explode(',', $keys);
@@ -628,14 +645,14 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $ret = $this->transformResult($result['found']);
 
                 } else {
-                    $this->core->__p->add('ds:fetchByKeys: ',  '','endnote');
+                    $this->core->__p->add('ds:fetchByKeys: '.$this->entity_name,  '','endnote');
                     return([]);
                 }
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('query');
             }
-            $this->core->__p->add('ds:fetchByKeys: ',  '','endnote');
+            $this->core->__p->add('ds:fetchByKeys: '.$this->entity_name,  '','endnote');
             return $ret;
         }
 
@@ -647,7 +664,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         function fetchOneByKey($key)
         {
             if(!$key) return;
-            $this->core->__p->add('ds:fetchOneByKey: ',  ' key:' . $key,'note');
+            $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  ' key:' . $key,'note');
             try {
 
                 // force type TYPE_NAME if there is a field KeyName
@@ -662,17 +679,17 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 if ($result) {
                     $result = [$result];
                     $result = $this->transformResult($result)[0];
-                    $this->core->__p->add('ds:fetchOneByKey: ',  '','endnote');
+                    $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  '','endnote');
                     return($result);
                 } else {
-                    $this->core->__p->add('ds:fetchOneByKey: ',  '','endnote');
+                    $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  '','endnote');
                     return([]);
                 }
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('query');
             }
-            $this->core->__p->add('ds:fetchOneByKey: ',  '','endnote');
+            $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  '','endnote');
 
         }
 
@@ -745,9 +762,10 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function setCache($key, $result)
         {
+            if(!$this->useCache) return;
             if ($this->cache === null) $this->initCache();
             $this->cache_data[$key] = gzcompress(serialize($result));
-            $this->cache->set($this->entity_name . '_' . $this->namespace, $this->cache_data);
+            $this->cache->set($this->entity_name . '_' . $this->namespace, $this->cache_data,null, $this->cacheSecretKey, $this->cacheSecretIV);
         }
 
         /**
@@ -757,8 +775,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function getCache($key)
         {
+            if(!$this->useCache) return;
             if ($this->cache === null) $this->initCache();
-
             if (isset($this->cache_data[$key])) {
                 return (unserialize(gzuncompress($this->cache_data[$key])));
             } else {
@@ -773,9 +791,10 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function resetCache()
         {
+            if(!$this->useCache) return;
             if ($this->cache === null) $this->initCache();
             $this->cache_data = [];
-            $this->cache->set($this->entity_name . '_' . $this->namespace, $this->cache_data);
+            $this->cache->set($this->entity_name . '_' . $this->namespace, $this->cache_data,null, $this->cacheSecretKey, $this->cacheSecretIV);
         }
 
         /**
@@ -783,8 +802,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function initCache()
         {
+            if(!$this->useCache) return;
             if ($this->cache === null) $this->cache = new CoreCache($this->core,'CF_DATASTORE');
-            $this->cache_data = $this->cache->get($this->entity_name . '_' . $this->namespace);
+            $this->cache_data = $this->cache->get($this->entity_name . '_' . $this->namespace,-1,'',$this->cacheSecretKey, $this->cacheSecretIV);
             if (!is_array($this->cache_data)) $this->cache_data = [];
         }
 
