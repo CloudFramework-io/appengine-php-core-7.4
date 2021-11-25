@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23241';
+        var $_version = 'v73.23251';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -133,7 +133,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
             //setup GCP basic vars
-            if(!getenv('PROJECT_ID') && $this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
+            if($this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
             $this->gc_project_id = getenv('PROJECT_ID');
             $this->gc_project_service = ($this->config->get('core.gcp.project_service'))?$this->config->get('core.gcp.project_service'):'default';
 
@@ -243,7 +243,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         } else {
                             $api->main();
                         }
+
                         $api->send();
+
+                        die('eee');
+
 
                     } else {
                         $api = new RESTful($this);
@@ -4516,96 +4520,114 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * @param string $model  We expect a '(db|ds):model_name' or just 'model_name'
+         * @param string $object  We expect a '(db|ds):model_name' or just 'model_name'
          * @param array $options  optional options
          *    string $namespace says what namespace to use for datastore objects
          *    string $cf_models_api_key is the API-KEY to use for CloudFrameworkDataModels and read the structure remotelly
          * @return DataStore|DataSQL|void
          */
-        public function getModelObject($model,$options=[]) {
+        public function getModelObject(string $object,$options=[]) {
+
+
 
             //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
-            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] && !isset($this->models['db:'.$model]) && !isset($this->models['ds:'.$model]) && !isset($this->models[$model])) {
-                if(!$this->readModelsFromCloudFramework($model,$options['cf_models_api_key'])) return;
+            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] && !isset($this->models['db:'.$object]) && !isset($this->models['ds:'.$object]) && !isset($this->models[$object])) {
+                if(!$this->readModelsFromCloudFramework($object,$options['cf_models_api_key'])) return;
             }
             //endregion
 
+
             // If the model does not include the '(ds|db):' we add it.
-            if(!strpos($model,':')) {
-                if(isset($this->models['db:'.$model])) $model = 'db:'.$model;
-                else $model = 'ds:'.$model;
+            if(!strpos($object,':')) {
+                if(isset($this->models['db:'.$object])) $object = 'db:'.$object;
+                elseif(isset($this->models['ds:'.$object])) $object = 'ds:'.$object;
+                elseif(isset($this->models['bq:'.$object])) $object = 'bq:'.$object;
+                else $object = 'api:'.$object;
             }
 
             // Let's find it and return
-            if(!isset($this->models[$model])) return($this->addError("Model $model does not exist",404));
-            if(!isset($this->models[$model]['data'])) return($this->addError($model. 'Does not have data',503));
+            if(!isset($this->models[$object])) return($this->addError("Model $object does not exist",404));
+            if(!isset($this->models[$object]['data'])) return($this->addError($object. 'Does not have data',503));
 
-            switch ($this->models[$model]['type']) {
+            switch ($this->models[$object]['type']) {
                 case "db":
-                    list($type,$table) = explode(':',$model,2);
+                    list($type,$table) = explode(':',$object,2);
 
-                    if(isset($this->models[$model]['data']['extends'])) {
-                        $model_extended = 'db:'.$this->models[$model]['data']['extends'];
-                        if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $model does not exist",404));
+                    if(isset($this->models[$object]['data']['extends'])) {
+                        $model_extended = 'db:'.$this->models[$object]['data']['extends'];
+                        if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $object does not exist",404));
 
                         // Rewrite model if it is defined
-                        if(isset($this->models[$model]['data']['model']) && $this->models[$model]['data']['model']) {
-                            $this->models[$model_extended]['data']['model'] =  $this->models[$model]['data']['model'];
+                        if(isset($this->models[$object]['data']['model']) && $this->models[$object]['data']['model']) {
+                            $this->models[$model_extended]['data']['model'] =  $this->models[$object]['data']['model'];
                         }
 
                         //Merge variables with the extended object.
-                        if(isset($this->models[$model]['data']['interface']) && $this->models[$model]['data']['interface']) foreach ($this->models[$model]['data']['interface'] as $object=>$data) {
+                        if(isset($this->models[$object]['data']['interface']) && $this->models[$object]['data']['interface']) foreach ($this->models[$object]['data']['interface'] as $object=>$data) {
                             $this->models[$model_extended]['data']['interface'][$object] = $data;
                         }
-                        $this->models[$model]['data'] = array_merge(['extended_from'=>$table],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$model]['data'],$this->models[$model_extended]['data'])));
+                        $this->models[$object]['data'] = array_merge(['extended_from'=>$table],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
 
                     }
                     // rewrite name of the table
-                    if(isset($this->models[$model]['data']['interface']['object'])) $table = $this->models[$model]['data']['interface']['object'];
+                    if(isset($this->models[$object]['data']['interface']['object'])) $table = $this->models[$object]['data']['interface']['object'];
 
                     // Object creation
-                    if(!is_object($object = $this->core->loadClass('DataSQL',[$table,$this->models[$model]['data']]))) return;
-                    return($object);
+                    if(!is_object($object_db = $this->core->loadClass('DataSQL',[$table,$this->models[$object]['data']]))) return;
+                    return($object_db);
                     break;
 
                 case "ds":
-                    list($type,$entity) = explode(':',$model,2);
+
+                    list($type,$entity) = explode(':',$object,2);
                     $namespace = (isset($options['namespace']))?$options['namespace']:$this->core->config->get('DataStoreSpaceName');
+                    if(isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $namespace=$this->models[$object]['data']['interface']['namespace'];
                     if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] paramater'));
 
-                    if(isset($this->models[$model]['data']['extends'])) {
+                    //region EVALUATE extends the object from others
+                    if(isset($this->models[$object]['data']['extends'])) {
                         // look for the model
-                        $model_extended = 'ds:'.$this->models[$model]['data']['extends'];
-                        if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $model does not exist",404));
+                        $model_extended = 'ds:'.$this->models[$object]['data']['extends'];
+                        if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $object does not exist",404));
 
                         // Rewrite model if it is defined
-                        if(isset($this->models[$model]['data']['model'])) {
-                            $this->models[$model_extended]['data']['model'] =  $this->models[$model]['data']['model'];
+                        if(isset($this->models[$object]['data']['model'])) {
+                            $this->models[$model_extended]['data']['model'] =  $this->models[$object]['data']['model'];
                         }
 
                         //Merge variables with the extended object.
-                        if(isset($this->models[$model]['data']['interface'])) foreach ($this->models[$model]['data']['interface'] as $object=>$data) {
+                        if(isset($this->models[$object]['data']['interface'])) foreach ($this->models[$object]['data']['interface'] as $object=>$data) {
                             $this->models[$model_extended]['data']['interface'][$object] = $data;
                         }
-                        $this->models[$model]['data'] = array_merge(['extended_from'=>$entity],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$model]['data'],$this->models[$model_extended]['data'])));
-                        $entity = $this->models[$model]['data']['extends'];
+                        $this->models[$object]['data'] = array_merge(['extended_from'=>$entity],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
+                        $entity = $this->models[$object]['data']['extends'];
                     }
-                    if(isset($this->models[$model]['data']['entity'])) $entity = $this->models[$model]['data']['entity'];
+                    //endregion
 
-                    if(!is_object($object = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$model]['data']]))) return;
-                    return($object);
+                    //region REWRITE entity if $this->models[$object]['data']['entity']
+                    if(isset($this->models[$object]['data']['entity'])) $entity = $this->models[$object]['data']['entity'];
+                    //endregion
+
+                    $options = ['projectId'=>(isset($this->models[$object]['data']['interface']['project_id']) && $this->models[$object]['data']['interface']['project_id'])?$this->models[$object]['data']['interface']['project_id']: $this->core->gc_project_id];
+                    if(isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $options['namespace'] = $this->models[$object]['data']['interface']['namespace'];
+                    if(!is_object($object_ds = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$object]['data'],$options]))) return;
+
+                    return($object_ds);
                     break;
 
                 case "bq":
-                    list($type,$table) = explode(':',$model,2);
-
+                    list($type,$dataset) = explode(':',$object,2);
 
                     // rewrite name of the table
-                    if(isset($this->models[$model]['data']['interface']['object'])) $dataset = $this->models[$model]['data']['interface']['object'];
+                    if(isset($this->models[$object]['data']['interface']['object'])) $dataset = $this->models[$object]['data']['interface']['object'];
 
+                    // $options
+                    $options = ['projectId'=>(isset($this->models[$object]['data']['interface']['project_id']) && $this->models[$object]['data']['interface']['project_id'])?$this->models[$object]['data']['interface']['project_id']: $this->core->gc_project_id];
+                    if(isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
                     // Object creation
-                    if(!is_object($object = $this->core->loadClass('DataBQ',[$dataset,$this->models[$model]['data']]))) return;
-                    return($object);
+                    if(!is_object($object_bq = $this->core->loadClass('DataBQ',[$dataset,$this->models[$object]['data'],$options]))) return;
+                    return($object_bq);
                     break;
             }
             return null;

@@ -38,6 +38,13 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         private $groupBy = '';
         private $view = null;
 
+        /**
+         * @param Core7 $core
+         * @param $params
+         * [0] = dataset_name
+         * [1] = cfo_schema
+         * [3] = $options = [projectId, KeyFile,..]
+         */
         function __construct(Core7 &$core, $params)
         {
             $this->core = $core;
@@ -66,14 +73,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             $options = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
             $this->project_id = $this->core->gc_project_id;
-            if(isset($options['projectId'])) $this->project_id = $this->core->gc_project_id;
+            if(isset($options['projectId'])) $this->project_id = $options['projectId'];
+            else $options['projectId'] = $this->project_id;
 
             // SETUP DatastoreClient
-            global $datastore;
             try {
-                $this->client = new BigQueryClient([
-                    'projectId' =>$this->project_id,
-                ]);
+                $this->client = new BigQueryClient($options);
             } catch (Exception $e) {
                 return($this->addError($e->getMessage()));
             }

@@ -39,7 +39,6 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $this->core = $core;
             $this->core->__p->add('DataStore new instance ', $params[0], 'note');
 
-
             $this->entity_name = $params[0];
             $this->namespace = (isset($params[1]) && $params[1])?$params[1]:'default';
             $this->loadSchema( $this->entity_name, (isset($params[2])) ? $params[2] : null); // Prepare $this->schema
@@ -47,14 +46,29 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
             if($this->core->gc_project_id && !isset($options['projectId'])) $options['projectId'] = $this->core->gc_project_id;
             if(!isset($options['namespaceId'])) $options['namespaceId'] = $this->namespace;
+            if(!isset($options['transport']) || !$options['transport'])
+                $options['transport'] = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
 
-            // SETUP DatastoreClient
             global $datastore;
-            try {
-                $this->datastore = &$datastore;
-            } catch (Exception $e) {
-                return($this->addError($e->getMessage()));
+
+            $default_project_id = $core->config->get("core.gcp.datastore.project_id") || getenv('PROJECT_ID');
+            // Evaluate to use global $datastore for performance or to create a new one object
+            if($default_project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
+                try {
+                    $this->datastore = new DatastoreClient($options);
+                } catch (Exception $e) {
+                    return($this->addError($e->getMessage()));
+                }
+            } else {
+                try {
+                    if($this->entity_name=='demo') _printe('bb',$options);
+                    $this->datastore = &$datastore;
+                } catch (Exception $e) {
+                    return($this->addError($e->getMessage()));
+                }
             }
+            // SETUP DatastoreClient
+
 
 
 
