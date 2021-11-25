@@ -50,8 +50,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $options['transport'] = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
 
             global $datastore;
-
-            $default_project_id = $core->config->get("core.gcp.datastore.project_id") || getenv('PROJECT_ID');
+            $default_project_id = ($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID');
             // Evaluate to use global $datastore for performance or to create a new one object
             if($default_project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
                 try {
@@ -61,7 +60,6 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 }
             } else {
                 try {
-                    if($this->entity_name=='demo') _printe('bb',$options);
                     $this->datastore = &$datastore;
                 } catch (Exception $e) {
                     return($this->addError($e->getMessage()));
