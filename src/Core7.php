@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23251';
+        var $_version = 'v73.23252';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4563,8 +4563,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         }
 
                         //Merge variables with the extended object.
-                        if(isset($this->models[$object]['data']['interface']) && $this->models[$object]['data']['interface']) foreach ($this->models[$object]['data']['interface'] as $object=>$data) {
-                            $this->models[$model_extended]['data']['interface'][$object] = $data;
+                        if(isset($this->models[$object]['data']['interface']) && $this->models[$object]['data']['interface']) foreach ($this->models[$object]['data']['interface'] as $object_property=>$data) {
+                            $this->models[$model_extended]['data']['interface'][$object_property] = $data;
                         }
                         $this->models[$object]['data'] = array_merge(['extended_from'=>$table],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
 
@@ -4596,9 +4596,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         }
 
                         //Merge variables with the extended object.
-                        if(isset($this->models[$object]['data']['interface'])) foreach ($this->models[$object]['data']['interface'] as $object=>$data) {
-                            $this->models[$model_extended]['data']['interface'][$object] = $data;
+                        if(isset($this->models[$object]['data']['interface'])) foreach ($this->models[$object]['data']['interface'] as $object_property=>$data) {
+                            $this->models[$model_extended]['data']['interface'][$object_property] = $data;
                         }
+
                         $this->models[$object]['data'] = array_merge(['extended_from'=>$entity],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
                         $entity = $this->models[$object]['data']['extends'];
                     }
