@@ -31,6 +31,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $cacheSecretKey = '';
         var $cacheSecretIV = '';
         var $cache_data = null;
+        var $project_id = '';
         var $namespace = 'default';
         var $transformReadedEntities = true; // Transform readed entities
 
@@ -50,9 +51,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $options['transport'] = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
 
             global $datastore;
-            $default_project_id = ($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID');
+            $this->project_id = ($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID');
             // Evaluate to use global $datastore for performance or to create a new one object
-            if($default_project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
+            if($this->project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
                 try {
                     $this->datastore = new DatastoreClient($options);
                 } catch (Exception $e) {
@@ -66,9 +67,6 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 }
             }
             // SETUP DatastoreClient
-
-
-
 
             $this->core->__p->add('DataStore new instance ', '', 'endnote');
             return true;

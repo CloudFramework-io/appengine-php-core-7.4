@@ -97,7 +97,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23254';
+        var $_version = 'v73.23261';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4529,13 +4529,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public function getModelObject(string $object,$options=[]) {
 
 
-
             //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
             if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] && !isset($this->models['db:'.$object]) && !isset($this->models['ds:'.$object]) && !isset($this->models[$object])) {
                 if(!$this->readModelsFromCloudFramework($object,$options['cf_models_api_key'])) return;
             }
             //endregion
-
 
             // If the model does not include the '(ds|db):' we add it.
             if(!strpos($object,':')) {
