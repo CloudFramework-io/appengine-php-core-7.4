@@ -47,6 +47,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         else echo "</pre>";
     }
 
+    /**
+     * @throws Exception
+     */
     function __fatal_handler() {
         global $core;
         $errfile = "unknown file";
@@ -62,6 +65,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $errfile = $error["file"];
             $errline = $error["line"];
             $errstr  = $error["message"];
+
+            //Catch gzuncompress() in Core7 file for cache
+            if ($errno == E_WARNING && $errstr == 'gzuncompress(): data error' && strpos($errfile,'Core7.php')) {
+                $core->logs->add('gzuncompress() failed. Potential wrong credentials in CoreCache->get() or wrong content in CoreSession->get()','gzumcompress','warning');
+                return;
+            }
 
             if($core)
                 $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
@@ -97,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23261';
+        var $_version = 'v73.23281';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1137,6 +1146,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $lastHash = null;
         var $lastExpireTime = null;
         var $atom = null;
+        var $errorSecurity = false; // It will change to true when you try to get a value using a wrong $cache_secret_key,$cache_secret_iv
         /** @var Core  */
         var $core=null;
 
@@ -1315,8 +1325,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if ($expireTime >= 0 && microtime(true) - $info['_microtime_'] >= $expireTime) {
                     $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('$key',$expireTime,'$hash') failed (because expiration) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
-
+                        $this->log->add("get('\$key=$key',$expireTime=\$expireTime) failed (because expiration)",'CoreCache');
                     $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                     return null;
                 }
@@ -1324,33 +1333,46 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if ('' != $hash && $hash != $info['_hash_']) {
                     $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('$key',$expireTime,'$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+                        $this->log->add("get('$key',$expireTime,'\$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
                     $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                     return null;
                 }
                 // Normal return
 
-                if($this->debug)
-                    $this->log->add("get('$key',$expireTime,'$hash'). successful returned token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
-
                 // decrypt data if $cache_secret_key and $cache_secret_iv are not empty
-                if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
+                if($cache_secret_key && $cache_secret_iv) {
+                    $this->errorSecurity = false;
+                    $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
+                }
 
                 // unserialize vars
                 $ret = null;
                 try {
-                    if(isset($info['_data_']) && $info['_data_'])
-                        $ret = ($info['_data_'])?@unserialize(@gzuncompress($info['_data_'])):null;
+                    if(isset($info['_data_']) && $info['_data_']) {
+                        $ret = @unserialize(@gzuncompress($info['_data_']));
+                        if($ret===false && $cache_secret_key && $cache_secret_iv) {
+                            $this->delete( $key);
+                            $this->errorSecurity = true;
+                            if($this->debug)
+                                $this->log->add("get('$key',$expireTime,'$hash',\$cache_secret_key or \$cache_secret_iv). Wrong \$cache_secret_key or \$cache_secret_iv. Cache key has been deleted because security",'CoreCache');
+                            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
+                            return null;
+                        }
+                    }
                 } catch (Exception $e) {
                     $ret = null;
                 }
+
+                if($this->debug)
+                    $this->log->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned.".$this->spacename . '-' . $key.' [time='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+
 
                 $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                 return $ret;
 
             } else {
-                if($this->debug) $this->log->add("get($key,$expireTime,$hash) failed (beacause it does not exist) token: ".$this->spacename . '-' . $key,'CoreCache');
+                if($this->debug) $this->log->add("get(\$key=$key) failed (because it does not exist)",'CoreCache');
                 $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", 'error', 'endnote');
                 return null;
             }
@@ -1386,7 +1408,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
 
             if($this->debug)
-                $this->log->add("set({$key}). token: ".$this->spacename . '-' . $key.(($hash)?' with hash: '.$hash:''),'CoreCache');
+                $this->log->add("set(\$key={$key},..)".(($hash)?' with $hash,':'').(($cache_secret_key && $cache_secret_iv)?' with $cache_secret_key and $cache_secret_iv':''),'CoreCache');
 
             unset($info);
             $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", '', 'endnote');
@@ -2391,25 +2413,25 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          *   - core.gcp.secrets.cache_encrypt_iv: To encryt the data in cache you can define a config-var iv
          *   - @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
          *   - @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache         *
-         * @param $gpc_secret_id string secre id in gcp.secrets. if empty it will take $this->get('core.gcp.secrets.env_vars')
+         * @param $gpc_secret_id string project id in gcp.secrets. if empty it will take $this->get('core.gcp.secrets.env_vars')
+         * @param $gpc_secret_id string secret id in gcp.secrets. if empty it will take $this->get('core.gcp.secrets.env_vars')
          * @param $reload boolean false by default. if true, force to read it from gcp.secrets
          * @return boolean
          */
-        function readEnvVarsFromGCPSecrets($gpc_secret_id = '', $reload=false) {
+        function readEnvVarsFromGCPSecrets($gpc_project_id = '',$gpc_secret_id = '', $reload=false) {
 
             //region CHECK $gpc_secret_id
+            if(!$gpc_project_id) $gpc_project_id = ($this->get('core.gcp.secrets.project_id'))?:$this->core->gc_project_id;
             if(!$gpc_secret_id) $gpc_secret_id = $this->get('core.gcp.secrets.env_vars');
-            if(!$gpc_secret_id) {
-                $this->core->logs->add('Missing $secret_id and core.gcp.secrets.env_vars config var','error_readEnvVarsFromGCPSecrets');
-                return false;
-            }
+            if(!$gpc_project_id) return $this->core->logs->add('Missing $gpc_project_id and core.gcp.secrets.project_id config var','error_readEnvVarsFromGCPSecrets');
+            if(!$gpc_secret_id) return $this->core->logs->add('Missing $secret_id and core.gcp.secrets.env_vars config var','error_readEnvVarsFromGCPSecrets');
             //endregion
 
             //region CHECK local_config.json if this.core.is.development to avoid read from secret_id
             if($this->core->is->development()
                 && is_file($this->core->system->root_path.'/local_config.json')
                 && isset($this->data['env_vars'] )) {
-                $this->core->logs->add('readEnvVarsFromGCPSecrets avoided because local_config.json exists');
+                $this->core->logs->add('readEnvVarsFromGCPSecrets avoided because local_config.json->["env_vars"] exists');
                 return true;
             }
             //endregion
@@ -2431,7 +2453,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             // read data from cache and encrypt data
-            $key ="{$this->core->gc_project_id}_{$this->core->gc_project_service}_core.gcp.secrets.env_vars";
+            $key ="{$gpc_project_id}_{$gpc_secret_id}_core.gcp.secrets.env_vars";
             $env_vars = $this->getCache($key);
 
             // for local development force reload if local_env_vars.json does not exist
@@ -2514,10 +2536,115 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
-        /*
-         * Return and EnvVar: if(getenv($var)) return getenv($var) else if($this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
+        /**
+         * Return an environment var from getenv($var) or from a GCP Secret
+         * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
+         * @param $var
+         * @param string $gcp_project_id optional GCP projectId where the secrets are stored. By default this value is got from $this->get('core.gcp.secrets.project_id')
+         * @param string $gcp_secret_id  optional GCP sercretId where env_vars are stored in JSON format. By default this value is got from $this->get('core.gcp.secrets.env_vars')
+         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
          */
-        public function getEnvVar($var) {
+        public function getEnvVar($var,$gcp_project_id='',$gcp_secret_id='') {
+
+            //region RETURN getenv($var) if it exist
+            if(getenv($var)) return(getenv($var));
+            //endregion
+
+            //region ELSE RETURN $this->data['env_vars'][$var] if exists reading it from $this->readEnvVarsFromGCPSecrets
+            if($gcp_project_id) $this->set('core.gcp.secrets.project_id',$gcp_project_id);
+            if($gcp_secret_id) $this->set('core.gcp.secrets.env_vars',$gcp_secret_id);
+            if(!isset($this->data['env_vars']) && $this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets($gcp_project_id,$gcp_secret_id);
+
+            // Return $this->data['env_vars'][$var] if it exists
+            if(isset($this->data['env_vars'][$var])) return $this->data['env_vars'][$var];
+            //endregion
+
+            //region ELSE RETURN null
+            return null;
+            //endregion
+
+        }
+
+        /**
+         * Return a secret var stored in CloudFramework Secret Manager through the ERP/BPA
+         * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
+         * @param string $var name of the var contained in the secret
+         * @param string optional $cf_secret_id CF secretId defined in the ERP. Default value is $this->get('core.erp.secrets.secret_id')
+         * @param string optional $cf_secret_token CF secretToken defined in the ERP. Default value is $this->get('core.erp.secrets.secret_token'
+         * @param string optional $platform_id of the ERP. Default value is $this->get('core.erp.platform_id'
+         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
+         */
+        public function getCFSecretVar(string $var,$cf_secret_id='',$cf_secret_token='',$platform_id='') {
+
+            if(!$cf_secret_id) $cf_secret_id = $this->get('core.erp.secrets.secret_id');
+            if(!$cf_secret_token) $cf_secret_token = $this->get('core.erp.secrets.secret_token');
+            if(!$platform_id) $platform_id = $this->get('core.erp.platform_id');
+
+            if(!$cf_secret_id) return($this->core->logs->add('Missing core.erp.secrets.secret_id config var ','Core7.getCFSecretVar'));
+            if(!$cf_secret_token) return($this->core->logs->add('Missing core.erp.secrets.secret_token config var ','Core7.getCFSecretVar'));
+            if(!$platform_id) return($this->core->logs->add('Missing core.erp.platform_id config var ','Core7.getCFSecretVar'));
+
+            $key = "{$this->core->gc_project_id}_{$cf_secret_id}_{$cf_secret_token}_{$platform_id}";
+            $secrets = ($this->getCache($key))?:[];
+            if(true || !$secrets || !is_array($secrets)) {
+                //region READ $secrets from CF ERP
+                $url = 'https://api.cloudframework.io/core/cf-secret/'.$platform_id.'/'.$cf_secret_id;
+                $secrets = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$cf_secret_id,'X-DS-TOKEN'=>$cf_secret_token]);
+                if($this->core->request->error) {
+                    $this->core->errors->add(['CoreConfig.getCFSecretVar'=>$this->core->request->errorMsg],'CoreConfig.getCFSecretVar');
+                    $this->core->request->reset();
+                    return;
+                }
+                //endregion
+                $secrets = ['user'=>$this->core->security->encrypt(serialize('test'),$cf_secret_id,$cf_secret_token)];
+                $this->updateCache($key,$secrets);
+            }
+
+            return (isset($secrets[$var]))?unserialize($this->core->security->decrypt($secrets[$var],$cf_secret_id,$cf_secret_token)):null;
+            return null;
+        }
+
+        /**
+         * Call https://api.clouframework.io/core/api-keys to verify an APIKey
+         * More info in: https://www.notion.so/cloudframework/CloudFrameworkSecurity-APIKeys-CFS-APIKeys-13b47034a6f14f23b836c1f4238da548
+         *
+         * @param string $token  token of the entity of CloudFrameWorkAPIKeys
+         * @param string $key   key of the APIKey to evaluate if it exists
+         * @param string $spacename spacename of the data. Default cloudframework.
+         * @param string $org organization of the entity inside of the spacename. Default common
+         * @return bool[]|false[]|mixed|string[]|void
+         */
+        public function getCFSecret($secretId,$secretToken) {
+
+            //Generate hash and evaluate return cached data
+            $hash = md5($token.$key.$spacename.$org);
+            if($data = $this->getCache($hash)) return $data;
+
+            // Call CloudFrameWorkAPIKeys Service
+            $url = 'https://api.cloudframework.io/core/api-keys/'.$spacename.'/'.$org;
+            $ret = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$key,'X-DS-TOKEN'=>$token]);
+            if($this->core->request->error) {
+                $this->addError(['checkAPIKey'=>$this->core->request->errorMsg]);
+                $this->core->request->reset();
+                return;
+            }
+            $this->core->logs->add('CloudFrameworkSecurity APIKeys service used');
+
+            //Update Cache
+            $this->updateCache($hash,$ret['data']);
+
+            // Return data
+            return $ret['data'];
+        }
+
+
+        /**
+         * Return and EnvVar: if(getenv($var)) return getenv($var) else if($this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
+         * @param $secret_id
+         * @param $var
+         * @return array|false|mixed|string|null
+         */
+        public function getSecretVar($secret_id,$var) {
             // By default returns a getenv var if it exists
             if(getenv($var)) return(getenv($var));
 
@@ -2533,38 +2660,56 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Reset Cache of the module
+         * @param string $cache_secret_key optional param to use a specific secret_key. Default value is $this->cache_secret_key
+         * @param string $cache_secret_iv optional param to use a specific secret_iv. Default value is $this->cache_secret_iv
          */
-        public function readCache() {
+        public function readCache(string $cache_secret_key='', string $cache_secret_iv='') {
 
+            if(!$cache_secret_key) $cache_secret_key = $this->cache_secret_key;
+            if(!$cache_secret_iv) $cache_secret_iv = $this->cache_secret_iv;
             if($this->cache === null) {
-                $this->cache = $this->core->cache->get('Core7.CoreConfig', -1,'',$this->cache_secret_key,$this->cache_secret_iv);
+                $this->cache = $this->core->cache->get('Core7.CoreConfig', -1,'',$cache_secret_key,$cache_secret_iv);
                 if(!$this->cache) $this->cache=[];
             }
         }
 
         /**
          * Reset Cache of the module
+         * @param string $cache_secret_key optional param to use a specific secret_key. Default value is $this->cache_secret_key
+         * @param string $cache_secret_iv optional param to use a specific secret_iv. Default value is $this->cache_secret_iv
          */
-        public function resetCache() {
+        public function resetCache(string $cache_secret_key='',string $cache_secret_iv='') {
             $this->cache = [];
-            $this->core->cache->set('Core7.CoreConfig',$this->cache,null,$this->cache_secret_key,$this->cache_secret_iv);
+            if(!$cache_secret_key) $cache_secret_key = $this->cache_secret_key;
+            if(!$cache_secret_iv) $cache_secret_iv = $this->cache_secret_iv;
+            $this->core->cache->set('Core7.CoreConfig',$this->cache,null,$cache_secret_key,$cache_secret_iv);
         }
 
         /**
          * Update Cache of the module
+         * @param $var
+         * @param $data
+         * @param string $cache_secret_key optional param to use a specific secret_key. Default value is $this->cache_secret_key
+         * @param string $cache_secret_iv optional param to use a specific secret_iv. Default value is $this->cache_secret_iv
          */
-        public function updateCache($var,$data) {
-            $this->readCache();
+        public function updateCache($var,$data,string $cache_secret_key='',string $cache_secret_iv='') {
+
+            if(!$cache_secret_key) $cache_secret_key = $this->cache_secret_key;
+            if(!$cache_secret_iv) $cache_secret_iv = $this->cache_secret_iv;
+            $this->readCache($cache_secret_key,$cache_secret_iv);
             $this->cache[$var] = $data;
-            $this->core->cache->set('Core7.CoreConfig',$this->cache,null,$this->cache_secret_key,$this->cache_secret_iv);
+            $this->core->cache->set('Core7.CoreConfig',$this->cache,null,$cache_secret_key,$cache_secret_iv);
         }
 
         /**
          * Get var Cache of the module
+         * @param string $key key to get from cache
+         * @param string $cache_secret_key optional param to use a specific secret_key. Default value is $this->cache_secret_key
+         * @param string $cache_secret_iv optional param to use a specific secret_iv. Default value is $this->cache_secret_iv
          */
-        public function getCache($var) {
-            $this->readCache();
-            if(isset($this->cache[$var])) return $this->cache[$var];
+        public function getCache(string $key,string $cache_secret_key='',string $cache_secret_iv='') {
+            $this->readCache($cache_secret_key,$cache_secret_iv);
+            if(isset($this->cache[$key])) return $this->cache[$key];
             else return null;
         }
 
@@ -2680,6 +2825,29 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function existWebKey()
         {
             return (isset($_GET['web_key']) || isset($_POST['web_key']) || strlen($this->getHeader('X-WEB-KEY')));
+        }
+
+        /**
+         * Retrieve info taking a token previous generated
+         * For example you can generate a token using: gcloud auth print-access-token --account={{personal_email_user}}
+         * @param $token
+         * @return mixed|string
+         */
+        function getGoogleTokenInfo($token)
+        {
+            $token_info = $this->core->request->post_json_decode('https://www.googleapis.com/oauth2/v1/tokeninfo',['access_token'=>$token],['Content-Type'=>'application/x-www-form-urlencoded']);
+            if($this->core->request->error) {
+                $this->addError((isset($token_info['error']))?$token_info:$this->core->request->errorMsg);
+                if(!isset($token_info['error_description'])) {
+                    $token_info['error_description'] = 'unknown';
+                } else {
+                    $this->core->errors->reset();
+                }
+            }
+            if(isset($token_info['error'])) $token_info['code'] = $this->core->request->getLastResponseCode();
+            $this->core->request->reset();
+
+            return $token_info;
         }
 
         function getWebKey()
