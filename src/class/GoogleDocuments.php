@@ -4,6 +4,7 @@
 /**
  * Class to facilitate the Google Drive and Google Documents creation
  * Documents mime-type: https://developers.google.com/drive/api/v3/mime-types
+ * Last update: 2021-11-29
  */
 
 // Instagram Class v1
@@ -44,21 +45,21 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
 
 
         /**
-         * Create a Spreadsheet
+         * Deprecated Create a Spreadsheet
          * @param $title
          * @param string $parent_id
          * @return string|false
          */
-        public function createSpreadsheet($title,$parent_id='') {
-            try {
-                $spreadsheet = new Google_Service_Sheets_Spreadsheet(['properties' => ['title' => $title]]);
-                $ss = $this->spreedsheet->spreadsheets->create($spreadsheet,['fields' => 'spreadsheetId']);
-                return $ss->spreadsheetId;
-            } catch(Exception $e) {
-                $this->addError($e->getMessage());
-                return false;
-            }
-        }
+        //        public function createSpreadsheet($title,$parent_id='') {
+        //            try {
+        //                $spreadsheet = new Google_Service_Sheets_Spreadsheet(['properties' => ['title' => $title]]);
+        //                $ss = $this->spreedsheet->spreadsheets->create($spreadsheet,['fields' => 'spreadsheetId']);
+        //                return $ss->spreadsheetId;
+        //            } catch(Exception $e) {
+        //                $this->addError($e->getMessage());
+        //                return false;
+        //            }
+        //        }
 
         /**
          * Assign to a $user_email priveleges over a $document_id with a specific rol
@@ -106,7 +107,7 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
          * @param string $folder_name
          * @param string $parent_id value of the parent folder id
          */
-        private function createSpreadSheetFile(string $spreadsheet_name, string $parent_id = "") {
+        public function createSpreadSheet(string $spreadsheet_name, string $parent_id = "") {
             try {
                 $file = new Google_Service_Drive_DriveFile();
                 $file->setName($spreadsheet_name);

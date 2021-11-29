@@ -1,6 +1,8 @@
 <?php
-
-# https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-php
+/**
+ * Class to handle Bigquery datasets:tables
+ * https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-php
+ */
 
 use Google\Cloud\BigQuery\BigQueryClient;
 use Google\Cloud\BigQuery\Timestamp;
@@ -14,6 +16,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         var $core = null;                   // Core7 reference
         /** @var BigQueryClient|null  */
         var $client = null;                 // BQ Client
+        /** @var \Google\Cloud\BigQuery\Dataset $dataset */
+        var $dataset=null;                  // Dataset to write Data
+
         var $project_id = null;             // project_id
         var $dataset_name = null;
         var $error = false;
@@ -53,23 +58,23 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $this->dataset_name = (isset($params[0]))?$params[0]:null;
             $this->entity_schema =  (isset($params[1])) ? $params[1] : null; // Prepare $this->schema
             if(isset($this->entity_schema['model'] ) && is_array($this->entity_schema['model']))
-            foreach ($this->entity_schema['model'] as $field =>$item) {
-                if(stripos($item[1],'isKey')!==false) {
-                    $this->keys[] = [$field,(stripos($item[0],'int')!== false
+                foreach ($this->entity_schema['model'] as $field =>$item) {
+                    if(stripos($item[1],'isKey')!==false) {
+                        $this->keys[] = [$field,(stripos($item[0],'int')!== false
+                            || stripos($item[0],'bit')!== false
+                            || stripos($item[0],'float')!== false
+                            || stripos($item[0],'double')!== false
+                            || stripos($item[0],'number')!== false)?'int':'char'];
+                    }
+
+                    // Detect numbers
+                    $this->fields[$field] = (stripos($item[0],'int')!== false
                         || stripos($item[0],'bit')!== false
                         || stripos($item[0],'float')!== false
                         || stripos($item[0],'double')!== false
-                        || stripos($item[0],'number')!== false)?'int':'char'];
+                        || stripos($item[0],'number')!== false
+                    )?'int':'char';
                 }
-
-                // Detect numbers
-                $this->fields[$field] = (stripos($item[0],'int')!== false
-                    || stripos($item[0],'bit')!== false
-                    || stripos($item[0],'float')!== false
-                    || stripos($item[0],'double')!== false
-                    || stripos($item[0],'number')!== false
-                )?'int':'char';
-            }
 
             $options = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
             $this->project_id = $this->core->gc_project_id;
@@ -79,6 +84,10 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             // SETUP DatastoreClient
             try {
                 $this->client = new BigQueryClient($options);
+                if($this->dataset_name) {
+                    /** @var \Google\Cloud\BigQuery\Dataset $dataset */
+                    $this->dataset = $this->client->dataset($this->dataset_name);
+                }
             } catch (Exception $e) {
                 return($this->addError($e->getMessage()));
             }
@@ -100,8 +109,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
         }
 
-
-
         /**
          * Define When I want to build a query but I do not want to be executed I call this method with true value
          * @param $boolean
@@ -117,6 +124,62 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          */
         public function dbQuery($title,$_q,$params=[]) {
             return $this->_query($_q,$params);
+        }
+
+
+        /**
+         * Feed a table in Bigquery
+         * @param $title
+         * @param $table_id
+         * @param $data
+         * @return array|void
+         */
+        public function dbFeed($title,$table_id,&$data) {
+            return $this->_feed($table_id,$data);
+        }
+
+
+        /**
+         * Feed a table with $data
+         * @param $table_id
+         * @param $data
+         * @return bool|void
+         */
+        private function _feed($table_id, &$data) {
+            if(!is_object($this->dataset)) return($this->addError('_feed requires a dataset_name when you instances the class'));
+
+            try {
+                /** @var \Google\Cloud\BigQuery\Table $table */
+                $table = $this->dataset->table($table_id);
+                $table_id = $table->id();
+            }  catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                return($this->addError(['bigquery'=>$error]));
+            }
+
+            //region PREPARE $data
+            $bq_data=[];
+            foreach ($data as $i=>$datum) {
+                $bq_data[] = ['data'=>&$data[$i]];
+            }
+            //endregion
+
+            try {
+                $insertResponse = $table->insertRows($bq_data);
+                if (!$insertResponse->isSuccessful()) {
+                    foreach ($insertResponse->failedRows() as $row) {
+                        foreach ($row['errors'] as $error) {
+                            $this->addError($error);
+                        }
+                    }
+                    return;
+                }
+            }  catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                return($this->addError(['bigquery'=>$error]));
+            }
+
+            return true;
         }
 
         /**
