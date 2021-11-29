@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23281';
+        var $_version = 'v73.23301';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2565,98 +2565,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
-        /**
-         * Return a secret var stored in CloudFramework Secret Manager through the ERP/BPA
-         * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
-         * @param string $var name of the var contained in the secret
-         * @param string optional $cf_secret_id CF secretId defined in the ERP. Default value is $this->get('core.erp.secrets.secret_id')
-         * @param string optional $cf_secret_token CF secretToken defined in the ERP. Default value is $this->get('core.erp.secrets.secret_token'
-         * @param string optional $platform_id of the ERP. Default value is $this->get('core.erp.platform_id'
-         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
-         */
-        public function getCFSecretVar(string $var,$cf_secret_id='',$cf_secret_token='',$platform_id='') {
-
-            if(!$cf_secret_id) $cf_secret_id = $this->get('core.erp.secrets.secret_id');
-            if(!$cf_secret_token) $cf_secret_token = $this->get('core.erp.secrets.secret_token');
-            if(!$platform_id) $platform_id = $this->get('core.erp.platform_id');
-
-            if(!$cf_secret_id) return($this->core->logs->add('Missing core.erp.secrets.secret_id config var ','Core7.getCFSecretVar'));
-            if(!$cf_secret_token) return($this->core->logs->add('Missing core.erp.secrets.secret_token config var ','Core7.getCFSecretVar'));
-            if(!$platform_id) return($this->core->logs->add('Missing core.erp.platform_id config var ','Core7.getCFSecretVar'));
-
-            $key = "{$this->core->gc_project_id}_{$cf_secret_id}_{$cf_secret_token}_{$platform_id}";
-            $secrets = ($this->getCache($key))?:[];
-            if(true || !$secrets || !is_array($secrets)) {
-                //region READ $secrets from CF ERP
-                $url = 'https://api.cloudframework.io/core/cf-secret/'.$platform_id.'/'.$cf_secret_id;
-                $secrets = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$cf_secret_id,'X-DS-TOKEN'=>$cf_secret_token]);
-                if($this->core->request->error) {
-                    $this->core->errors->add(['CoreConfig.getCFSecretVar'=>$this->core->request->errorMsg],'CoreConfig.getCFSecretVar');
-                    $this->core->request->reset();
-                    return;
-                }
-                //endregion
-                $secrets = ['user'=>$this->core->security->encrypt(serialize('test'),$cf_secret_id,$cf_secret_token)];
-                $this->updateCache($key,$secrets);
-            }
-
-            return (isset($secrets[$var]))?unserialize($this->core->security->decrypt($secrets[$var],$cf_secret_id,$cf_secret_token)):null;
-            return null;
-        }
-
-        /**
-         * Call https://api.clouframework.io/core/api-keys to verify an APIKey
-         * More info in: https://www.notion.so/cloudframework/CloudFrameworkSecurity-APIKeys-CFS-APIKeys-13b47034a6f14f23b836c1f4238da548
-         *
-         * @param string $token  token of the entity of CloudFrameWorkAPIKeys
-         * @param string $key   key of the APIKey to evaluate if it exists
-         * @param string $spacename spacename of the data. Default cloudframework.
-         * @param string $org organization of the entity inside of the spacename. Default common
-         * @return bool[]|false[]|mixed|string[]|void
-         */
-        public function getCFSecret($secretId,$secretToken) {
-
-            //Generate hash and evaluate return cached data
-            $hash = md5($token.$key.$spacename.$org);
-            if($data = $this->getCache($hash)) return $data;
-
-            // Call CloudFrameWorkAPIKeys Service
-            $url = 'https://api.cloudframework.io/core/api-keys/'.$spacename.'/'.$org;
-            $ret = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$key,'X-DS-TOKEN'=>$token]);
-            if($this->core->request->error) {
-                $this->addError(['checkAPIKey'=>$this->core->request->errorMsg]);
-                $this->core->request->reset();
-                return;
-            }
-            $this->core->logs->add('CloudFrameworkSecurity APIKeys service used');
-
-            //Update Cache
-            $this->updateCache($hash,$ret['data']);
-
-            // Return data
-            return $ret['data'];
-        }
-
-
-        /**
-         * Return and EnvVar: if(getenv($var)) return getenv($var) else if($this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
-         * @param $secret_id
-         * @param $var
-         * @return array|false|mixed|string|null
-         */
-        public function getSecretVar($secret_id,$var) {
-            // By default returns a getenv var if it exists
-            if(getenv($var)) return(getenv($var));
-
-            // Else try to read from $this->data['env_vars'] and read it from readEnvVarsFromGCPSecrets
-            if(!isset($this->data['env_vars']) && $this->get('core.gcp.secrets.env_vars')) $this->readEnvVarsFromGCPSecrets();
-
-            // Return $this->data['env_vars'][$var] if it exists
-            if(isset($this->data['env_vars'][$var])) return $this->data['env_vars'][$var];
-
-            return null;
-
-        }
 
         /**
          * Reset Cache of the module
@@ -2729,10 +2637,19 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $error = false;
         var $errorMsg = [];
         var $cache = null;
+        var $erp_platform_id;
+        var $erp_secret_id;
+        var $erp_secret_token;
+        var $erp_user;
+        var $erp_user_token;
 
         function __construct(Core7 &$core)
         {
             $this->core = $core;
+            $this->erp_platform_id = $this->core->config->get('core.erp.platform_id');
+            $this->erp_user = $this->core->config->get('core.erp.user');
+            $this->erp_secret_id = $this->core->config->get('core.erp.secret_id');
+            $this->erp_secret_token = $this->core->config->get('core.erp.secret_token');
 
         }
 
@@ -2828,8 +2745,248 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * Assign ERP Connection variables to get access to secret vars
+         * @param $erp_project_id
+         * @param $erp_secret_id
+         * @param $erp_secret_token
+         * @param $erp_user
+         * @param $erp_user_token
+         */
+        function setERPConnection($erp_platform_id,$erp_secret_id,$erp_secret_token,$erp_user,$erp_user_token='') {
+            $this->erp_platform_id = $erp_platform_id;
+            $this->erp_secret_id = $erp_secret_id;
+            $this->erp_secret_token = $erp_secret_token;
+            $this->erp_user = $erp_user;
+            if($erp_user_token) $this->erp_user_token = $erp_user_token;
+        }
+
+        /**
+         * GET from CloudFramework ERP Secrets of user is running the script or the GCP appengine,cloudfuntion,computeengine
+         * If the user is running in localhost it will prompted
+         * If the GCP engine is running it will use the Token of the Instance
+         * @param string $platform_id
+         */
+        function getMyERPSecrets($platform_id='') {
+
+            //region SET $platform_id if it is empty
+            if($platform_id) $this->erp_platform_id = $platform_id;
+            elseif(!$platform_id) $platform_id = $this->erp_platform_id;
+            if(!$platform_id) return($this->addError('CoreSecurity.getERPgetMyERPSecrets() has been called but core.erp.platform_id config var is not defined '));
+            //endregion
+
+            //region READ $user_secrets from cache and RETURN it if it exist
+            $user_secrets = $this->getCache('getMyERPSecrets_'.$this->core->gc_project_id.'_'.$platform_id.'_token');
+            if($user_secrets){
+                $this->erp_user = $user_secrets['email'];
+                $this->erp_user_token = $user_secrets['access_token'];
+                $this->erp_platform_id = $user_secrets['platform'];
+                return(['email'=>$user_secrets['email'],'secrets'=>$user_secrets['secrets']]);
+            }
+            //endregion
+
+            //region IF $user_secrets is empty feed it with basic structure
+            $user_secrets = ['access_token'=>null,'email'=>'','platform'=>$platform_id,'secrets'=>''];
+            //endregion
+
+            //region SET $user_token['access_token'] from User or GCP Engine Instance Token
+            if($this->core->is->development()) {
+                $user_secrets['access_token'] = $this->getGoogleUserToken();
+            } else {
+                // Read access token from Instance Metadata
+                $token = $this->getGoogleInstanceServiceAccountToken();
+                if(!isset($token['access_token'])) return($this->addError('CoreSecurity.getGoogleInstanceServiceAccountToken() has not returned a ["access_token"] array object '));
+                $user_secrets['access_token'] =$token['access_token'];
+            }
+            if(!$user_secrets['access_token']) return;
+            $this->erp_user_token = $user_secrets['access_token'];
+            //endregion
+
+            //region SET $user_secrets['email'] and $user_secrets['token']
+            $token_info = $this->getGoogleTokenInfo($user_secrets['access_token']);
+            if(isset($token_info['error'])) return($this->addError($token_info));
+            if(!isset($token_info['email'])) return($this->addError('CoreSecurity.getMyERPSecrets() has got a token with not email associated'));
+            $user_secrets['email'] = $token_info['email'];
+            $user_secrets['token'] = $token_info;
+            //endregion
+
+            //region CALL secret CF API and set $user_secrets['secrets']
+            $url = 'https://api.cloudframework.io/core/secrets/'.$platform_id.'/my-secrets';
+            $headers = ['X-WEB-KEY'=>$user_secrets['email'],'X-DS-TOKEN'=>$user_secrets['access_token']];
+            $secrets = $this->core->request->get_json_decode($url,null,$headers);
+            if($this->core->request->error) {
+                return($this->addError($this->core->request->errorMsg));
+                $this->core->request->reset();
+                $this->core->errors->reset();
+            }
+            $user_secrets['secrets'] = $secrets['data']['secrets'];
+            //endregion
+
+            //region UPDATE cache
+            $this->updateCache('getMyERPSecrets_'.$this->core->gc_project_id.'_'.$platform_id.'_token',$user_secrets);
+            //endregion
+
+            //region RETURN $user_secrets
+            return(['email'=>$user_secrets['email'],'secrets'=>$user_secrets['secrets']]);
+            //endregion
+        }
+
+        /**
+         * Return a secret var stored in CloudFramework Secret Manager through the ERP/BPA
+         * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
+         * @param string $var name of the var contained in the secret
+         * @param string optional $cf_secret_id CF secretId defined in the ERP. Default value is $this->get('core.erp.secrets.secret_id')
+         * @param string optional $cf_secret_token CF secretToken defined in the ERP. Default value is $this->get('core.erp.secrets.secret_token'
+         * @param string optional $platform_id of the ERP. Default value is $this->get('core.erp.platform_id'
+         * @param string optional $user_token User token when is required from the following command: gcloud auth print-access-token --account={{personal_user}}
+         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
+         */
+        public function getERPSecretVars($var='') {
+
+            if(!$this->erp_platform_id) return($this->core->logs->add('Missing core.erp.platform_id config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
+            if(!$this->erp_secret_id) return($this->core->logs->add('Missing core.erp.secret_id config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
+            if(!$this->erp_secret_token) return($this->core->logs->add('Missing core.erp.erp_token config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
+            if(!$this->erp_user) return($this->core->logs->add('Missing core.erp.user config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
+
+            //region SET $key, $secrets
+            $key = "{$this->core->gc_project_id}_{$this->erp_platform_id}_{$this->erp_secret_id}_{$this->erp_user}";
+            $secrets = ($this->getCache($key))?:[];
+            //endregion
+
+            //region RESET $secrets hash if erp_secret_id or erp_secret_token has changed
+            // IF THE $secrets['hash'] has changed we reset the $secrets
+            if(!isset($secrets['hash']) || $secrets['hash']!=md5($this->erp_secret_id.$this->erp_secret_token)) $secrets = [];
+            //endregion
+
+            //region IF !$secrets READ from API the secrets passing credentials
+            if(!$secrets || !is_array($secrets)) {
+
+                //region GENERATE $this->erp_user_token if it does not exist
+                if(!$this->erp_user_token) {
+                    if($this->core->is->development()) {
+                        $this->erp_user_token = $this->getGoogleUserToken($this->erp_user);
+                    } else {
+                        // Read access token from Instance Metadata
+                        $token = $this->getGoogleInstanceServiceAccountToken();
+                        if(!isset($token['access_token'])) return($this->addError('CoreSecurity.getGoogleInstanceServiceAccountToken() has not returned a ["access_token"] array object '));
+                        $this->erp_user_token =$token['access_token'];
+                    }
+                }
+                //endregion
+
+                //region CALL CF SECRET API SERVICE to receive $secrets
+                $url = 'https://api.cloudframework.io/core/secrets/'.$this->erp_platform_id.'/ids/'.$this->erp_secret_id;
+                $headers = [
+                    'X-WEB-KEY'=>$this->erp_user
+                    ,'X-EXTRA-INFO'=>$this->erp_secret_token
+                    ,'X-DS-TOKEN'=>$this->erp_user_token
+                ];
+                $secrets = ['hash'=>md5($this->erp_secret_id.$this->erp_secret_token)];
+                $secrets['vars'] = $this->core->request->get_json_decode($url,null,$headers);
+                if($this->core->request->error) {
+                    if(!isset($secrets['vars']['message'])) $secrets['vars']['message'] = '';
+                    $this->addError("{$secrets['vars']['code']}:{$secrets['vars']['message']}",'CoreSecurity.getERPSecretVars');
+                    $secrets['hash'] = '';
+                    $secrets['vars'] = '';
+                    $this->updateCache($key,$secrets);
+                    $this->core->request->reset();
+                    $this->core->errors->reset();
+                    return;
+                }
+                $secrets['time']=microtime(true);
+                $secrets['expire_in']=$secrets['vars']['data']['token_info']['expires_in'];
+                $secrets['vars'] = (isset($secrets['vars']['data']['secrets']))?$secrets['vars']['data']['secrets']:[];
+                //endregion
+
+                //region ENCRYPT variable contents
+                foreach ($secrets['vars'] as $key_secret=>$secret) {
+                    $secrets['vars'][$key_secret] = $this->core->security->encrypt(serialize($secret),$this->erp_secret_id,$this->erp_secret_token);
+                }
+                //endregion
+
+                //region UPDATE cache
+                $this->updateCache($key,$secrets);
+                //endregion
+            }
+            //endregion
+
+            //region RETURN $secrets['vars'] or $secrets['vars'][$var] if $var is not empty
+            if(isset($secrets['vars']) && is_array($secrets['vars'])) {
+                if($var) return (isset($secrets['vars'][$var]))?unserialize($this->core->security->decrypt($secrets['vars'][$var],$this->erp_secret_id,$this->erp_secret_token)):null;
+                else {
+                    foreach ($secrets['vars'] as $key=>$var)
+                        $secrets['vars'][$key] = unserialize($this->core->security->decrypt($secrets['vars'][$key],$this->erp_secret_id,$this->erp_secret_token));
+                    return($secrets['vars']);
+                }
+            }
+            return null;
+            //endregion
+        }
+
+        /**
+         * Execute a user Prompt
+         * @param $title
+         * @param null $default
+         * @return false|string|null
+         */
+        function prompt($title,$default=null) {
+            // Check default value
+            if($default) $title.="[{$default}] ";
+            $ret = readline($title);
+            if(!$ret) $ret=$default;
+            return $ret;
+        }
+
+        /**
+         * Prompt the user to generate a token
+         */
+        function getGoogleUserToken($user='') {
+            if(!$this->core->is->development()) {
+                $this->addError('You can only call CoreSecurity.getGoogleUserToken($scopes=\'\') from development environment');
+                return;
+            }
+            if(!$user || !$this->core->is->validEmail($user)) {
+                do {
+                    $user = $this->prompt('Give me your Google User Email: ');
+                } while (!$this->core->is->validEmail($user)) ;
+            }
+            $gcloud_token_command = 'gcloud auth print-access-token --account='.$user;
+            $token = shell_exec($gcloud_token_command);
+            if(!$token) return($this->addError('The following command does not work: '.$gcloud_token_command));
+            return($token);
+        }
+
+        /**
+         * Retrieve Metadata token from the Instance running in GCP
+         * https://cloud.google.com/run/docs/securing/service-identity
+         * https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
+         * For example you can instance token with:
+         *         $metadata = new Google\Cloud\Core\Compute\Metadata();
+         *         $ret = json_decode($metadata->get('instance/service-accounts/default/token'),true)['access_token'];
+         * @param string $scopes optinally you can add $scopes (https://www.googleapis.com/auth/cloud-platform or https://www.googleapis.com/auth/drive
+         * @return array
+         * {
+            * "access_token": "ya29.****",
+            * "expires_in": 1799,
+            * "token_type": "Bearer"
+            * }
+         */
+        function getGoogleInstanceServiceAccountToken($scopes='')
+        {
+            if($this->core->is->development()) {
+                $this->addError('You can not call CoreSecurity.getGoogleInstanceServiceAccountToken($scopes=\'\') from development environment');
+                return;
+            }
+            if($scopes) $scopes="?scopes={$scopes}";
+            $metadata = new Google\Cloud\Core\Compute\Metadata();
+            return json_decode($metadata->get('instance/service-accounts/default/token'.$scopes),true);
+        }
+
+        /**
          * Retrieve info taking a token previous generated
-         * For example you can generate a token using: gcloud auth print-access-token --account={{personal_email_user}}
+         * For example you can generate a localhost token using: gcloud auth print-access-token --account={{personal_email_user}}
+         * For example you can instance token with:
+         *         $metadata = new Google\Cloud\Core\Compute\Metadata();
+         *         $ret = json_decode($metadata->get('instance/service-accounts/default/token'),true)['access_token'];
          * @param $token
          * @return mixed|string
          */
@@ -2850,6 +3007,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $token_info;
         }
 
+        /**
+         * Read $_GET['web-key'] or HEADER X-WEB-KEY
+         * @return mixed|string
+         */
         function getWebKey()
         {
             if (isset($_GET['web_key'])) return $_GET['web_key'];
@@ -2858,6 +3019,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             else return '';
         }
 
+        /**
+         * @param null $keys
+         * @return array|false|mixed
+         */
         function checkWebKey($keys = null)
         {
 
@@ -5446,6 +5611,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->vars[$var] = $value;
                 }
             }
+            //endregion
+
             $this->cache = &$this->core->cache;
             $this->time = microtime(true);
 
@@ -5593,5 +5760,43 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
         }
 
+        function getUserGoogleAccessToken()
+        {
+            $user = $this->getCacheVar('user_readUserGoogleCredentials');
+            $user_new='';
+            $token=[];
+            if($user) $token = $this->getCacheVar($user.'_token_readUserGoogleCredentials');
+            if (!$user || !$this->core->is->validEmail($user) || !$token || (microtime(true)-$token['time'] > 3500)) {
+                do {
+                    $user_new = $this->prompt('Give me your Google User Email: ', $user);
+                } while (!$this->core->is->validEmail($user_new)) ;
+                $this->setCacheVar('user_readUserGoogleCredentials',$user_new);
+            }
+
+            if(!$token || ($user_new && $user != $user_new)) {
+                $user = $user_new;
+                $token = $this->getCacheVar($user.'_token_readUserGoogleCredentials');
+            }
+
+            if(!$token || (microtime(true)-$token['time'] > 3500)) {
+                $token=[];
+                $gcloud_token_command = 'gcloud auth print-access-token --account='.$user;
+                $this->sendTerminal('Gathering token for account: '.$user);
+                $auth['token'] = shell_exec($gcloud_token_command);
+                if(!$auth['token']) return($this->addError('The following command does not work: '.$gcloud_token_command));
+                $token_info = $this->core->request->post_json_decode('https://www.googleapis.com/oauth2/v1/tokeninfo',['access_token'=>$auth['token']],['Content-Type'=>'application/x-www-form-urlencoded']);
+                if($this->core->request->error)
+                    return($this->addError($this->core->request->errorMsg));
+
+                $token['time'] = microtime(true);
+                $token['token'] = $auth['token'];
+                $token['email'] = $user;
+                $token['info'] = $token_info;
+                $this->setCacheVar($user.'_token_readUserGoogleCredentials',$token);
+            } else {
+                $this->sendTerminal('Using Google Access Token for User: '.$user);
+            }
+            return($token);
+        }
     }
 }
