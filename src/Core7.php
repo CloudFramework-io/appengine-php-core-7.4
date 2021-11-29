@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23301';
+        var $_version = 'v73.23302';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -938,7 +938,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             global $logger;
             $this->logger= &$logger;
         }
-            /**
+        /**
          * Reset the log and add an entry in the log.. if syslog_title is passed, also insert a LOG_DEBUG
          * @param $data
          * @param string $syslog_title
@@ -2765,8 +2765,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * If the user is running in localhost it will prompted
          * If the GCP engine is running it will use the Token of the Instance
          * @param string $platform_id
+         * @param string $user User to use in the autentication. If empty it will prompt in the terminal if you are an script
          */
-        function getMyERPSecrets($platform_id='') {
+        function getMyERPSecrets($platform_id='',$user='') {
 
             //region SET $platform_id if it is empty
             if($platform_id) $this->erp_platform_id = $platform_id;
@@ -2776,6 +2777,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region READ $user_secrets from cache and RETURN it if it exist
             $user_secrets = $this->getCache('getMyERPSecrets_'.$this->core->gc_project_id.'_'.$platform_id.'_token');
+            if($user && isset($user_secrets['email']) && $user_secrets['email']!=$user) $user_secrets=[];
             if($user_secrets){
                 $this->erp_user = $user_secrets['email'];
                 $this->erp_user_token = $user_secrets['access_token'];
@@ -2790,7 +2792,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region SET $user_token['access_token'] from User or GCP Engine Instance Token
             if($this->core->is->development()) {
-                $user_secrets['access_token'] = $this->getGoogleUserToken();
+                $user_secrets['access_token'] = $this->getGoogleUserToken($user);
             } else {
                 // Read access token from Instance Metadata
                 $token = $this->getGoogleInstanceServiceAccountToken();
@@ -2965,10 +2967,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $scopes optinally you can add $scopes (https://www.googleapis.com/auth/cloud-platform or https://www.googleapis.com/auth/drive
          * @return array
          * {
-            * "access_token": "ya29.****",
-            * "expires_in": 1799,
-            * "token_type": "Bearer"
-            * }
+         * "access_token": "ya29.****",
+         * "expires_in": 1799,
+         * "token_type": "Bearer"
+         * }
          */
         function getGoogleInstanceServiceAccountToken($scopes='')
         {
