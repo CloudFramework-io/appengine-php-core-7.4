@@ -37,7 +37,7 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
         function __construct(Core7 &$core, $config = [])
         {
             $this->core = $core;
-            $client = $this->getGoogleClient();
+            $client = $this->getGoogleClient($config);
             $this->spreedsheet = new Google_Service_Sheets($client);
             $this->drive = new Google_Service_Drive($client);
             $this->file = new Google_Service_Drive($client);
@@ -104,8 +104,9 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
 
         /**
          * Create a Spreadsheet file
-         * @param string $folder_name
+         * @param string $spreadsheet_name
          * @param string $parent_id value of the parent folder id
+         * @return void
          */
         public function createSpreadSheet(string $spreadsheet_name, string $parent_id = "") {
             try {
@@ -288,8 +289,11 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
         /**
          * Return a Google Client with the scopes necessary to manage Google Documents
          */
-        private function getGoogleClient() {
+        private function getGoogleClient(&$config) {
             $client = new Google_Client();
+
+            if($config)
+                $client->setAuthConfig($config);
             $client->useApplicationDefaultCredentials();
             $client->setScopes([Google_Service_Sheets::SPREADSHEETS,Google_Service_Sheets::DRIVE,Google_Service_Sheets::DRIVE_FILE]);
             return($client);
