@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23304';
+        var $_version = 'v73.23305';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2777,17 +2777,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region READ $user_secrets from cache and RETURN it if it exist
             $user_secrets = $this->getCache('getMyERPSecrets_'.$this->core->gc_project_id.'_'.$platform_id.'_token');
-            if($user && isset($user_secrets['email']) && $user_secrets['email']!=$user) $user_secrets=[];
+            if($user && isset($user_secrets['id']) && $user_secrets['id']!=$user) $user_secrets=[];
             if($user_secrets){
-                $this->erp_user = $user_secrets['email'];
+                $this->erp_user = $user_secrets['id'];
                 $this->erp_user_token = $user_secrets['access_token'];
                 $this->erp_platform_id = $user_secrets['platform'];
-                return(['email'=>$user_secrets['email'],'secrets'=>$user_secrets['secrets']]);
+                return(['id'=>$user_secrets['id'],'secrets'=>$user_secrets['secrets']]);
             }
             //endregion
 
             //region IF $user_secrets is empty feed it with basic structure
-            $user_secrets = ['access_token'=>null,'email'=>'','platform'=>$platform_id,'secrets'=>''];
+            $user_secrets = ['access_token'=>null,'id'=>'','platform'=>$platform_id,'secrets'=>''];
             //endregion
 
             //region SET $user_token['access_token'] from User or GCP Engine Instance Token
@@ -2807,16 +2807,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $token_info = $this->getGoogleTokenInfo($user_secrets['access_token']);
             if(isset($token_info['error'])) return($this->addError($token_info));
             // If the token_info does not contains email attribute the we trust the email sent in the header.
-            if(!isset($token_info['email']) && $user) $token_info['email']=$user;
-            if(!isset($token_info['email'])) return($this->addError('CoreSecurity.getMyERPSecrets() has got a token with not email associated'));
+            if(!isset($token_info['email']) && !isset($token_info['issued_to'])) return($this->addError('CoreSecurity.getMyERPSecrets() has not got a token without email and issued_to attributes'));
 
-            $user_secrets['email'] = $token_info['email'];
+            $user_secrets['id'] = (isset($token_info['email']))?$token_info['email']:$token_info['issued_to'];
             $user_secrets['token'] = $token_info;
             //endregion
 
             //region CALL secret CF API and set $user_secrets['secrets']
             $url = 'https://api.cloudframework.io/core/secrets/'.$platform_id.'/my-secrets';
-            $headers = ['X-WEB-KEY'=>$user_secrets['email'],'X-DS-TOKEN'=>$user_secrets['access_token']];
+            $headers = ['X-WEB-KEY'=>$user_secrets['id'],'X-DS-TOKEN'=>$user_secrets['access_token']];
             $secrets = $this->core->request->get_json_decode($url,null,$headers);
             if($this->core->request->error) {
                 return($this->addError($this->core->request->errorMsg));
@@ -2831,7 +2830,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region RETURN $user_secrets
-            return(['email'=>$user_secrets['email'],'secrets'=>$user_secrets['secrets']]);
+            return(['id'=>$user_secrets['id'],'secrets'=>$user_secrets['secrets']]);
             //endregion
         }
 
@@ -2946,7 +2945,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function getGoogleUserToken($user='') {
             if(!$this->core->is->development()) {
-                $this->addError('You can only call CoreSecurity.getGoogleUserToken($scopes=\'\') from development environment');
+                $this->addError('You can only call CoreSecurity.getGoogleUserToken($user="") from development environment');
                 return;
             }
             if(!$user || !$this->core->is->validEmail($user)) {
@@ -2967,7 +2966,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * For example you can instance token with:
          *         $metadata = new Google\Cloud\Core\Compute\Metadata();
          *         $ret = json_decode($metadata->get('instance/service-accounts/default/token'),true)['access_token'];
-         * @param string $scopes optinally you can add $scopes (https://www.googleapis.com/auth/cloud-platform or https://www.googleapis.com/auth/drive
+         * @param string $scopes optionally you can add $scopes (https://www.googleapis.com/auth/cloud-platform or https://www.googleapis.com/auth/drive
          * @return array
          * {
          * "access_token": "ya29.****",
