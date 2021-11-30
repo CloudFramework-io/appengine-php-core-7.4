@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23303';
+        var $_version = 'v73.23304';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2806,7 +2806,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //region SET $user_secrets['email'] and $user_secrets['token']
             $token_info = $this->getGoogleTokenInfo($user_secrets['access_token']);
             if(isset($token_info['error'])) return($this->addError($token_info));
+            // If the token_info does not contains email attribute the we trust the email sent in the header.
+            if(!isset($token_info['email']) && $user) $token_info['email']=$user;
             if(!isset($token_info['email'])) return($this->addError('CoreSecurity.getMyERPSecrets() has got a token with not email associated'));
+
             $user_secrets['email'] = $token_info['email'];
             $user_secrets['token'] = $token_info;
             //endregion
