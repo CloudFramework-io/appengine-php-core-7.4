@@ -27,16 +27,16 @@ class Script extends Scripts2020
      */
     function METHOD_default()
     {
-        $this->sendTerminal('Available methods (use hello/XXXX):');
-        $this->sendTerminal(' - hello/test');
+        $this->sendTerminal("Available methods (use {$this->params[0]}/{method}):");
+        $this->sendTerminal(" - {$this->params[0]}/hello");
     }
 
     /**
      * This method is called from the main method taking the parameters of command line: composer script hello/test
      */
-    function METHOD_test()
+    function METHOD_hello()
     {
-        $this->sendTerminal('This is a test');
+        $this->sendTerminal('This is a Hello World :)');
 
     }
 }

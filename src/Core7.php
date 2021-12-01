@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.23306';
+        var $_version = 'v73.24011';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -167,6 +167,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // If the $this->system->app_path ends in / delete the char.
             $this->system->app_path = preg_replace('/\/$/','',$this->system->app_path);
+
+            // region EVALUATE env variables:
+            if($this->config->get("core.gcp.project_id")) putenv('PROJECT_ID='.$this->config->get("core.gcp.project_id"));
+            if($this->config->get("core.gcp.credentials")) putenv('GOOGLE_APPLICATION_CREDENTIALS='.$this->config->get("core.gcp.credentials"));
 
             // Support of DataStorage to work with Buckets
             $this->initDataStorage();
@@ -693,7 +697,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
      */
     class CoreSystem
     {
-        var $url, $app,$root_path, $app_path, $app_url;
+        var $url, $app,$root_path, $app_path, $app_url,$script_path;
         var $config = [];
         var $ip, $user_agent, $os, $lang, $format, $time_zone;
         var $geo;
@@ -766,6 +770,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->geo['CITY'] = $server_var['HTTP_X_APPENGINE_CITY'];
             $this->geo['REGION'] = $server_var['HTTP_X_APPENGINE_REGION'];
             $this->geo['COORDINATES'] = $server_var['HTTP_X_APPENGINE_CITYLATLONG'];
+
+            // Script path for terminal
+            $this->script_path = $this->app_path.'/scripts';
 
         }
 
@@ -1900,6 +1907,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->cache_secret_key=$this->get('core.gcp.secrets.cache_encrypt_key');
             $this->cache_secret_iv=$this->get('core.gcp.secrets.cache_encrypt_iv');
 
+            // Update $this->get('core.scripts.path')
+            if($this->get('core.scripts.path')) $this->core->system->script_path = $this->get('core.scripts.path');
+
         }
 
         /**
@@ -2033,7 +2043,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->_configPaths[$path] = 1; // Control witch config paths are beeing loaded.
             try {
                 $data = json_decode(@file_get_contents($path), true);
-
                 if (!is_array($data)) {
                     $this->core->errors->add('error reading ' . $path);
                     if (json_last_error())
@@ -2637,20 +2646,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $error = false;
         var $errorMsg = [];
         var $cache = null;
-        var $erp_platform_id;
-        var $erp_secret_id;
-        var $erp_secret_token;
-        var $erp_user;
-        var $erp_user_token;
+        var $cache_key = null;
+        var $cache_iv = null;
+
 
         function __construct(Core7 &$core)
         {
             $this->core = $core;
-            $this->erp_platform_id = $this->core->config->get('core.erp.platform_id');
-            $this->erp_user = $this->core->config->get('core.erp.user');
-            $this->erp_secret_id = $this->core->config->get('core.erp.secret_id');
-            $this->erp_secret_token = $this->core->config->get('core.erp.secret_token');
-
+            $this->cache_key = ($this->core->config->get('core.gcp.secrets.cache_encrypt_key'))?:'T8K1Ogtl5E9R9CDbWIdV6Vs4yBY4';
+            $this->cache_iv = ($this->core->config->get('core.gcp.secrets.cache_encrypt_iv'))?:'iveTFs7++f9niowHcuafMzTeKLG4X';
         }
 
         /**
@@ -2761,6 +2765,22 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * @param $erp_platform_id
+         * @param $erp_user
+         */
+        public function readERPDeveloperEncryptedSubKeys($erp_platform_id,$erp_user)
+        {
+            $headers = ['X-WEB-KEY'=>$erp_user];
+            $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-daily-encryption-subkeys';
+            $keys = $this->core->request->get_json_decode($url,null,$headers);
+            if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.$keys['message'].' '));
+            if(!isset($keys['data']['key']) || !isset($keys['data']['iv'])) return($this->addError('Error in CloudFramework Service to retirve subkeys. key or iv is missing'));
+            $this->cache_key.=$keys['data']['key'];
+            $this->cache_iv.=$keys['data']['iv'];
+            return true;
+        }
+
+        /**
          * GET from CloudFramework ERP Secrets of user is running the script or the GCP appengine,cloudfuntion,computeengine
          * If the user is running in localhost it will prompted
          * If the GCP engine is running it will use the Token of the Instance
@@ -2768,31 +2788,42 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $user User to use in the autentication. If empty it will prompt in the terminal if you are an script
          */
         function getMyERPSecrets($platform_id='',$user='') {
+            return($this->readERPSecretVars($platform_id,$user));
+        }
+
+        /**
+         * Return a secret var stored in CloudFramework Secret Manager through the ERP/BPA
+         * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
+         * @param string $var name of the var contained in the secret
+         * @param string optional $cf_secret_id CF secretId defined in the ERP. Default value is $this->get('core.erp.secrets.secret_id')
+         * @param string optional $cf_secret_token CF secretToken defined in the ERP. Default value is $this->get('core.erp.secrets.secret_token'
+         * @param string optional $platform_id of the ERP. Default value is $this->get('core.erp.platform_id'
+         * @param string optional $user_token User token when is required from the following command: gcloud auth print-access-token --account={{personal_user}}
+         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
+         */
+        public function readERPSecretVars($erp_platform_id,$erp_user='',$erp_secret_id='') {
 
             //region SET $platform_id if it is empty
-            if($platform_id) $this->erp_platform_id = $platform_id;
-            elseif(!$platform_id) $platform_id = $this->erp_platform_id;
-            if(!$platform_id) return($this->addError('CoreSecurity.getERPgetMyERPSecrets() has been called but core.erp.platform_id config var is not defined '));
+            $this->erp_platform_id = $erp_platform_id;
             //endregion
 
             //region READ $user_secrets from cache and RETURN it if it exist
-            $user_secrets = $this->getCache('getMyERPSecrets_'.$this->core->gc_project_id.'_'.$platform_id.'_token');
-            if($user && isset($user_secrets['id']) && $user_secrets['id']!=$user) $user_secrets=[];
+            $key = 'getMyERPSecrets_'.$this->core->gc_project_id.'_'.$erp_platform_id.'_'.$erp_secret_id;
+            $user_secrets = $this->getCache($key);
+
+            if($erp_user && isset($user_secrets['id']) && $user_secrets['id']!=$erp_user) $user_secrets=[];
             if($user_secrets){
-                $this->erp_user = $user_secrets['id'];
-                $this->erp_user_token = $user_secrets['access_token'];
-                $this->erp_platform_id = $user_secrets['platform'];
-                return(['id'=>$user_secrets['id'],'secrets'=>$user_secrets['secrets']]);
+                return(['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']]);
             }
             //endregion
 
             //region IF $user_secrets is empty feed it with basic structure
-            $user_secrets = ['access_token'=>null,'id'=>'','platform'=>$platform_id,'secrets'=>''];
+            $user_secrets = ['access_token'=>null,'id'=>'','platform'=>$erp_platform_id,'secrets'=>''];
             //endregion
 
             //region SET $user_token['access_token'] from User or GCP Engine Instance Token
             if($this->core->is->development()) {
-                $user_secrets['access_token'] = $this->getGoogleUserToken($user);
+                $user_secrets['access_token'] = $this->getGoogleUserToken($erp_user);
             } else {
                 // Read access token from Instance Metadata
                 $token = $this->getGoogleInstanceServiceAccountToken();
@@ -2812,9 +2843,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $user_secrets['id'] = (isset($token_info['email']))?$token_info['email']:$token_info['issued_to'];
             $user_secrets['token'] = $token_info;
             //endregion
-
             //region CALL secret CF API and set $user_secrets['secrets']
-            $url = 'https://api.cloudframework.io/core/secrets/'.$platform_id.'/my-secrets';
+            if($erp_secret_id)
+                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/secret-with-my-token/'.$erp_secret_id;
+            else
+                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-secrets';
+
             $headers = ['X-WEB-KEY'=>$user_secrets['id'],'X-DS-TOKEN'=>$user_secrets['access_token']];
             $secrets = $this->core->request->get_json_decode($url,null,$headers);
             if($this->core->request->error) {
@@ -2822,108 +2856,19 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->request->reset();
                 $this->core->errors->reset();
             }
+            $user_secrets['secret-id'] = ($erp_secret_id)?:$user_secrets['id'];
             $user_secrets['secrets'] = $secrets['data']['secrets'];
             //endregion
 
             //region UPDATE cache
-            $this->updateCache('getMyERPSecrets_'.$this->core->gc_project_id.'_'.$platform_id.'_token',$user_secrets);
+            $this->updateCache($key,$user_secrets);
             //endregion
 
             //region RETURN $user_secrets
-            return(['id'=>$user_secrets['id'],'secrets'=>$user_secrets['secrets']]);
-            //endregion
-        }
-
-        /**
-         * Return a secret var stored in CloudFramework Secret Manager through the ERP/BPA
-         * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
-         * @param string $var name of the var contained in the secret
-         * @param string optional $cf_secret_id CF secretId defined in the ERP. Default value is $this->get('core.erp.secrets.secret_id')
-         * @param string optional $cf_secret_token CF secretToken defined in the ERP. Default value is $this->get('core.erp.secrets.secret_token'
-         * @param string optional $platform_id of the ERP. Default value is $this->get('core.erp.platform_id'
-         * @param string optional $user_token User token when is required from the following command: gcloud auth print-access-token --account={{personal_user}}
-         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
-         */
-        public function getERPSecretVars($var='') {
-
-            if(!$this->erp_platform_id) return($this->core->logs->add('Missing core.erp.platform_id config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
-            if(!$this->erp_secret_id) return($this->core->logs->add('Missing core.erp.secret_id config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
-            if(!$this->erp_secret_token) return($this->core->logs->add('Missing core.erp.erp_token config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
-            if(!$this->erp_user) return($this->core->logs->add('Missing core.erp.user config var or use CoreSecurity.setERPConnection(..)','CoreSecurity.getERPSecretVars'));
-
-            //region SET $key, $secrets
-            $key = "{$this->core->gc_project_id}_{$this->erp_platform_id}_{$this->erp_secret_id}_{$this->erp_user}";
-            $secrets = ($this->getCache($key))?:[];
+            return(['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']]);
             //endregion
 
-            //region RESET $secrets hash if erp_secret_id or erp_secret_token has changed
-            // IF THE $secrets['hash'] has changed we reset the $secrets
-            if(!isset($secrets['hash']) || $secrets['hash']!=md5($this->erp_secret_id.$this->erp_secret_token)) $secrets = [];
-            //endregion
 
-            //region IF !$secrets READ from API the secrets passing credentials
-            if(!$secrets || !is_array($secrets)) {
-
-                //region GENERATE $this->erp_user_token if it does not exist
-                if(!$this->erp_user_token) {
-                    if($this->core->is->development()) {
-                        $this->erp_user_token = $this->getGoogleUserToken($this->erp_user);
-                    } else {
-                        // Read access token from Instance Metadata
-                        $token = $this->getGoogleInstanceServiceAccountToken();
-                        if(!isset($token['access_token'])) return($this->addError('CoreSecurity.getGoogleInstanceServiceAccountToken() has not returned a ["access_token"] array object '));
-                        $this->erp_user_token =$token['access_token'];
-                    }
-                }
-                //endregion
-
-                //region CALL CF SECRET API SERVICE to receive $secrets
-                $url = 'https://api.cloudframework.io/core/secrets/'.$this->erp_platform_id.'/ids/'.$this->erp_secret_id;
-                $headers = [
-                    'X-WEB-KEY'=>$this->erp_user
-                    ,'X-EXTRA-INFO'=>$this->erp_secret_token
-                    ,'X-DS-TOKEN'=>$this->erp_user_token
-                ];
-                $secrets = ['hash'=>md5($this->erp_secret_id.$this->erp_secret_token)];
-                $secrets['vars'] = $this->core->request->get_json_decode($url,null,$headers);
-                if($this->core->request->error) {
-                    if(!isset($secrets['vars']['message'])) $secrets['vars']['message'] = '';
-                    $this->addError("{$secrets['vars']['code']}:{$secrets['vars']['message']}",'CoreSecurity.getERPSecretVars');
-                    $secrets['hash'] = '';
-                    $secrets['vars'] = '';
-                    $this->updateCache($key,$secrets);
-                    $this->core->request->reset();
-                    $this->core->errors->reset();
-                    return;
-                }
-                $secrets['time']=microtime(true);
-                $secrets['expire_in']=$secrets['vars']['data']['token_info']['expires_in'];
-                $secrets['vars'] = (isset($secrets['vars']['data']['secrets']))?$secrets['vars']['data']['secrets']:[];
-                //endregion
-
-                //region ENCRYPT variable contents
-                foreach ($secrets['vars'] as $key_secret=>$secret) {
-                    $secrets['vars'][$key_secret] = $this->core->security->encrypt(serialize($secret),$this->erp_secret_id,$this->erp_secret_token);
-                }
-                //endregion
-
-                //region UPDATE cache
-                $this->updateCache($key,$secrets);
-                //endregion
-            }
-            //endregion
-
-            //region RETURN $secrets['vars'] or $secrets['vars'][$var] if $var is not empty
-            if(isset($secrets['vars']) && is_array($secrets['vars'])) {
-                if($var) return (isset($secrets['vars'][$var]))?unserialize($this->core->security->decrypt($secrets['vars'][$var],$this->erp_secret_id,$this->erp_secret_token)):null;
-                else {
-                    foreach ($secrets['vars'] as $key=>$var)
-                        $secrets['vars'][$key] = unserialize($this->core->security->decrypt($secrets['vars'][$key],$this->erp_secret_id,$this->erp_secret_token));
-                    return($secrets['vars']);
-                }
-            }
-            return null;
-            //endregion
         }
 
         /**
@@ -3573,7 +3518,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function readCache() {
             if($this->cache === null)
-                $this->cache = ($this->core->cache->get('Core7.CoreSecurity'))?:[];
+                $this->cache = ($this->core->cache->get('Core7.CoreSecurity',3600*24,null,$this->cache_key,$this->cache_iv))?:[];
         }
 
         /**
@@ -3581,7 +3526,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function resetCache() {
             $this->cache = [];
-            $this->core->cache->set('Core7.CoreSecurity',$this->cache);
+            $this->core->cache->set('Core7.CoreSecurity',$this->cache,null,$this->cache_key,$this->cache_iv);
         }
 
         /**
@@ -3590,7 +3535,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public function updateCache($var,$data) {
             $this->readCache();
             $this->cache[$var] = $data;
-            $this->core->cache->set('Core7.CoreSecurity',$this->cache);
+            $this->core->cache->set('Core7.CoreSecurity',$this->cache,null,$this->cache_key,$this->cache_iv);
 
         }
 
@@ -3662,6 +3607,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
     }
+
 
     /**
      * Class to manage localizations
@@ -3995,7 +3941,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $path Path to complete URL. if it does no start with http.. $path will be aggregated to: $this->core->config->get("CloudServiceUrl")
          * @return string
          */
-        function getServiceUrl($path = '')
+        function defaultServiceUrl($path = '')
         {
             if (strpos($path, 'http') === 0) return $path;
             else {
@@ -4009,6 +3955,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 return ($this->http . $path);
             }
         }
+        function getServiceUrl($path = '') {return $this->defaultServiceUrl($path);}
+
 
         /**
          * Call External Cloud Service Caching the result

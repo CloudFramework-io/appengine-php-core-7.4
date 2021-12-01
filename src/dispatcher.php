@@ -1,7 +1,9 @@
 <?php
+//region SET $_root_path and autolad
 $_root_path = (strlen($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : $_SERVER['PWD'];
 // Autoload libraries
 require_once  $_root_path.'/vendor/autoload.php';
+//endregion
 
 //region INIT $core = new Core7();
 include_once(__DIR__ . "/Core7.php"); //

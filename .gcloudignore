@@ -19,6 +19,7 @@ composer.lock
 # CLOUDFRAMEWORK local directories
 /local_data/
 /buckets/
+/scripts/
 /tmp/
 
 # CLOUDFRAMEWORK Files
