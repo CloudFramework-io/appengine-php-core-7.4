@@ -1,0 +1,118 @@
+# CloudFramework ALIASES AND FUNCTION
+function gcp () {
+  local f_source="$1"
+  local d_source=$(echo "${f_source}" | sed -e 's/buckets/gs:\//' )
+  echo copying from ${f_source} to ${d_source}
+  gsutil cp ${f_source} ${d_source}
+}
+
+function gsecret () {
+  # verify params
+  if [ "$1" != "read" ] && [ "$1" != "update" ] && [ "$1" != "list" ] && [ "$1" != "create" ]; then
+     echo "Wrong command, use:"
+     echo " gsecret list [{project-name}]"
+     echo " gsecret create {secret-name} {file-data} [{project-name}]"
+     echo " gsecret (read|update) {secret-name} [{project-name}]"
+     return
+  fi
+
+  # read last project name
+  local project=$(cat /tmp/last_secret_project)
+
+  # process commands
+  case $1 in
+     list)
+         if [[ -z $2 ]]; then
+             if [[ -z $project ]]; then
+                 local project="cloudframework-io"
+             fi
+         else
+             echo "$2" > /tmp/last_secret_project
+             local project="$2"
+         fi
+         echo "gcloud secrets list --project=\"$project\""
+         echo "Listing secrets from project $project"
+         gcloud secrets list --project="$project"
+         return;
+         ;;
+     read)
+         if [[ -z $2 ]]; then
+            echo " gsecret read {secret-name} [{project-name}]"
+            return
+         fi
+         if [[ -z $3 ]]; then
+            if [[ -z $project ]]; then
+                local project="cloudframework-io"
+            fi
+         else
+            echo "$3" > /tmp/last_secret_project
+            local project="$3"
+         fi
+         echo "gcloud secrets versions access latest --secret=\"$2\" --project=\"$project\""
+         echo "Reading secret $2 in project $project"
+         gcloud secrets versions access latest --secret="$2" --project="$project"
+         return;
+         ;;
+     update)
+         if [[ -z $2 ]]; then
+            echo " gsecret update {secret-name} {path-file-to-update} [{project-name}]"
+            return
+         fi
+         if [[ -z $3 ]]; then
+            echo " gsecret update {secret-name} {path-file-to-update} [{project-name}]"
+            return
+         fi
+        if [[ -z $4 ]]; then
+            if [[ -z $project ]]; then
+                local project="cloudframework-io"
+            fi
+         else
+            echo "$4" > /tmp/last_secret_project
+            local project="$4"
+         fi
+         echo "gcloud secrets versions add \"$2\" --data-file=\"$3\" --project=\"$project\""
+         echo "Updating to secret $2  with file $3 in project $project. To confirm write 'y' [N,y]"
+         read confirm
+         if [ "$confirm" = "y" ]; then
+            gcloud secrets versions add "$2" --data-file="$3" --project="$project"
+         fi
+         return;
+         ;;
+     create)
+         if [[ -z $2 ]]; then
+            echo " gsecret create {secret-name} [{project-name}]"
+            return
+         fi
+         if [[ -z $3 ]]; then
+            if [[ -z $project ]]; then
+                local project="cloudframework-io"
+            fi
+         else
+            echo "$3" > /tmp/last_secret_project
+            local project="$3"
+         fi
+         echo "gcloud secrets create \"$2\" --replication-policy=\"automatic\" --project=\"$project\""
+         echo "Creating secret $2 in project $project. To confirm write 'y' [N,y]"
+         read confirm
+         if [ "$confirm" = "y" ]; then
+            gcloud secrets create "$2" --replication-policy="automatic" --project="$project"
+         fi
+         return;
+         ;;
+  esac
+  return
+}
+
+alias cfserve='composer run-script clean'
+alias cfserve='composer run-script serve'
+alias cfdeploy='composer run-script deploy'
+alias cfcredentials='composer run-script install-development-credentials'
+alias cfscript='composer run-script script'
+alias cffront="python cf_http_dev.py 5000 'Pragma: no-cache' 'Cache-Control: no-cache' 'Expires: 0'  'Access-Control-Allow-Origin: *'"
+alias cfdownload_dev_secrets="composer run-script download-dev-secrets"
+alias cfupload_dev_secrets="composer run-script upload-dev-secrets"
+alias cfdownload_prod_secrets="composer run-script download-prod-secrets"
+alias cfupload_prod_secrets="composer run-script upload-prod-secrets"
+alias cfgen_password="openssl rand -base64 21"
+alias cftest="echo use cftest _test/{org};php vendor/cloudframework-io/appengine-php-core-7.3/runtest.php"
+alias cfreload_source="source ~/.zshrc"

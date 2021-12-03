@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24031';
+        var $_version = 'v73.24032';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -4993,7 +4993,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function dbQuery($title, $SQL, $params=[],$types=null) {
 
-
             if(!is_string($SQL)) return($this->addError('Wrong $SQL method parameter in: dbQuery($title, $SQL, $params=[]) '));
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
@@ -5001,8 +5000,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // Execute the query
             $ret = $this->db->getDataFromQuery($SQL,$params);
             if(!$this->db->_onlyCreateQuery)
-                $this->core->logs->add($title.' -> '.$this->db->getQuery()." [{$this->db->_lastExecutionMicrotime} sec.]",'dbQuery');
-
+                $this->core->logs->add($title.' -> '.$this->db->getQuery()." [{$this->db->_lastExecutionMicrotime} secs]",'dbQuery');
             if($this->db->error()) return($this->addError($this->db->getError()));
             else {
 
@@ -5040,13 +5038,16 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function dbUpdate($title, $table, &$data) {
 
+            $time = microtime(true);
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
 
             // Execute the query
-            $this->core->logs->add($title,'dbUpdate');
             $this->db->cfmode=false; // Deactivate Cloudframework mode.
             $this->db->cloudFrameWork('update',$data,$table);
+            $time = round(microtime(true)-$time,4);
+            $this->core->logs->add($title." [{$time} secs]",'dbUpdate');
+
             if($this->db->error()) return($this->addError($this->db->getError()));
             else return true;
 
@@ -5054,13 +5055,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         public function dbCommand($title, $q,$params=[]) {
 
+            $time = microtime(true);
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
 
             // Execute the query
-            $this->core->logs->add($title,'dbCommand');
             $this->db->cfmode=false; // Deactivate Cloudframework mode.
             $this->db->command($q,$params);
+            $time = round(microtime(true)-$time,4);
+            $this->core->logs->add($title." [{$time} secs]",'dbCommand');
             if($this->db->error()) return($this->addError($this->db->getError()));
             else return true;
 
@@ -5075,16 +5078,20 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function dbUpsert($title, $table, &$data) {
 
+            $time = microtime(true);
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
 
             // Execute the query
-            $this->core->logs->add($title,'dbUpsert');
+
             $this->db->cfmode=false; // Deactivate Cloudframework mode.
             if(!isset($data[0])) $data = [$data];
             foreach ($data as $record) {
                 $this->db->cloudFrameWork('replace',$record,$table);
+                $time = round(microtime(true)-$time,4);
+                $this->core->logs->add($title." [{$time} secs]",'dbUpsert');
                 if($this->db->error()) return($this->addError($this->db->getError()));
+                $time = microtime(true);
             }
 
             return true;
@@ -5099,16 +5106,20 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function dbInsert($title, $table, &$data) {
 
+            $time = microtime(true);
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
 
             // Execute the query
-            $this->core->logs->add($title,'dbInsert');
+
             $this->db->cfmode=false; // Deactivate Cloudframework mode.
             if(!isset($data[0])) $data = [$data];
             foreach ($data as $record) {
                 $this->db->cloudFrameWork('insert',$record,$table);
+                $time = round(microtime(true)-$time,4);
+                $this->core->logs->add($title." [{$time} secs]",'dbInsert');
                 if($this->db->error()) return($this->addError($this->db->getError()));
+                $time = microtime(true);
             }
 
             return $this->db->getInsertId();
@@ -5124,15 +5135,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function dbDelete($title, $table, &$data) {
 
+            $time = microtime(true);
+
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
 
             // Execute the query
-            $this->core->logs->add($title,'dbDelete');
             $this->db->cfmode=false; // Deactivate Cloudframework mode.
             if(!isset($data[0])) $data = [$data];
             foreach ($data as $record) {
                 $this->db->cloudFrameWork('delete',$record,$table);
+                $time = round(microtime(true)-$time,4);
+                $this->core->logs->add($title." [{$time} secs]",'dbDelete');
                 if($this->db->error()) return($this->addError($this->db->getError()));
             }
 
