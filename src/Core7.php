@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24011';
+        var $_version = 'v73.24031';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2765,18 +2765,47 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * Read a Development SubKeys to encrypt locally the cache where the secrets will be stores
+         * In production these subkeys are cached to increase performance and because the risk who someone have access to Cache server is low
          * @param $erp_platform_id
          * @param $erp_user
+         * @return bool|void
          */
         public function readERPDeveloperEncryptedSubKeys($erp_platform_id,$erp_user)
         {
-            $headers = ['X-WEB-KEY'=>$erp_user];
-            $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-daily-encryption-subkeys';
-            $keys = $this->core->request->get_json_decode($url,null,$headers);
-            if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.$keys['message'].' '));
+            //region SET $url, $key_cache, $keys=[];
+            $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
+            $key_cache = $erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
+            $keys = [];
+            //endregion
+
+            //region GET from cache $keys if we are in production servers
+            if($this->core->is->production())
+                $keys = $this->core->cache->get($key_cache,3600*24,date('Y-m-d'));
+            //endregion
+
+            //region CALL $url and SET $keys if empty $keys
+            if(!$keys) {
+                //region SET $headers and call $url
+                $headers = ['X-WEB-KEY'=>$erp_user];
+                $keys = $this->core->request->get_json_decode($url,null,$headers);
+
+                if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.$keys['message'].' '));
+                //endregion
+
+                //region SAVE from cache $keys if we are in production servers
+                if($this->core->is->production())
+                    $this->core->cache->set($key_cache,$keys,date('Y-m-d'));
+                //endregion
+            }
+            //endregion
+
+            //region ADD $keys to  $this->cache_key and $this->cache_iv
             if(!isset($keys['data']['key']) || !isset($keys['data']['iv'])) return($this->addError('Error in CloudFramework Service to retirve subkeys. key or iv is missing'));
             $this->cache_key.=$keys['data']['key'];
             $this->cache_iv.=$keys['data']['iv'];
+            //endregion
+
             return true;
         }
 
@@ -2844,11 +2873,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $user_secrets['token'] = $token_info;
             //endregion
             //region CALL secret CF API and set $user_secrets['secrets']
-            if($erp_secret_id)
-                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/secret-with-my-token/'.$erp_secret_id;
-            else
-                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-secrets';
-
+            if($erp_secret_id){
+                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/secret-with-my-token/'.$user_secrets['id'].'/'.$erp_secret_id;
+            }
+            else{
+                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-secrets/'.$user_secrets['id'];
+            }
             $headers = ['X-WEB-KEY'=>$user_secrets['id'],'X-DS-TOKEN'=>$user_secrets['access_token']];
             $secrets = $this->core->request->get_json_decode($url,null,$headers);
             if($this->core->request->error) {
