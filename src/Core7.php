@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24041';
+        var $_version = 'v73.24042';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -3059,7 +3059,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if($user) {
                     $gcloud_token_command .= ' --account=' . $user;
                     if(strpos($user,'compute@developer.gserviceaccount.com')) {
-                        $gcloud_token_command.=' token-format=full';
+                        $gcloud_token_command.=' --token-format=full';
                     }
                 }
                 $token = shell_exec($gcloud_token_command);
