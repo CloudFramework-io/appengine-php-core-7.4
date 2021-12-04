@@ -10,6 +10,26 @@ include_once __DIR__.'/src/Core7.php';
 $core = new Core7($rootPath);
 //endregion
 
+//region IF core.erp.platform_id READ user email/id account
+if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.user_id.'.$core->config->get('core.erp.platform_id'))) {
+    $config_erp_user_tag = 'core.erp.user_id.'.$core->config->get('core.erp.platform_id');
+    if(!($user = $core->cache->get($config_erp_user_tag))) {
+        $user = $core->security->getGoogleEmailAccount();
+        if($user) {
+            $core->cache->set($config_erp_user_tag,$user);
+        }
+    }
+    if(!$user) {
+        echo "You have configured core.erp.platform_id=".$core->config->get('core.erp.platform_id')."\n";
+        echo "but you do not have an ACTIVE gcloud auth user. Execute 'gcloud auth login' to activate an account to be used as ERP user access\n";
+        echo "-----\n\n";
+        exit;
+    }
+    $core->config->set($config_erp_user_tag,$user);
+    echo 'ERP user assigned: '.$user."\n";
+}
+//endregion
+
 //region EVALUATE create $datastore
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;

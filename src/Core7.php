@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24032';
+        var $_version = 'v73.24041';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -349,11 +349,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         _print($this->errors->data);
                     }
                 }
-            }
-            // URL not found in the menu.
-            else {
-                $this->errors->add('URL has not exist in config-menu');
-                _printe($this->errors->data);
             }
         }
 
@@ -2630,7 +2625,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             else return null;
         }
 
-
     }
 
     /**
@@ -2648,6 +2642,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache = null;
         var $cache_key = null;
         var $cache_iv = null;
+        protected $secret_vars = null;
 
 
         function __construct(Core7 &$core)
@@ -2655,6 +2650,33 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->core = $core;
             $this->cache_key = ($this->core->config->get('core.gcp.secrets.cache_encrypt_key'))?:'T8K1Ogtl5E9R9CDbWIdV6Vs4yBY4';
             $this->cache_iv = ($this->core->config->get('core.gcp.secrets.cache_encrypt_iv'))?:'iveTFs7++f9niowHcuafMzTeKLG4X';
+        }
+
+        /**
+         * Assgin a $secret_value to the secret $secret_key
+         * @param $secret_key
+         * @param $secret_value
+         */
+        public function setSecretVar($secret_key,$secret_value) {
+            $this->secret_vars['secrets'][$secret_key] =$secret_value;
+        }
+
+        /**
+         * Return the secret value of $secret_key
+         * @param $secret_key
+         * @return mixed|null
+         */
+        public function getSecretVar($secret_key) {
+            return $this->secret_vars['secrets'][$secret_key] ?? null;
+        }
+
+        /**
+         * Return $this->secret_vars
+         * @param $secret_key
+         * @return mixed|null
+         */
+        public function getSecretVars() {
+            return $this->secret_vars;
         }
 
         /**
@@ -2749,30 +2771,31 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Assign ERP Connection variables to get access to secret vars
-         * @param $erp_project_id
-         * @param $erp_secret_id
-         * @param $erp_secret_token
-         * @param $erp_user
-         * @param $erp_user_token
-         */
-        function setERPConnection($erp_platform_id,$erp_secret_id,$erp_secret_token,$erp_user,$erp_user_token='') {
-            $this->erp_platform_id = $erp_platform_id;
-            $this->erp_secret_id = $erp_secret_id;
-            $this->erp_secret_token = $erp_secret_token;
-            $this->erp_user = $erp_user;
-            if($erp_user_token) $this->erp_user_token = $erp_user_token;
-        }
-
-        /**
          * Read a Development SubKeys to encrypt locally the cache where the secrets will be stores
-         * In production these subkeys are cached to increase performance and because the risk who someone have access to Cache server is low
-         * @param $erp_platform_id
-         * @param $erp_user
+         * In production these subkeys are cached to increase performance and because the risk who someone have access to Cache server is low. It rotates every day.
+         * @param string $erp_platform_id if empty it will try to get it from $this->core->config->get('core.erp.platform_id')
+         * @param string $erp_user if empty it will try to get it from $this->core->config->get('core.erp.user_id.'.$erp_platform_id)
          * @return bool|void
          */
-        public function readERPDeveloperEncryptedSubKeys($erp_platform_id,$erp_user)
+        public function readERPDeveloperEncryptedSubKeys($erp_platform_id='',$erp_user='')
         {
+            //region CHECK $erp_platform_id value
+            if(!$erp_platform_id || !is_string($erp_platform_id)) {
+                $erp_platform_id = $this->core->config->get('core.erp.platform_id');
+                if(!$erp_platform_id) return($this->addError('readERPDeveloperEncryptedSubKeys(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+            }
+            //endregion
+
+            //region CHECK $erp_user value
+            if(!$erp_user || !is_string($erp_user)) {
+                $erp_user = $this->core->config->get('core.erp.user_id.'.$erp_platform_id);
+                if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
+                    $erp_user = $this->core->security->getGoogleUserEmailAccount();
+                }
+                if(!$erp_user) return($this->addError('readERPDeveloperEncryptedSubKeys(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+            }
+            //endregion
+
             //region SET $url, $key_cache, $keys=[];
             $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
             $key_cache = $erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
@@ -2789,7 +2812,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 //region SET $headers and call $url
                 $headers = ['X-WEB-KEY'=>$erp_user];
                 $keys = $this->core->request->get_json_decode($url,null,$headers);
-
                 if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.$keys['message'].' '));
                 //endregion
 
@@ -2813,11 +2835,40 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * GET from CloudFramework ERP Secrets of user is running the script or the GCP appengine,cloudfuntion,computeengine
          * If the user is running in localhost it will prompted
          * If the GCP engine is running it will use the Token of the Instance
-         * @param string $platform_id
-         * @param string $user User to use in the autentication. If empty it will prompt in the terminal if you are an script
+         * @param string $erp_platform_id
+         * @param string $erp_user User to use in the autentication. If empty it will prompt in the terminal if you are an script
          */
-        function getMyERPSecrets($platform_id='',$user='') {
-            return($this->readERPSecretVars($platform_id,$user));
+        function readMyERPSecretsVars($erp_platform_id='',$erp_user='') {
+
+            //region CHECK $erp_platform_id value
+            if(!$erp_platform_id || !is_string($erp_platform_id)) {
+                $erp_platform_id = $this->core->config->get('core.erp.platform_id');
+                if(!$erp_platform_id) return($this->addError('readERPSecretVars(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+            }
+            //endregion
+
+            //region CHECK $erp_user value
+            if(!$erp_user || !is_string($erp_user)) {
+                $erp_user = $this->core->config->get('core.erp.user_id.'.$erp_platform_id);
+                if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
+                    $erp_user = $this->core->security->getGoogleUserEmailAccount();
+                }
+                if(!$erp_user) return($this->addError('readERPSecretVars(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+            }
+            //endregion
+
+            return($this->readERPSecretVars($erp_user,$erp_platform_id,$erp_user));
+        }
+
+        /**
+         * Return a specific secret var form ERP
+         * @param $var
+         * @param string $erp_secret_id
+         * @param string $erp_platform_id
+         * @param string $erp_user
+         */
+        public function getERPSecretVar($var, string $erp_secret_id='', string $erp_platform_id='', string $erp_user='') {
+            if($this->secret_vars ===null) if(!$this->readERPSecretVars($erp_secret_id,$erp_platform_id,$erp_user)) return;
         }
 
         /**
@@ -2830,10 +2881,30 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string optional $user_token User token when is required from the following command: gcloud auth print-access-token --account={{personal_user}}
          * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
          */
-        public function readERPSecretVars($erp_platform_id,$erp_user='',$erp_secret_id='') {
+        public function readERPSecretVars($erp_secret_id='',$erp_platform_id='',$erp_user='') {
 
-            //region SET $platform_id if it is empty
-            $this->erp_platform_id = $erp_platform_id;
+            //region CHECK $erp_platform_id value
+            if(!$erp_secret_id || !is_string($erp_secret_id)) {
+                $erp_secret_id = $this->core->config->get('core.erp.secrets.secret_id');
+                if(!$erp_secret_id) return($this->addError('readERPSecretVars(..) missing function-var($erp_secret_id) or config-var(core.erp.secrets.secret_id)'));
+            }
+            //endregion
+
+            //region CHECK $erp_platform_id value
+            if(!$erp_platform_id || !is_string($erp_platform_id)) {
+                $erp_platform_id = $this->core->config->get('core.erp.platform_id');
+                if(!$erp_platform_id) return($this->addError('readERPSecretVars(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+            }
+            //endregion
+
+            //region CHECK $erp_user value
+            if(!$erp_user || !is_string($erp_user)) {
+                $erp_user = $this->core->config->get('core.erp.user_id.'.$erp_platform_id);
+                if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
+                    $erp_user = $this->core->security->getGoogleEmailAccount();
+                }
+                if(!$erp_user) return($this->addError('readERPSecretVars(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+            }
             //endregion
 
             //region READ $user_secrets from cache and RETURN it if it exist
@@ -2842,7 +2913,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             if($erp_user && isset($user_secrets['id']) && $user_secrets['id']!=$erp_user) $user_secrets=[];
             if($user_secrets){
-                return(['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']]);
+                $this->secret_vars = ['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']];
+                return true;
             }
             //endregion
 
@@ -2850,36 +2922,30 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $user_secrets = ['access_token'=>null,'id'=>'','platform'=>$erp_platform_id,'secrets'=>''];
             //endregion
 
-            //region SET $user_token['access_token'] from User or GCP Engine Instance Token
-            if($this->core->is->development()) {
-                $user_secrets['access_token'] = $this->getGoogleUserToken($erp_user);
-            } else {
-                // Read access token from Instance Metadata
-                $token = $this->getGoogleInstanceServiceAccountToken();
-                if(!isset($token['access_token'])) return($this->addError('CoreSecurity.getGoogleInstanceServiceAccountToken() has not returned a ["access_token"] array object '));
-                $user_secrets['access_token'] =$token['access_token'];
-            }
-            if(!$user_secrets['access_token']) return;
-            $this->erp_user_token = $user_secrets['access_token'];
+            //region SET $token from User or GCP Engine Instance Token
+            $token = $this->getGoogleIdentityToken($erp_user);
+            if(!$token) return($this->addError('CoreSecurity.readERPSecretVars() has returned an error calling $this->getGoogleIdentityToken($erp_user)'));
             //endregion
 
-            //region SET $user_secrets['email'] and $user_secrets['token']
-            $token_info = $this->getGoogleTokenInfo($user_secrets['access_token']);
+            //region VERIFY $token and SET $user_secrets['id'] and $user_secrets['token']
+            $token_info = $this->getGoogleTokenInfo($token);
             if(isset($token_info['error'])) return($this->addError($token_info));
             // If the token_info does not contains email attribute the we trust the email sent in the header.
-            if(!isset($token_info['email']) && !isset($token_info['issued_to'])) return($this->addError('CoreSecurity.getMyERPSecrets() has not got a token without email and issued_to attributes'));
+            if(!isset($token_info['email']) && !isset($token_info['sub'])) return($this->addError('CoreSecurity.getMyERPSecrets() has not got a token with email or $token attributes'));
 
-            $user_secrets['id'] = (isset($token_info['email']))?$token_info['email']:$token_info['issued_to'];
+            $user_secrets['id'] = (isset($token_info['email']))?$token_info['email']:$token_info['sub'];
             $user_secrets['token'] = $token_info;
             //endregion
+
             //region CALL secret CF API and set $user_secrets['secrets']
-            if($erp_secret_id){
+            if($erp_secret_id!=$user_secrets['id']){
                 $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/secret-with-my-token/'.$user_secrets['id'].'/'.$erp_secret_id;
             }
             else{
                 $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-secrets/'.$user_secrets['id'];
             }
-            $headers = ['X-WEB-KEY'=>$user_secrets['id'],'X-DS-TOKEN'=>$user_secrets['access_token']];
+
+            $headers = ['X-WEB-KEY'=>$user_secrets['id'],'X-DS-TOKEN'=>$token];
             $secrets = $this->core->request->get_json_decode($url,null,$headers);
             if($this->core->request->error) {
                 return($this->addError($this->core->request->errorMsg));
@@ -2895,9 +2961,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region RETURN $user_secrets
-            return(['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']]);
+            $this->secret_vars = ['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']];
+            return true;
             //endregion
-
 
         }
 
@@ -2916,60 +2982,163 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Prompt the user to generate a token
+         * Get the Google user email that the terminal or the instance (appengine, computeengine, or user localhost..) is using.
          */
-        function getGoogleUserToken($user='') {
-            if(!$this->core->is->development()) {
-                $this->addError('You can only call CoreSecurity.getGoogleUserToken($user="") from development environment');
-                return;
-            }
-            if(!$user || !$this->core->is->validEmail($user)) {
+        function getGoogleEmailAccount() {
+            if($this->core->is->development()) {
+                $gcloud_auth_list = 'gcloud auth list';
+                $auth_list = shell_exec($gcloud_auth_list);
+                if(!$auth_list) return($this->addError("'{$gcloud_auth_list}' has produced an error. Install gcloud or check gcloud auth login"));
+                $lines = explode("\n",$auth_list);
+                array_shift($lines);
+                if(!isset($lines[0]) || strpos($lines[0],'ACTIVE')===false) return($this->addError("'{$gcloud_auth_list}' has no active account. Execute gcloud auth login"));
+                array_shift($lines);
+                $user='';
                 do {
-                    $user = $this->prompt('Give me your Google User Email: ');
-                } while (!$this->core->is->validEmail($user)) ;
+                    if(strpos($lines[0],'*')===0) {
+                        $user = preg_replace('/[\* ]/','',trim($lines[0]));
+                    }
+                    array_shift($lines);
+                } while($lines && !$user);
+                if(!$user) return($this->addError("getGoogleUserEmailAccount() has not found an active user with '{$gcloud_auth_list}'. Verify the programming of this method"));
+                return $user;
+            } else {
+                try {
+                    $metadata = new Google\Cloud\Core\Compute\Metadata();
+                    $user = explode('/',$metadata->get('instance/service-accounts'))[0];
+                } catch (Exception $e) {
+                    return($this->addError("getGoogleUserEmailAccount() has produced an error in metadata call: ".$e->getMessage()));
+                }
             }
-            $gcloud_token_command = 'gcloud auth print-access-token --account='.$user;
-            $token = shell_exec($gcloud_token_command);
-            if(!$token) return($this->addError('The following command does not work: '.$gcloud_token_command));
+        }
+
+        /**
+         * Prompt the user to generate a token
+         * @param string $user this should be passed when you are working in a script or development environment
+         * @return array|voud
+         * {
+            "access_token": "ya29.****",
+            "expires_in": 1799,
+            "token_type": "Bearer"
+            }
+         */
+        function getGoogleAccessToken(string $user='') {
+            if($this->core->is->development()) {
+                $gcloud_token_command = 'gcloud auth print-access-token';
+                if($user) $gcloud_token_command.=' --account='.$user;
+                $token = shell_exec($gcloud_token_command);
+                if(!$token) return($this->addError('CoreSecurity.getGoogleUserAccessToken(..) The following command does not work: '.$gcloud_token_command));
+                $token = ['access_token'=>$token,'token_type'=>'Bearer','expires_in'=>0];
+            } else {
+                try {
+                    $url = 'instance/service-accounts/default/token';
+                    $metadata = new Google\Cloud\Core\Compute\Metadata();
+                    $token =  json_decode($metadata->get($url),true);
+                } catch (Exception $e) {
+                    return($this->addError("CoreSecurity.getGoogleUserAccessToken(..) has produced an error calling {$url}: ".$e->getMessage()));
+                }
+            }
             return($token);
         }
 
         /**
-         * Retrieve Metadata token from the Instance running in GCP
-         * https://cloud.google.com/run/docs/securing/service-identity
-         * https://cloud.google.com/compute/docs/instances/verifying-instance-identity#request_signature
-         * For example you can instance token with:
-         *         $metadata = new Google\Cloud\Core\Compute\Metadata();
-         *         $ret = json_decode($metadata->get('instance/service-accounts/default/token'),true)['access_token'];
-         * @param string $scopes optionally you can add $scopes (https://www.googleapis.com/auth/cloud-platform or https://www.googleapis.com/auth/drive
-         * @return array
-         * {
-         * "access_token": "ya29.****",
-         * "expires_in": 1799,
-         * "token_type": "Bearer"
-         * }
+         * Get an Identity token for the $user
+         * https://cloud.google.com/compute/docs/instances/verifying-instance-identity#curl
+         * https://cloud.google.com/compute/docs/instances/verifying-instance-identity#token_format
+         * @param string $user this should be passed when you are working in a script or development environment
+         * @param string $audience this is the audience added to the token for more security. Only valid for GAE service account
+         * @return string|void example: eyJhbGciOiJSUzI1NiIsImtpZCI6I....
          */
-        function getGoogleInstanceServiceAccountToken($scopes='')
-        {
+        function getGoogleIdentityToken($user='',$audience='https//api.cloudframework.io') {
             if($this->core->is->development()) {
-                $this->addError('You can not call CoreSecurity.getGoogleInstanceServiceAccountToken($scopes=\'\') from development environment');
-                return;
+                $gcloud_token_command = 'gcloud auth print-identity-token';
+                if($audience) {
+                    if(strpos($user,'compute@developer.gserviceaccount.com'))
+                        $gcloud_token_command.=' --audiences='.$audience;
+                }
+                if($user) {
+                    $gcloud_token_command .= ' --account=' . $user;
+                    if(strpos($user,'compute@developer.gserviceaccount.com')) {
+                        $gcloud_token_command.=' token-format=full';
+                    }
+                }
+                $token = shell_exec($gcloud_token_command);
+                if(!$token) return($this->addError('CoreSecurity.getGoogleIdentityToken(...) The following command does not work: '.$gcloud_token_command));
+            } else {
+                try {
+                    $url='instance/service-accounts/default/identity?format=full&licenses=true';
+                    if($audience) $url.='&audience='.$audience;
+                    $metadata = new Google\Cloud\Core\Compute\Metadata();
+                    $token = $metadata->get($url);
+                    if(!$token) return($this->addError('CoreSecurity.getGoogleIdentityToken(...)  Error calling The following url does not work: '.$url));
+                } catch (Exception $e) {
+                    return($this->addError('CoreSecurity.getGoogleIdentityToken(...)  Error calling The following url does not work: '.$url));
+                }
             }
-            if($scopes) $scopes="?scopes={$scopes}";
-            $metadata = new Google\Cloud\Core\Compute\Metadata();
-            return json_decode($metadata->get('instance/service-accounts/default/token'.$scopes),true);
+            return($token);
         }
 
         /**
-         * Retrieve info taking a token previous generated
+         * Return info about an Access Token or Identity Tokens
+         * This function call getGoogleAccessTokenInfo($token) or getGoogleIdentityTokenInfo($token) depending on $token format
+         * @param $token
+         * @return array|void
+         */
+        function getGoogleTokenInfo($token) {
+
+            // IF IT IS AN ACCESS TOKEN
+            if(strpos($token,'ya29.')===0) {
+                return($this->getGoogleAccessTokenInfo($token));
+            }
+            // ELSE THEN IT HAS TO BE AN IDENTITY TOKEN
+            // https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+            else {
+                return($this->getGoogleIdentityTokenInfo($token));
+            }
+        }
+
+        /**
+         * Retrieve info about a Google Access Token
          * For example you can generate a localhost token using: gcloud auth print-access-token --account={{personal_email_user}}
          * For example you can instance token with:
          *         $metadata = new Google\Cloud\Core\Compute\Metadata();
          *         $ret = json_decode($metadata->get('instance/service-accounts/default/token'),true)['access_token'];
          * @param $token
          * @return mixed|string
+         * appengine output {
+            "issued_to": "anonymous",
+            "audience": "anonymous",
+            "scope": "https://www.googleapis.com/auth/trace.append https://www.googleapis.com/auth/monitoring.write https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/logging.write https://www.googleapis.com/auth/cloud_debugger https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/appengine.apis",
+            "expires_in": 1408,
+            "email": "cloudframework-io@appspot.gserviceaccount.com",
+            "verified_email": true,
+            "access_type": "online"
+            },
+         * compute engine script {
+            "aud": "32555940559.apps.googleusercontent.com",
+            "azp": "107073846750350635781",
+            "email": "173191905033-compute@developer.gserviceaccount.com",
+            "email_verified": true,
+            "exp": 1638615700,
+            "google": {
+                "compute_engine": {
+                    "instance_creation_timestamp": 1608593543,
+                    "instance_id": "5265569244953019153",
+                    "instance_name": "bnext-spain-etl-machine",
+                    "license_id": [
+                    "5926592092274602096"
+                    ],
+                    "project_id": "bnext-cloud",
+                    "project_number": 173191905033,
+                    "zone": "europe-west1-b"
+                }
+            },
+            "iat": 1638612100,
+            "iss": "https://accounts.google.com",
+            "sub": "107073846750350635781"
+            }
          */
-        function getGoogleTokenInfo($token)
+        function getGoogleAccessTokenInfo($token)
         {
             $token_info = $this->core->request->post_json_decode('https://www.googleapis.com/oauth2/v1/tokeninfo',['access_token'=>$token],['Content-Type'=>'application/x-www-form-urlencoded']);
             if($this->core->request->error) {
@@ -2982,8 +3151,57 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             if(isset($token_info['error'])) $token_info['code'] = $this->core->request->getLastResponseCode();
             $this->core->request->reset();
-
             return $token_info;
+        }
+
+        /**
+         * Retrieve info about a Google Identity Token
+         * https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+         * https://cloud.google.com/compute/docs/instances/verifying-instance-identity#token_format
+         * @param $token
+         * @return array|boolean|null if the token is valid returns an array otherwise false. If there is a service error it returns null and addError in the class
+         * appengine output example{
+            "aud": "https://api7.cloudframework.io",
+            "azp": "105263613482625024225",
+            "email": "cloudframework-io@appspot.gserviceaccount.com",
+            "email_verified": true,
+            "exp": 1638601791,
+            "iat": 1638598191,
+            "iss": "https://accounts.google.com",
+            "sub": "105263613482625024225"
+            },
+         * computeengine script example{
+            "aud": "32555940559.apps.googleusercontent.com",
+            "azp": "107073846750350635781",
+            "exp": 1638609030,
+            "iat": 1638605430,
+            "iss": "https://accounts.google.com",
+            "sub": "107073846750350635781"
+            },
+         * user localhost example{
+            "iss": "https://accounts.google.com",
+            "azp": "32555940559.apps.googleusercontent.com",
+            "aud": "32555940559.apps.googleusercontent.com",
+            "sub": "116008531197812823243",
+            "hd": "adrianmm.com",
+            "email": "info@adrianmm.com",
+            "email_verified": true,
+            "at_hash": "LgKsYP8U6NcmstQR1LgO7w",
+            "iat": 1638611898,
+            "exp": 1638615498
+            }
+         */
+        function getGoogleIdentityTokenInfo($token)
+        {
+            try {
+                $client = new Google_Client();
+                $token_info = $client->verifyIdToken($token);
+                return $token_info;
+            } catch (Exception $e) {
+                $this->addError($e->getMessage());
+                return null;
+            }
+
         }
 
         /**
