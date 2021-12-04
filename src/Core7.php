@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24042';
+        var $_version = 'v73.24043';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2790,9 +2790,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(!$erp_user || !is_string($erp_user)) {
                 $erp_user = $this->core->config->get('core.erp.user_id.'.$erp_platform_id);
                 if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
-                    $erp_user = $this->core->security->getGoogleUserEmailAccount();
+                    $erp_user = $this->core->security->getGoogleEmailAccount();
                 }
-                if(!$erp_user) return($this->addError('readERPDeveloperEncryptedSubKeys(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+                if(!$erp_user) return($this->addError('readERPDeveloperEncryptedSubKeys(..) missing function-var($erp_user) or config-var(core.erp.user_id.'.$erp_platform_id.'.)'));
             }
             //endregion
 
@@ -2947,6 +2947,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $headers = ['X-WEB-KEY'=>$user_secrets['id'],'X-DS-TOKEN'=>$token];
             $secrets = $this->core->request->get_json_decode($url,null,$headers);
+
             if($this->core->request->error) {
                 return($this->addError($this->core->request->errorMsg));
                 $this->core->request->reset();
@@ -3006,6 +3007,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 try {
                     $metadata = new Google\Cloud\Core\Compute\Metadata();
                     $user = explode('/',$metadata->get('instance/service-accounts'))[0];
+                    return $user;
                 } catch (Exception $e) {
                     return($this->addError("getGoogleUserEmailAccount() has produced an error in metadata call: ".$e->getMessage()));
                 }
