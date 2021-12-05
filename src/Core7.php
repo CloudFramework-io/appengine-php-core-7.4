@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24043';
+        var $_version = 'v73.24051';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -1310,11 +1310,16 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function get($key, $expireTime = -1, $hash = '',$cache_secret_key='',$cache_secret_iv='')
         {
-            $encrypted = ($cache_secret_key && $cache_secret_iv)?'/encrypted':'/no-encrypted';
             if(!$this->init() || !strlen(trim($key))) return null;
-            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", $key, 'note');
 
+            //region SET __p performance paramater
             if (!strlen($expireTime)) $expireTime = -1;
+            $encrypted = ($cache_secret_key && $cache_secret_iv)?'/encrypted':'/no-encrypted';
+            $encrypted.='/exp:'.$expireTime;
+            $encrypted.='/hash:'.(($hash)?'/with-hash':'/no-hash');
+            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", $key, 'note');
+            //endregion
+
 
             $info = $this->cache->get($this->spacename . '-' . $key);
             if (strlen($info) && $info !== null) {
@@ -2823,7 +2828,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region ADD $keys to  $this->cache_key and $this->cache_iv
-            if(!isset($keys['data']['key']) || !isset($keys['data']['iv'])) return($this->addError('Error in CloudFramework Service to retirve subkeys. key or iv is missing'));
+            if(!isset($keys['data']['key']) || !isset($keys['data']['iv'])) return($this->addError('Error in CloudFramework Service to retrieve subkeys. key or iv is missing'));
             $this->cache_key.=$keys['data']['key'];
             $this->cache_iv.=$keys['data']['iv'];
             //endregion
@@ -3777,6 +3782,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public function resetCache() {
             $this->cache = [];
             $this->core->cache->set('Core7.CoreSecurity',$this->cache,null,$this->cache_key,$this->cache_iv);
+            $this->core->logs->add('CoreSecurity.resetCache() from '.$this->core->system->url['host_url_uri'],'CoreSecurity');
         }
 
         /**
