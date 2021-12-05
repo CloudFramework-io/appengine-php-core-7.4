@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
 
-        var $_version = 'v73.24051';
+        var $_version = 'v73.24052';
 
         /**
          * @var array $loadedClasses control the classes loaded
@@ -2914,7 +2914,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region READ $user_secrets from cache and RETURN it if it exist
             $key = 'getMyERPSecrets_'.$this->core->gc_project_id.'_'.$erp_platform_id.'_'.$erp_secret_id;
-            $user_secrets = $this->getCache($key);
+            $user_secrets = $this->getCache($key,'ERP.secrets');
 
             if($erp_user && isset($user_secrets['id']) && $user_secrets['id']!=$erp_user) $user_secrets=[];
             if($user_secrets){
@@ -2963,7 +2963,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region UPDATE cache
-            $this->updateCache($key,$user_secrets);
+            $this->updateCache($key,$user_secrets,'ERP.secrets');
             //endregion
 
             //region RETURN $user_secrets
@@ -2971,6 +2971,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return true;
             //endregion
 
+        }
+
+        /**
+         * Reset the cache for the ERP Secrets
+         */
+        public function resetERPCache() {
+            return $this->resetCache('ERP.secrets');
         }
 
         /**
@@ -3771,37 +3778,42 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /**
          * Reset Cache of the module
          */
-        public function readCache() {
-            if($this->cache === null)
-                $this->cache = ($this->core->cache->get('Core7.CoreSecurity',3600*24,null,$this->cache_key,$this->cache_iv))?:[];
+        public function readCache($security_group = 'default') {
+            if(!isset($this->cache[$security_group]))
+                $this->cache[$security_group] = ($this->core->cache->get('Core7.CoreSecurity.'.$security_group,3600*24,null,$this->cache_key,$this->cache_iv))?:[];
         }
 
         /**
          * Reset Cache of the module
          */
-        public function resetCache() {
-            $this->cache = [];
-            $this->core->cache->set('Core7.CoreSecurity',$this->cache,null,$this->cache_key,$this->cache_iv);
-            $this->core->logs->add('CoreSecurity.resetCache() from '.$this->core->system->url['host_url_uri'],'CoreSecurity');
+        public function resetCache($security_group = 'default') {
+            $this->cache[$security_group] = [];
+            $this->core->cache->set('Core7.CoreSecurity.'.$security_group,$this->cache[$security_group],null,$this->cache_key,$this->cache_iv);
+            $this->core->logs->add('CoreSecurity.resetCache(\''.$security_group.'\') from '.$this->core->system->url['host_url_uri'],'CoreSecurity');
         }
 
         /**
          * Update Cache of the module
          */
-        public function updateCache($var,$data) {
-            $this->readCache();
-            $this->cache[$var] = $data;
-            $this->core->cache->set('Core7.CoreSecurity',$this->cache,null,$this->cache_key,$this->cache_iv);
+        public function updateCache($var,$data,$security_group = 'default') {
+            if(!$security_group) $security_group = 'default';
+            $this->readCache($security_group);
+            $this->cache[$security_group][$var] = $data;
+            $this->core->cache->set('Core7.CoreSecurity.'.$security_group,$this->cache[$security_group],null,$this->cache_key,$this->cache_iv);
 
         }
 
         /**
          * Get var Cache of the module
+         * @param string $var y empty it returns all the variable of the security group
+         * @param string $security_group
+         * @return mixed|null
          */
-        public function getCache($var) {
-            $this->readCache();
-            if(isset($this->cache[$var])) return $this->cache[$var];
-            else return null;
+        public function getCache(string $var='',$security_group = 'default') {
+            if(!$security_group) $security_group = 'default';
+            $this->readCache($security_group);
+            if($var) return $this->cache[$security_group][$var] ?? null;
+            else return $this->cache[$security_group] ?? null;
         }
 
 
