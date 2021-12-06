@@ -10,6 +10,15 @@ include_once(__DIR__ . "/Core7.php"); //
 $core = new Core7();
 //endregion
 
+//region SET $logger
+// https://cloud.google.com/logging/docs/setup/php
+use Google\Cloud\Logging\LoggingClient;
+$logger = null;
+if(getenv('PROJECT_ID') && $core->is->production()) {
+    $logger = LoggingClient::psrBatchLogger('app');
+}
+//endregion
+
 //region IF core.erp.platform_id READ user for service account.
 if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.user_id.'.$core->config->get('core.erp.platform_id'))) {
     $config_erp_user_tag = 'core.erp.user_id.'.$core->config->get('core.erp.platform_id');
@@ -43,15 +52,6 @@ if((getenv('PROJECT_ID') || $core->config->get("core.gcp.datastore.project_id"))
 
     $transport = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
     $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID')]);
-}
-//endregion
-
-//region SET $logger
-// https://cloud.google.com/logging/docs/setup/php
-use Google\Cloud\Logging\LoggingClient;
-$logger = null;
-if(getenv('PROJECT_ID') && $core->is->production()) {
-    $logger = LoggingClient::psrBatchLogger('app');
 }
 //endregion
 
