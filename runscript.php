@@ -1,4 +1,5 @@
 <?php
+$time = microtime(true);
 //region SET $root_path
 $rootPath = exec('pwd');
 // Autoload libraries
@@ -8,12 +9,16 @@ require_once  $rootPath.'/vendor/autoload.php';
 //region CREATE $core
 include_once __DIR__.'/src/Core7.php';
 $core = new Core7($rootPath);
+echo "CloudFramWork (CFW) Core7.Script ".$core->_version."\n";
 //endregion
+
+
 
 //region IF core.erp.platform_id READ user email/id account
 if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.user_id.'.$core->config->get('core.erp.platform_id'))) {
     $config_erp_user_tag = 'core.erp.user_id.'.$core->config->get('core.erp.platform_id');
     if(!($user = $core->cache->get($config_erp_user_tag))) {
+        echo ' - Because it is not in cache, executd $core->security->getGoogleEmailAccount() to get the default GCP user'."\n";
         $user = $core->security->getGoogleEmailAccount();
         if($user) {
             $core->cache->set($config_erp_user_tag,$user);
@@ -26,7 +31,7 @@ if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.u
         exit;
     }
     $core->config->set($config_erp_user_tag,$user);
-    echo 'ERP user assigned: '.$user."\n";
+    echo " - '{$config_erp_user_tag}' config var assigned for ERP user to [{$user}]\n";
 }
 //endregion
 
@@ -53,6 +58,7 @@ if(count($argv)>1) {
     $script = explode('/', $script);
     $script_name = $script[0];
     if($script_name[0]=='_') {
+        echo " - Looking for scripts of the framework because the name start with [_]\n";
         $path = __DIR__.'/scripts';
     } else {
         $path =($core->config->get('core.scripts.path')?$core->config->get('core.scripts.path'):$core->system->app_path.'/scripts');
@@ -66,35 +72,22 @@ $show_path = str_replace($rootPath,'.',$path);
 //endregion
 
 //region CHECK if $script_name is empty
-echo "CloudFramwork Script v21.11\nroot_path: {$rootPath}\napp_path: {$show_path}\n";
-if(!$script_name) die ('Missing Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
-echo "Script: {$show_path}/{$script_name}.php\n";
+echo " - root_path: {$rootPath}\n - app_path: {$show_path}".(($core->config->get('core.scripts.path'))?" set in config var: 'core.scripts.path'":'')."\n";
+if(!$script_name) die (' - !!! Missing Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
+echo " - script: {$show_path}/{$script_name}.php\n";
 //endregion
 
-//region LOAD local_script.json
-if(is_file('./local_script.json')) {
-    $core->config->readConfigJSONFile('./local_script.json');
-    if($core->errors->lines) {
-        _printe(['errors'=>$core->errors->data]);
-        exit;
-    } else {
-        echo "local_script.json: read\n";
 
-    }
-
-
-}
 echo "------------------------------\n";
-//endregion
 
 //region SET $options,
 $options = ['performance'=>in_array('--p',$argv)];
 //endregion
 
 //region VERIFY if the script exist
-if(!is_file($path.'/'.$script_name.'.php')) die("Script not found. Create it with: composer script _create/<your-script-name>\n");
+if(!is_file($path.'/'.$script_name.'.php')) die(" - !!!Script not found. Create it with: composer script _create/<your-script-name>\n");
 include_once $path.'/'.$script_name.'.php';
-if(!class_exists('Script')) die('The script does not include a "Class Script'."\nUse:\n-------\n<?php\nclass Script extends Scripts2020 {\n\tfunction main() { }\n}\n-------\n\n");
+if(!class_exists('Script')) die(' - !!!The script does not include a "Class Script'."\nUse:\n-------\n<?php\nclass Script extends Scripts2020 {\n\tfunction main() { }\n}\n-------\n\n");
 /** @var Script $script */
 //endregion
 
@@ -104,11 +97,12 @@ $run->params = $script;
 if(strlen($formParams))
     parse_str($formParams,$run->formParams);
 
-if(!method_exists($run,'main')) die('The class Script does not include the method "main()'."\n\n");
+if(!method_exists($run,'main')) die(' - !!!The class Script does not include the method "main()'."\n\n");
 //endregion
 
 //region TRY $run->main();
 try {
+    if(!isset($run->formParams['__p'])) $core->__p->active = false;
     $core->__p->add('Running Script',$show_path.'/'.$script_name,"note");
     $run->main();
     $core->__p->add('Running Script','',"endnote");
@@ -124,9 +118,19 @@ echo "\n------------------------------\n";
 //region EVALUATE to show logs and errors and end the scrpit
 if($core->errors->lines) {
     $run->sendTerminal(['errors'=>$core->errors->data]);
-    $run->sendTerminal('Script: Error');
+    $run->sendTerminal(' - Script: Error');
 }
-else $run->sendTerminal('Script: OK');
-if($core->logs->lines) $run->sendTerminal(['logs'=>$core->logs->data]);
-if($options['performance']) $run->sendTerminal($core->__p->data['info']);
+else $run->sendTerminal(' - Script: OK');
+if($core->logs->lines) {
+    $run->sendTerminal("\n----------- LOGS -------------");
+    $run->sendTerminal($core->logs->data);
+    $run->sendTerminal("-----------/LOGS -------------");
+
+}
+if($options['performance'] || isset($run->formParams['__p'])) {
+    $run->sendTerminal("\n-------- PERFORMANCE ---------");
+    $run->sendTerminal($core->__p->data['info']);
+    $run->sendTerminal("--------/PERFORMANCE ---------");
+}
+echo 'SCRIPT execution time: '.round(microtime(true)-$time,4).'secs'."\n";
 //endregion

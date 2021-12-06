@@ -105,16 +105,41 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
      */
     final class Core7
     {
-
-        var $_version = 'v73.24052';
-
+        // Version of the Core7 CloudFrameWork
+        var $_version = 'v73.24061';
+        /** @var CorePerformance $__p */
+        var  $__p;
+        /** @var CoreIs $is */
+        var  $is;
+        /** @var CoreSession $session */
+        var  $session;
+        /** @var CoreSystem $system */
+        var  $system;
+        /** @var CoreLog $logs */
+        var  $logs;
+        /** @var CoreLog $errors */
+        var  $errors;
+        /** @var CoreConfig $config */
+        var $config;
+        /** @var CoreSecurity $security */
+        var $security;
+        /** @var CoreCache $cache */
+        var $cache;
+        /** @var CoreRequest $request */
+        var $request;
+        /** @var CoreLocalization $localization */
+        var $localization;
+        /** @var CoreModel $model */
+        var $model;
+        /** @var CFILog $cfiLog */
+        var $cfiLog;
+        /** @var string $gc_project_id GCP Google Project assciated */
+        var $gc_project_id;
         /**
          * @var array $loadedClasses control the classes loaded
          * @link Core::loadClass()
          */
         private $loadedClasses = [];
-
-        var $gc_project_id = null;  // Google Cloud Project ID
         /** @var StorageClient $gc_datastorage_client  */
         var $gc_datastorage_client = null;          // Google Cloud DataStorage Client
 
@@ -124,23 +149,39 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function __construct($root_path = '')
         {
+            //region SET $this->__p,$this->is,$this->system,$this->logs,$this->errors
             $this->__p = new CorePerformance();
-            $this->session = new CoreSession();
-            $this->system = new CoreSystem($root_path);
-            $this->logs = new CoreLog();
-            $this->errors = new CoreLog();
             $this->is = new CoreIs();
-            $this->__p->add('Construct Class with objects (__p,session[started=' . (($this->session->start) ? 'true' : 'false') . '],system,logs,errors,is):' . __CLASS__, __FILE__);
+            $this->system = new CoreSystem($root_path);
+            $this->logs = new CoreLog($this->is->development() && $this->is->terminal());
+            $this->errors = new CoreLog($this->is->development() && $this->is->terminal());
+            //endregion
 
+            //region SET $this->config and evaluate to read local_config.json and local_script.json
             $this->config = new CoreConfig($this, __DIR__ . '/config.json');
+            if ($this->is->development() && is_file($this->system->root_path . '/local_config.json')) {
+                $this->config->readConfigJSONFile($this->system->root_path . '/local_config.json');
+                $this->logs->add('[development] loaded local_config.json');
+            }
+            if ($this->is->development() && $this->is->terminal() && is_file($this->system->root_path . '/local_script.json')) {
+                $this->config->readConfigJSONFile($this->system->root_path . '/local_script.json');
+                $this->logs->add('[script] loaded local_script.json');
+            }
+            //endregion
+            //region SET $this->session and evaluate if we are runnning from a termina
+            $this->session = new CoreSession($this);
+            // To run scripts you can use Session data to store temporal Data. The session expire every 180 minutes by default
+            if($this->is->development() && $this->is->terminal()) {
+                $this->session->debug = true;
+                $this->session->init('CloudFrameworkScripts');
+            }
+            //endregion
             $this->security = new CoreSecurity($this);
             $this->cache = new CoreCache($this);
             $this->request = new CoreRequest($this);
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
             $this->cfiLog = new CFILog($this);
-
-
             //setup GCP basic vars
             if($this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
             $this->gc_project_id = getenv('PROJECT_ID');
@@ -158,9 +199,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
 
             // Local configuration
-            if ($this->is->development() && is_file($this->system->root_path . '/local_config.json'))
-                $this->config->readConfigJSONFile($this->system->root_path . '/local_config.json');
-            $this->__p->add('Loaded security,user,config,request objects with __session[started=' . (($this->session->start) ? 'true' : 'false') . ']: ,', __METHOD__);
+            $this->__p->add('Loaded $this->__p,$this->system,$this->logs,$this->errors,$this->is,$this->config,$this->session,$this->security,$this->cache,$this->request,$this->localization,$this->model,$this->cfiLog with __session[started=' . (($this->session->start) ? 'true' : 'false') . ']: ,', __METHOD__);
 
             // Config objects based in config
             $this->cache->setSpaceName($this->config->get('cacheSpacename'));
@@ -505,6 +544,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $deep = 0;
         var $spaces = "";
         var $lastnote = "";
+        var $active = true; // turn to false to deactivate Performance lines to save Memory
 
         function __construct()
         {
@@ -521,6 +561,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function add($title, $file = '', $type = 'all')
         {
+            if(!$this->active) return;
             // Hidding full path (security)
             $file = str_replace($_SERVER['DOCUMENT_ROOT'], '', $file);
 
@@ -530,6 +571,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->deep++;
                 $line = "{$this->spaces}[$type";
                 $this->lastnote = 'note';
+                $this->data['lastMicrotime_'.$this->deep] = microtime(true);
             }
             else $line = $this->data['lastIndex'] . ' [';
 
@@ -537,7 +579,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $_time = microtime(TRUE) - $this->data['lastMicrotime'];
             if ($type == 'all' || $type == 'endnote' || $type == 'time' || (isset($_GET['data']) && $_GET['data'] == $this->data['lastIndex'])) {
-                $line .=  (round($_time, 3)) . ' secs';
+                if(isset($this->data['lastMicrotime_'.$this->deep]))
+                    $_time = microtime(TRUE) - $this->data['lastMicrotime_'.$this->deep];
+
+                $line .=  (round($_time, 4)) . ' secs';
                 $this->data['lastMicrotime'] = microtime(TRUE);
             }
 
@@ -549,7 +594,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $line .= '] ' . $title;
 
             $line = (($type != 'note') ? '['
-                    . (round(microtime(TRUE) - $this->data['initMicrotime'], 3)) . ' secs, '
+                    . (round(microtime(TRUE) - $this->data['initMicrotime'], 4)) . ' secs, '
                     . number_format(round(memory_get_usage() / (1024 * 1024), 3), 3) . ' Mb] / '
                     : '') . $line . $file;
 
@@ -592,6 +637,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function init($spacename, $key)
         {
+            if(!$this->active) return;
             $this->data['init'][$spacename][$key]['mem'] = memory_get_usage();
             $this->data['init'][$spacename][$key]['time'] = microtime(TRUE);
             $this->data['init'][$spacename][$key]['ok'] = TRUE;
@@ -599,6 +645,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         function end($spacename, $key, $ok = TRUE, $msg = FALSE)
         {
+            if(!$this->active) return;
             // Verify indexes
             if(!isset($this->data['init'][$spacename][$key])) {
                 $this->data['init'][$spacename][$key] = [];
@@ -617,21 +664,43 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
      */
     class CoreSession
     {
+        /** @var bool $start says if the session has been started */
         var $start = false;
+        /** @var string $id Id of the session */
         var $id = '';
+        /** @var bool $debug if true the class will send to $core->logs the use of the methods*/
+        var $debug = false;
+        /** @var Core7 $core */
+        var $core;
 
-        function __construct()
+        /**
+         * CoreSession constructor
+         * @param Core7 $core Core7 class passed by reference
+         * @param null $debug if true it will send to $core->logs the use of the methods
+         */
+        function __construct(Core7 &$core,$debug=null)
         {
+            $this->core = $core;
+            //region SET $this->>debug. Activate debug based on $debug or if I am in development (local environgmnet)
+            if(null !== $debug) $this->debug = true === $debug;
+            else if($this->core->is->development()) $this->debug = true;
+            //endregion
+
+            //region VERIFY the session is currently active
             if(session_status() == PHP_SESSION_ACTIVE) {
                 $this->id = session_id();
                 $this->start = true;
             }
+            //endregion
 
         }
 
+        /**
+         * init the session
+         * @param string $id optional paramater to assign a session_id
+         */
         function init($id = '')
         {
-
             // If they pass a session id I will use it.
             if (!empty($id)) {
                 $this->id = '';
@@ -657,8 +726,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Initiated.
             $this->start = true;
+
+            if($this->debug)
+                $this->core->logs->add("init(). id: {$this->id}",'CoreSession');
+
         }
 
+        /**
+         * get a variable from session
+         * @param $var
+         * @return mixed|null
+         */
         function get($var)
         {
             if (!$this->start) $this->init();
@@ -666,23 +744,43 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 try {
                     $ret = unserialize(gzuncompress($_SESSION['CloudSessionVar_' . $var]));
                 } catch (Exception $e) {
+                    if($this->debug)
+                        $this->core->logs->add("get('\$var=$var') Exception: ".$e->getMessage(),'CoreSession');
                     return null;
                 }
+                if($this->debug)
+                    $this->core->logs->add("get('\$var=$var') found",'CoreSession');
                 return $ret;
             }
+            if($this->debug)
+                $this->core->logs->add("get('\$var=$var') not-found",'CoreSession');
+
             return null;
         }
 
+        /**
+         * set a variable from session
+         * @param $var
+         * @param $value
+         */
         function set($var, $value)
         {
             if (!$this->start) $this->init();
             $_SESSION['CloudSessionVar_' . $var] = gzcompress(serialize($value));
+            if($this->debug)
+                $this->core->logs->add("set('\$var=$var') ok",'CoreSession');
         }
 
+        /**
+         * delete a variable from session
+         * @param $var
+         */
         function delete($var)
         {
             if (!$this->start) $this->init();
             unset($_SESSION['CloudSessionVar_' . $var]);
+            if($this->debug)
+                $this->core->logs->add("delete('\$var=$var') ok",'CoreSession');
         }
     }
 
@@ -933,12 +1031,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $syslog_type = 'info';  //error, info, warning, notice, debug, critical, alert, emergency
         /** @var Logger|PsrLogger  */
         var $logger = null;
-        var $is_development;
+        var $is_terminal;
+        var $active_lines = true;
 
-        function __construct()
+        function __construct($is_terminal=false)
         {
             global $logger;
             $this->logger= &$logger;
+            $this->is_terminal = $is_terminal;
         }
         /**
          * Reset the log and add an entry in the log.. if syslog_title is passed, also insert a LOG_DEBUG
@@ -967,14 +1067,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 //syslog($syslog_type, $syslog_title.': '. json_encode($data,JSON_FORCE_OBJECT));
                 // Change the data sent to say that the info has been sent to syslog
                 if(is_string($data))
-                    $data = 'SYSLOG ['.$syslog_type.'] '.$syslog_title.': '.$data;
+                    $data = '[syslog:'.$syslog_type.'] '.$syslog_title.': '.$data;
                 else
-                    $data = ['SYSLOG ['.$syslog_type.'] '.$syslog_title=>$data];
+                    $data = ['[syslog:'.$syslog_type.'] '.$syslog_title=>$data];
             }
             // Store in local var.
-            $this->data[] = $data;
-            $this->lines++;
-
+            if($this->active_lines) {
+                $this->data[] = $data;
+                $this->lines++;
+            }
         }
 
         /**
@@ -1047,9 +1148,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         syslog(LOG_INFO,$data);
                         break;
                 }
-                file_put_contents("php://stderr", $syslog_type.': '.$data."\n");
+                if(!$this->is_terminal || !$this->active_lines)
+                    file_put_contents("php://stderr", ' - [log:'.$syslog_type.']: '.$data."\n");
             }
-
         }
 
         /**
@@ -1143,7 +1244,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $dir = '';
         var $error = false;
         var $errorMsg = [];
-        var $log = null;
         var $debug = false;
         var $lastHash = null;
         var $lastExpireTime = null;
@@ -1160,9 +1260,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function __construct(Core7 &$core, $spacename = '',  $path=null, $debug = null)
         {
             $this->core = $core;
-
-            // Asign a CoreLog Class to log
-            $this->log = new CoreLog();
 
             // Initialize $this->spacename
             if (!strlen(trim($spacename))) $spacename = (isset($_SERVER['HTTP_HOST'])) ? $_SERVER['HTTP_HOST'] : $_SERVER['PWD'];
@@ -1254,12 +1351,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(null !== $this->cache) return(is_object($this->cache));
 
             if($this->debug)
-                $this->log->add("init(). type: {$this->type}",'CoreCache');
+                $this->core->logs->add("init(). type: {$this->type}",'CoreCache');
 
             if ($this->type == 'memory') {
                 if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
                     if($this->debug)
-                        $this->log->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
+                        $this->core->logs->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
                     $this->cache=-1;
                     return;
                 } else {
@@ -1269,7 +1366,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $this->cache = new Redis();
                         $this->cache->connect($host, $port);
                     } catch (Exception $e) {
-                        $this->log->add("init(). REDIS connection failed because: ". $e->getMessage(),'CoreCache','warning');
+                        $this->core->logs->add("init(). REDIS connection failed because: ". $e->getMessage(),'CoreCache','warning');
                         unset($this->cache);
                         $this->cache=-1;
                         return;
@@ -1332,7 +1429,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if ($expireTime >= 0 && microtime(true) - $info['_microtime_'] >= $expireTime) {
                     $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('\$key=$key',$expireTime=\$expireTime) failed (because expiration)",'CoreCache');
+                        $this->core->logs->add("get('\$key=$key',$expireTime=\$expireTime) failed (because expiration)",'CoreCache');
                     $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                     return null;
                 }
@@ -1340,7 +1437,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if ('' != $hash && $hash != $info['_hash_']) {
                     $this->delete( $key);
                     if($this->debug)
-                        $this->log->add("get('$key',$expireTime,'\$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+                        $this->core->logs->add("get('$key',$expireTime,'\$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
                     $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                     return null;
@@ -1362,7 +1459,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                             $this->delete( $key);
                             $this->errorSecurity = true;
                             if($this->debug)
-                                $this->log->add("get('$key',$expireTime,'$hash',\$cache_secret_key or \$cache_secret_iv). Wrong \$cache_secret_key or \$cache_secret_iv. Cache key has been deleted because security",'CoreCache');
+                                $this->core->logs->add("get('$key',$expireTime,'$hash',\$cache_secret_key or \$cache_secret_iv). Wrong \$cache_secret_key or \$cache_secret_iv. Cache key has been deleted because security",'CoreCache');
                             $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                             return null;
                         }
@@ -1372,14 +1469,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
 
                 if($this->debug)
-                    $this->log->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned.".$this->spacename . '-' . $key.' [time='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+                    $this->core->logs->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned in namespace ".$this->spacename . ' [time='.round($this->lastExpireTime,2).' ms.]','CoreCache');
 
 
                 $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
                 return $ret;
 
             } else {
-                if($this->debug) $this->log->add("get(\$key=$key) failed (because it does not exist)",'CoreCache');
+                if($this->debug) $this->core->logs->add("get(\$key=$key) failed (because it does not exist)",'CoreCache');
                 $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", 'error', 'endnote');
                 return null;
             }
@@ -1415,7 +1512,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
 
             if($this->debug)
-                $this->log->add("set(\$key={$key},..)".(($hash)?' with $hash,':'').(($cache_secret_key && $cache_secret_iv)?' with $cache_secret_key and $cache_secret_iv':''),'CoreCache');
+                $this->core->logs->add("set(\$key={$key},..)".(($hash)?' with $hash,':'').(($cache_secret_key && $cache_secret_iv)?' with $cache_secret_key and $cache_secret_iv':''),'CoreCache');
 
             unset($info);
             $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", '', 'endnote');
@@ -1437,7 +1534,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             else
                 $this->cache->delete($this->spacename . '-' . $key);
             if($this->debug)
-                $this->log->add("delete(). token: ".$this->spacename . '-' . $key,'CoreCache');
+                $this->core->logs->add("delete(). token: ".$this->spacename . '-' . $key,'CoreCache');
 
             return true;
         }
@@ -2647,7 +2744,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache = null;
         var $cache_key = null;
         var $cache_iv = null;
-        protected $secret_vars = null;
+        var $secret_vars = null;
 
 
         function __construct(Core7 &$core)
@@ -2796,6 +2893,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $erp_user = $this->core->config->get('core.erp.user_id.'.$erp_platform_id);
                 if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
                     $erp_user = $this->core->security->getGoogleEmailAccount();
+                    if($this->core->is->development() && $this->core->is->script()) echo '  - Read $this->core->security->getGoogleEmailAccount() in readERPDeveloperEncryptedSubKeys()';
                 }
                 if(!$erp_user) return($this->addError('readERPDeveloperEncryptedSubKeys(..) missing function-var($erp_user) or config-var(core.erp.user_id.'.$erp_platform_id.'.)'));
             }
@@ -2810,6 +2908,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //region GET from cache $keys if we are in production servers
             if($this->core->is->production())
                 $keys = $this->core->cache->get($key_cache,3600*24,date('Y-m-d'));
+            else
+                $keys = $this->core->session->get($key_cache);
             //endregion
 
             //region CALL $url and SET $keys if empty $keys
@@ -2823,6 +2923,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 //region SAVE from cache $keys if we are in production servers
                 if($this->core->is->production())
                     $this->core->cache->set($key_cache,$keys,date('Y-m-d'));
+                else
+                    $this->core->session->set($key_cache,$keys);
                 //endregion
             }
             //endregion
@@ -2999,7 +3101,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function getGoogleEmailAccount() {
             if($this->core->is->development()) {
-                $gcloud_auth_list = 'gcloud auth list';
+                $gcloud_auth_list = 'gcloud auth list 2>/dev/null';
                 $auth_list = shell_exec($gcloud_auth_list);
                 if(!$auth_list) return($this->addError("'{$gcloud_auth_list}' has produced an error. Install gcloud or check gcloud auth login"));
                 $lines = explode("\n",$auth_list);
@@ -4258,7 +4360,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $_time = microtime(TRUE);
             if($this->sendSysLogs)
-                $this->core->logs->sendToSysLog("curl request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+                $this->core->logs->add("curl request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'),'CoreRequest');
 
             $this->core->__p->add('Request->getCurl: ', "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             $route = $this->getServiceUrl($route);
@@ -4362,7 +4464,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             if($this->sendSysLogs) {
                 $_time = round(microtime(TRUE) -$_time,4);
-                $this->core->logs->sendToSysLog("end curl request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." {$_time} secs",(($this->error)?'debug':'info'));
+                $this->core->logs->add("end curl request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." {$_time} secs",(($this->error)?'debug':'info'),'CoreRequest');
             }
 
             $this->core->__p->add('Request->getCurl: ', '', 'endnote');
@@ -4566,14 +4668,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function call($route, $data = null, $verb = 'GET', $extra_headers = null, $raw = false)
         {
             $_time = microtime(TRUE);
+            $this->core->__p->add("Request->{$verb}: ", "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
+
             $route = $this->getServiceUrl($route);
             $this->responseHeaders = null;
 
             if($this->sendSysLogs)
-                $this->core->logs->sendToSysLog("request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
+                $this->core->logs->add("request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'),'CoreRequest');
             //syslog(LOG_INFO,"request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
-            $this->core->__p->add("Request->{$verb}: ", "$route " . (($data === null) ? '{no params}' : '{with params}'), 'note');
             // Performance for connections
             $options = $this->default_options;
             $options['http']['header'] = 'Connection: close' . "\r\n";
@@ -4738,12 +4841,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             if($this->sendSysLogs) {
                 $_time = round(microtime(TRUE) -$_time,4);
-                $this->core->logs->sendToSysLog("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." {$_time} secs",(($this->error)?'debug':'info'));
+                $this->core->logs->add("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." - {$code} [{$_time} secs]",'CoreRequest');
             }
+            $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
+
 
             //syslog(($this->error)?LOG_DEBUG:LOG_INFO,"end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}'));
 
-            $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
             return ($ret);
         }
 

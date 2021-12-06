@@ -14,11 +14,10 @@ $core = new Core7();
 if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.user_id.'.$core->config->get('core.erp.platform_id'))) {
     $config_erp_user_tag = 'core.erp.user_id.'.$core->config->get('core.erp.platform_id');
     if(!($user = $core->cache->get($config_erp_user_tag))) {
+        $core->logs->add('Because it is not in cache, execute $core->security->getGoogleEmailAccount() to get the default GCP user','CloudFrameWork.ERP');
         $user = $core->security->getGoogleEmailAccount();
         if($user) {
             $core->cache->set($config_erp_user_tag,$user);
-            $core->logs->add('ERP user assigned: '.$user,$config_erp_user_tag);
-            if($core->is->development()) echo 'ERP user assigned: '.$user."\n----\n\n";
         }
     }
     if($core->is->development() && !$user) {
@@ -28,6 +27,8 @@ if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.u
         exit;
     }
     $core->config->set($config_erp_user_tag,$user);
+    $core->logs->add("'{$config_erp_user_tag}' config var assigned for ERP user to [{$user}]",'CloudFrameWork.ERP');
+
 }
 //endregion
 
