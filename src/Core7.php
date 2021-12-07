@@ -71,6 +71,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $core->logs->add('gzuncompress() failed. Potential wrong credentials in CoreCache->get() or wrong content in CoreSession->get()','gzumcompress','warning');
                 return;
             }
+            //Catch StreamWrapper::stream_set_option
+            if ($errno == E_WARNING && $errstr == 'gzuncompress(): data error' && strpos($errfile,'Core7.php')) {
+                $core->logs->add('gzuncompress() failed. Potential wrong credentials in CoreCache->get() or wrong content in CoreSession->get()','gzumcompress','warning');
+                return;
+            }
 
             if($core)
                 $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
