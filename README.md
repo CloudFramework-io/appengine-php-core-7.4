@@ -1,14 +1,14 @@
 # appengine-php-core-7.4
 CloudFrameWork.io / APPENGINE PHP 7.4 Framework
 ```
-composer require cloudframework-io/appengine-php-core-7.3
+composer require cloudframework-io/appengine-php-core-7.4
 ```
 
 ## Google Cloud
 * https://cloud.google.com/appengine/docs/standard/php7/runtime?hl=id
 
 ## Package
-https://packagist.org/packages/cloudframework-io/appengine-php-core-7.3
+https://packagist.org/packages/cloudframework-io/appengine-php-core-7.4
 
 ## Memorystore. Install REDIS to manage Memory Cache
 In php7 we have lost MemoryCache :(. To solve it Google provide a 

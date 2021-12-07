@@ -1,7 +1,7 @@
 {
   "name": "cloudframework-io/appengine-php-core-7.4",
   "keywords": ["appengine", "google", "framework", "sql", "cloud datastore", "nosql","mysql","mongo","gcp","bigquery","gae","cloudframwork"],
-  "description": "Framework to develop APIs and web applications optimized for Google Appengine PHP 7.3",
+  "description": "Framework to develop APIs and web applications optimized for Google Appengine PHP 7.4",
   "type":"library",
   "minimum-stability": "stable",
   "license": "MIT",

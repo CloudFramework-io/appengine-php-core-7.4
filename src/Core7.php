@@ -106,7 +106,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00072';
+        var $_version = 'v74.00073';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -478,8 +478,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // only setup datastorage if gc_project_id
             if($this->gc_project_id) {
-                $this->gc_datastorage_client = new StorageClient(['projectId' => $this->gc_project_id]);
-                $this->gc_datastorage_client->registerStreamWrapper();
+                if(!isset($_GET['_no_register_stream_wrapper'])) {
+                    $this->gc_datastorage_client = new StorageClient(['projectId' => $this->gc_project_id]);
+                    $this->gc_datastorage_client->registerStreamWrapper();
+                }
             }
         }
 
