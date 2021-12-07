@@ -1,5 +1,5 @@
-# appengine-php-core-7.3
-CloudFrameWork.io / APPENGINE PHP 7.3 Framework
+# appengine-php-core-7.4
+CloudFrameWork.io / APPENGINE PHP 7.4 Framework
 ```
 composer require cloudframework-io/appengine-php-core-7.3
 ```

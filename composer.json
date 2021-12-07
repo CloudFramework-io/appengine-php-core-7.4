@@ -6,14 +6,14 @@
   "minimum-stability": "stable",
   "license": "MIT",
   "require": {
-    "google/cloud-datastore": "^1.11",
-    "google/cloud-storage": "^1.18",
-    "google/cloud-logging": "^1.19",
-    "google/apiclient": "^2.4",
-    "google/cloud-tasks": "^1.6",
-    "google/cloud-bigquery": "^1.16",
-    "google/cloud-secret-manager": "^1.0",
-    "zbateson/mail-mime-parser": "^1.2",
+    "google/cloud-datastore": "^1.13",
+    "google/cloud-storage": "^1.25",
+    "google/cloud-logging": "^1.22",
+    "google/apiclient": "^2.12",
+    "google/cloud-tasks": "^1.9",
+    "google/cloud-bigquery": "^1.23",
+    "google/cloud-secret-manager": "^1.7",
+    "zbateson/mail-mime-parser": "^2.1",
     "google/cloud-pubsub": "^1.34"
   },
   "authors": [

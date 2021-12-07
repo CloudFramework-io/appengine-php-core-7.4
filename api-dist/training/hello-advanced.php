@@ -1,21 +1,42 @@
 <?php
-
+/**
+ * Basic structure for a CloudFramework API
+ * last-update 2021-12
+ * Author: CloudFramework.io
+ */
 class API extends RESTful
 {
+    var $end_point= '';
     function main()
     {
+        //You can restrict methods in main level
+        if(!$this->checkMethod('GET,POST,PUT,DELETE')) return;
+
         //Call internal ENDPOINT_$end_point
-        $end_point = (isset($this->params[1]))?str_replace('-','_',$this->params[1]):'default';
-        if(!$this->useFunction('ENDPOINT_'.$end_point)) {
-            return($this->setErrorFromCodelib('params-error',"/{$this->params[0]}/{$end_point} is not implemented"));
+        $this->end_point = str_replace('-','_',$this->params[1] ?? 'default');
+        if(!$this->useFunction('ENDPOINT_'.$this->end_point)) {
+            return($this->setErrorFromCodelib('params-error',"/{$this->params[0]}/{$this->end_point} is not implemented"));
         }
     }
 
     /**
-     * Endpoint to add a default feature
+     * Endpoint to add a default feature. We suggest to use this endpoint to explain how to use other endpoints
      */
     public function ENDPOINT_default()
     {
+        // return Data in json format by default
+        $this->addReturnData("use /training/{$this->end_point}/world");
+    }
+
+    /**
+     * Endpoint to show Hello World message
+     */
+    public function ENDPOINT_world()
+    {
+        //You can restrict methods in endpoint level
+        if(!$this->checkMethod('GET,POST,PUT,DELETE')) return;
+
+        // return Data in json format by default
         $this->addReturnData('Advanced hello World');
     }
 }
