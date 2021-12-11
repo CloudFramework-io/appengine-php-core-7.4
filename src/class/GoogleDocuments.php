@@ -31,8 +31,9 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
         var $errorMsg = [];
 
         /**
-         * Constructor
-         *
+         * CloudFramework GoogleDocument class
+         * @param Core7 $core
+         * @param array $config
          */
         function __construct(Core7 &$core, $config = [])
         {
@@ -279,6 +280,28 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
                     ,'spreadsheetId'=>$update->getSpreadsheetId()
                     ,'url'=>'https://docs.google.com/spreadsheets/d/'.$update->getSpreadsheetId()
                 ];
+                return $ret;
+            } catch (Exception $e) {
+                $this->addError(['code'=>$e->getCode(),'message'=>$e->getMessage()]);
+                return false;
+            }
+        }
+
+        /**
+         * Read data from  SpreadSheet
+         * The error codes can be: 404 = not found, 403 = insufficient permissions
+         * @param string $fileId
+         * @param string $range Where to start the update
+         * @return array|void
+         */
+        public function readSpreadSheet($fileId,$range='A1') {
+
+            try {
+                $result = $this->spreedsheet->spreadsheets_values->get($fileId,$range);
+                $ret = [];
+                foreach ($result as $item) {
+                    $ret[] = $item;
+                }
                 return $ret;
             } catch (Exception $e) {
                 $this->addError(['code'=>$e->getCode(),'message'=>$e->getMessage()]);

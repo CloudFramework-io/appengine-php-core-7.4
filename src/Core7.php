@@ -697,6 +697,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(session_status() == PHP_SESSION_ACTIVE) {
                 $this->id = session_id();
                 $this->start = true;
+                if($this->core->is->development() && $this->core->is->terminal()) {
+                    $this->core->logs->add("__construct. id [{$this->id}]",'CoreSession');
+                }
             }
             //endregion
 
@@ -735,7 +738,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->start = true;
 
             if($this->debug)
-                $this->core->logs->add("init(). id: {$this->id}",'CoreSession');
+                $this->core->logs->add("init(). id [{$this->id}]",'CoreSession');
 
         }
 
@@ -2983,6 +2986,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function getERPSecretVar($var, string $erp_secret_id='', string $erp_platform_id='', string $erp_user='') {
             if($this->secret_vars ===null) if(!$this->readERPSecretVars($erp_secret_id,$erp_platform_id,$erp_user)) return;
+            return $this->secret_vars['secrets'][$var]??null;
         }
 
         /**

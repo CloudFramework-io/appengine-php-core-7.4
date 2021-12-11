@@ -15,23 +15,29 @@ echo "CloudFramWork (CFW) Core7.Script ".$core->_version."\n";
 
 
 //region IF core.erp.platform_id READ user email/id account
-if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.user_id.'.$core->config->get('core.erp.platform_id'))) {
-    $config_erp_user_tag = 'core.erp.user_id.'.$core->config->get('core.erp.platform_id');
-    if(!($user = $core->cache->get($config_erp_user_tag))) {
-        echo ' - Because it is not in cache, executd $core->security->getGoogleEmailAccount() to get the default GCP user'."\n";
-        $user = $core->security->getGoogleEmailAccount();
-        if($user) {
-            $core->cache->set($config_erp_user_tag,$user);
+if($core->config->get('core.erp.platform_id')) {
+    echo " - ERP Integration [on] because 'core.erp.platform_id' config-var exist: [".$core->config->get('core.erp.platform_id')."]\n";
+    $config_erp_user_tag = 'core.erp.user_id.' . $core->config->get('core.erp.platform_id');
+
+    if (!$core->config->get($config_erp_user_tag)) {
+        if (!($user = $core->cache->get($config_erp_user_tag))) {
+            echo ' - Because it is not in cache, executd $core->security->getGoogleEmailAccount() to get the default GCP user' . "\n";
+            $user = $core->security->getGoogleEmailAccount();
+            if ($user) {
+                $core->cache->set($config_erp_user_tag, $user);
+            }
         }
+        if (!$user) {
+            echo "You have configured core.erp.platform_id=" . $core->config->get('core.erp.platform_id') . "\n";
+            echo "but you do not have an ACTIVE gcloud auth user. Execute 'gcloud auth login' to activate an account to be used as ERP user access\n";
+            echo "-----\n\n";
+            exit;
+        }
+        $core->config->set($config_erp_user_tag, $user);
+        echo " - ERP user dynamically loaded in '{$config_erp_user_tag}' config-var assigned [{$user}]\n";
+    } else {
+        echo " - ERP user defined in '{$config_erp_user_tag}' config-var [".$core->config->get($config_erp_user_tag)."]\n";
     }
-    if(!$user) {
-        echo "You have configured core.erp.platform_id=".$core->config->get('core.erp.platform_id')."\n";
-        echo "but you do not have an ACTIVE gcloud auth user. Execute 'gcloud auth login' to activate an account to be used as ERP user access\n";
-        echo "-----\n\n";
-        exit;
-    }
-    $core->config->set($config_erp_user_tag,$user);
-    echo " - '{$config_erp_user_tag}' config var assigned for ERP user to [{$user}]\n";
 }
 //endregion
 
@@ -75,10 +81,13 @@ $show_path = str_replace($rootPath,'.',$path);
 echo " - root_path: {$rootPath}\n - app_path: {$show_path}".(($core->config->get('core.scripts.path'))?" set in config var: 'core.scripts.path'":'')."\n";
 if(!$script_name) die (' - !!! Missing Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
 echo " - script: {$show_path}/{$script_name}.php\n";
+echo " - Initial Logs:\n";
+echo "   #".implode("\n   #",$core->logs->data)."\n";
+$core->logs->reset();
 //endregion
 
 
-echo "------------------------------\n";
+echo "\n##########################\n";
 
 //region SET $options,
 $options = ['performance'=>in_array('--p',$argv)];
@@ -112,16 +121,12 @@ try {
     $run->addError(error_get_last());
     $run->addError($e->getMessage());
 }
-echo "\n------------------------------\n";
+echo "\n##########################\n";
 //endregion
 
 //region EVALUATE to show logs and errors and end the scrpit
-if($core->errors->lines) {
-    $run->sendTerminal(['errors'=>$core->errors->data]);
-    $run->sendTerminal(' - Script: Error');
-}
-else $run->sendTerminal(' - Script: OK');
-if($core->logs->lines) {
+
+if($core->logs->lines && ($core->errors->lines || isset($run->formParams['__logs']))) {
     $run->sendTerminal("\n----------- LOGS -------------");
     $run->sendTerminal($core->logs->data);
     $run->sendTerminal("-----------/LOGS -------------");
@@ -132,5 +137,16 @@ if($options['performance'] || isset($run->formParams['__p'])) {
     $run->sendTerminal($core->__p->data['info']);
     $run->sendTerminal("--------/PERFORMANCE ---------");
 }
+if($core->errors->lines) {
+    $run->sendTerminal("\n----------- ERRORS -------------");
+    echo "ERRORS:\n";
+    foreach ($core->errors->data as $datum) {
+        echo " - ".json_encode($datum)."\n";
+
+    }
+    $run->sendTerminal("\n-----------/ERRORS -------------");
+    $run->sendTerminal('Script: Error');
+}
+else $run->sendTerminal('Script: OK');
 echo 'SCRIPT execution time: '.round(microtime(true)-$time,4).'secs'."\n";
 //endregion
