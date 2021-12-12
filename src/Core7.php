@@ -111,7 +111,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00124';
+        var $_version = 'v74.00125';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -3057,7 +3057,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region CALL secret CF API and set $user_secrets['secrets']
             if($erp_secret_id!=$user_secrets['id']){
-                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/secret-with-my-token/'.$user_secrets['id'].'/'.$erp_secret_id;
+                $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/system-secrets/'.$user_secrets['id'].'/'.$erp_secret_id;
             }
             else{
                 $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-secrets/'.$user_secrets['id'];
