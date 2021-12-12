@@ -10,6 +10,8 @@ if(!is_dir("./local_data")) mkdir($_root_path.'/local_data');
 if(!is_dir("./local_data/cache")) mkdir($_root_path.'/local_data/cache');
 if(!is_dir("./local_data/cache")) die('ERROR trying to create [./local_data/cache]. Verify privileges');
 
+echo " - Rewriting composer.json\n";
+copy("vendor/cloudframework-io/appengine-php-core-7.4/composer-dist.json", "./composer.json");
 
 echo " - Copying /api examples\n";
 if(!is_dir("./api")) mkdir('api');
@@ -18,11 +20,6 @@ shell_exec("cp -Ra vendor/cloudframework-io/appengine-php-core-7.4/api-dist/* ap
 echo " - Copying /scripts examples\n";
 if(!is_dir("./scripts")) mkdir('scripts');
 shell_exec("cp -Ra vendor/cloudframework-io/appengine-php-core-7.4/scripts-dist/* scripts");
-
-if(!is_file('./composer.json')) {
-    echo " - Copying composer.json\n";
-    copy("vendor/cloudframework-io/appengine-php-core-7.4/composer-dist.json", "./composer.json");
-} else echo " - Already exist composer.json\n";
 
 if(!is_file('./config.json')) {
     echo " - Copying composer.json\n";
@@ -48,14 +45,3 @@ if(!is_file('./README.md')) {
     echo " - Copying README.md\n";
     copy("vendor/cloudframework-io/appengine-php-core-7.4/README-dist.md", "./README.md");
 } else echo " - Already exist README.md\n";
-
-
-/*
-cp vendor/cloudframework-io/appengine-php-core-7.4/composer-dist.json composer.json
-cp vendor/cloudframework-io/appengine-php-core-7.4/config-dist.json config.json
-cp vendor/cloudframework-io/appengine-php-core-7.4/app-dist.yaml app.yaml
-cp vendor/cloudframework-io/appengine-php-core-7.4/.gitignore .
-cp vendor/cloudframework-io/appengine-php-core-7.4/.gcloudignore .
-cp -Ra vendor/cloudframework-io/appengine-php-core-7.4/api-dist api
-cp -Ra vendor/cloudframework-io/appengine-php-core-7.4/scripts-dist scripts
-cp -Ra vendor/cloudframework-io/appengine-php-core-7.4/README-dist.md README.md*/
