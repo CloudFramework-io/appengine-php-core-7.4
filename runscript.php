@@ -12,8 +12,6 @@ $core = new Core7($rootPath);
 echo "CloudFramWork (CFW) Core7.Script ".$core->_version."\n";
 //endregion
 
-
-
 //region IF core.erp.platform_id READ user email/id account
 if($core->config->get('core.erp.platform_id')) {
     echo " - ERP Integration [on] because 'core.erp.platform_id' config-var exist: [".$core->config->get('core.erp.platform_id')."]\n";
@@ -21,7 +19,7 @@ if($core->config->get('core.erp.platform_id')) {
 
     if (!$core->config->get($config_erp_user_tag)) {
         if (!($user = $core->cache->get($config_erp_user_tag))) {
-            echo ' - Because it is not in cache, executd $core->security->getGoogleEmailAccount() to get the default GCP user' . "\n";
+            echo ' - Because it is not in cache, execute $core->security->getGoogleEmailAccount() to get the default GCP user' . "\n";
             $user = $core->security->getGoogleEmailAccount();
             if ($user) {
                 $core->cache->set($config_erp_user_tag, $user);
@@ -55,6 +53,9 @@ if((getenv('PROJECT_ID') || $core->config->get("core.gcp.datastore.project_id"))
 $script = [];
 $path='';
 if(count($argv)>1) {
+    // allow to specify the endpoint with a space
+    if(isset($argv[2]) && strpos($argv[2],'-')!==0 && strpos($argv[1],'/')===false && strpos($argv[1],'?')===false) $argv[1].='/'.$argv[2];
+
     if(strpos($argv[1],'?'))
         list($script, $formParams) = explode('?', str_replace('..', '', $argv[1]), 2);
     else {

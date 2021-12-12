@@ -1,24 +1,29 @@
 {
-  "--": "API Configuration",
+  "--:API": "API Configuration",
   "core.api.urls": ["/"],
 
-  "--": "--- DATA REPOSITORIES ---",
-  "--": "Datastore Configuration",
-  "core.datastore.on": false,
-  "core.gcp.datastore.project_id": "cloudframework-devoteam",
-  "core.gcp.datastore.transport": "rest",
-  "--": "Datastorage Configuration",
-  "core.datastorage.on": false,
-  "core.gcp.datastorage.project_id": "cloudframework-devoteam",
-  "--": "Bigquery Configuration",
-  "core.bigquery.on": false,
-  "core.gcp.bigquery.project_id": "cloudframework-devoteam",
+  "--:ERP": "--- ERP Configuration ---",
+  "core.erp.platform_id": "",
 
-  "--": " --- REWRITE variables when you are DEVELOPING ---",
+  "--:GCP": "--- GCP CONFIGURATION ---",
+  "core.gcp.project_id": "cloudframework-academy",
+    "--:DATA": "--- DATA REPOSITORIES ---",
+    "--:Datastore": "Datastore Configuration",
+    "core.datastore.on": false,
+    "core.gcp.datastore.project_id": "",
+    "core.gcp.datastore.transport": "rest",
+    "--:Datastorage": "Datastorage Configuration",
+    "core.datastorage.on": false,
+    "core.gcp.datastorage.project_id": "",
+    "--:Bigquery": "Bigquery Configuration",
+    "core.bigquery.on": false,
+    "core.gcp.bigquery.project_id": "",
+
+  "--:Local Development": " --- REWRITE variables when you are DEVELOPING ---",
   "development: Vars to work in development": {
-    "--": "Variables when you are developing in your computer or development environment",
-    "--": "To get access DATA REPOSITORY use: export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/local_data/service-account.json",
-    "--": "Use cache in directory to avoid installing REDIS when you are developing",
+    "--:comment1": "Variables when you are developing in your computer or development environment",
+    "--:comment2": "To get access DATA REPOSITORY use: export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/local_data/service-account.json",
+    "--:comment3": "Use cache in directory to avoid installing REDIS when you are developing",
     "core.cache.cache_path": "{{rootPath}}/local_data/cache"
   }
 }

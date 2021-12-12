@@ -6,7 +6,7 @@ if (!defined("_RESTfull_CLASS_")) {
 
     class RESTful
     {
-
+        var $apiName ='';
         var $formParams = array();
         var $rawData = array();
         var $params = array();

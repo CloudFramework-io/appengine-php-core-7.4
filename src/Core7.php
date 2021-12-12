@@ -111,7 +111,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00091';
+        var $_version = 'v74.00121';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -302,9 +302,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         }
 
                         $api->send();
-
-                        die('eee');
-
 
                     } else {
                         $api = new RESTful($this);
@@ -800,7 +797,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
      */
     class CoreSystem
     {
-        var $url, $app,$root_path, $app_path, $app_url,$script_path;
+        var $url, $app,$root_path, $app_path, $app_url,$script_path,$api_path;
         var $config = [];
         var $ip, $user_agent, $os, $lang, $format, $time_zone;
         var $geo;
@@ -876,6 +873,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // Script path for terminal
             $this->script_path = $this->app_path.'/scripts';
+            $this->api_path = $this->app_path.'/api';
 
         }
 
@@ -2014,8 +2012,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->cache_secret_key=$this->get('core.gcp.secrets.cache_encrypt_key');
             $this->cache_secret_iv=$this->get('core.gcp.secrets.cache_encrypt_iv');
 
-            // Update $this->get('core.scripts.path')
+            // Update $this->get('core.scripts.path') and $this->get('core.api.path')
             if($this->get('core.scripts.path')) $this->core->system->script_path = $this->get('core.scripts.path');
+            if($this->get('core.api.path')) $this->core->system->api_path = $this->get('core.api.path');
 
         }
 
@@ -2191,6 +2190,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     list($tagcode, $tagvalue) = explode(":", $cond, 2);
                     $tagcode = trim($tagcode);
                     $tagvalue = trim($tagvalue);
+                    if($tagcode=='--') continue;
 
                     if ($this->isConditionalTag($tagcode))
                         $include = $this->getConditionalTagResult($tagcode, $tagvalue);

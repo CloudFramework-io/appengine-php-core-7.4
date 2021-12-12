@@ -1,7 +1,7 @@
 runtime: php74
 
 # the default is to serve your app using `public/index.php` or `index.php`
-entrypoint: serve  vendor/cloudframework-io/appengine-php-core-7.3/src/dispatcher.php
+entrypoint: serve  vendor/cloudframework-io/appengine-php-core-7.4/src/dispatcher.php
 
 handlers:
 

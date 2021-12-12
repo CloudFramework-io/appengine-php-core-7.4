@@ -5,20 +5,25 @@
  */
 class Script extends Scripts2020
 {
+
+    var $script = '';   // value of the script to execute: training/hello
+    var $method = '';   // value of the method in the script world
+
     /**
      * This function is executed as the main method of the class
      */
     function main()
     {
-        // We take parameter 1 to stablish the method to call when you execute: composer script hello/parameter-1/parameter-2/..
-        // If the parameter 1 is empty we assign default by default :)
-        $method = (isset($this->params[1])) ? $this->params[1] : 'default';
+
+        // We take parameter 2 to stablish the method to call when you execute: composer script hello/parameter-1/parameter-2/..
+        // If the parameter 2 is empty we assign default by default :)
+        $this->script = "{$this->params[0]}";
+        $this->method = (isset($this->params[1])) ? $this->params[1] : 'default';
         // we convert - by _ because a method name does not allow '-' symbol
-        $method = str_replace('-', '_', $method);
 
         //Call internal ENDPOINT_{$method}
-        if (!$this->useFunction('METHOD_' . $method)) {
-            return ($this->setErrorFromCodelib('params-error', "/{$method} is not implemented"));
+        if (!$this->useFunction('METHOD_' . str_replace('-', '_', $this->method))) {
+            return ($this->setErrorFromCodelib('params-error', "/{$this->script}/{$this->method} is not implemented"));
         }
     }
 
@@ -27,8 +32,13 @@ class Script extends Scripts2020
      */
     function METHOD_default()
     {
-        $this->sendTerminal("Available methods (use {$this->params[0]}/{method}):");
-        $this->sendTerminal(" - {$this->params[0]}/hello");
+        $this->sendTerminal("Available methods (use {$this->script}/{method}):");
+        $this->sendTerminal(" - {$this->script}/default");
+        $this->sendTerminal(" - {$this->script}/hello");
+        $this->sendTerminal("Current url-paramaters: ");
+        $this->sendTerminal($this->params);
+        $this->sendTerminal("Current formParameters: ");
+        $this->sendTerminal($this->formParams);
     }
 
     /**
@@ -37,6 +47,5 @@ class Script extends Scripts2020
     function METHOD_hello()
     {
         $this->sendTerminal('This is a Hello World :)');
-
     }
 }

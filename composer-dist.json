@@ -2,12 +2,21 @@
   "name": "company-name/project-name",
   "description": "Your description. More info https://www.notion.so/cloudframework/appengine-php-core20-74c573448dc94ebba7e51fc86b8ad9cb",
   "require": {
-    "cloudframework-io/appengine-php-core-7.4": "^v74.00091"
+    "cloudframework-io/appengine-php-core-7.4": "^v74.00121"
   },
   "scripts": {
     "clean": [
       "[ -d ./local_data ] && echo \"creating ./local_data\" || mkdir  ./local_data ",
       "[ -d ./local_data/cache ] && rm -rf ./local_data/cache/* && echo \"cleaning ./local_data/cache\"  || mkdir  ./local_data/cache "
+    ],
+    "setup": [
+      "php vendor/cloudframework-io/appengine-php-core-7.4/runscript.php _setup"
+    ],
+    "create-script": [
+      "php vendor/cloudframework-io/appengine-php-core-7.4/runscript.php _create_script"
+    ],
+    "create-api": [
+      "php vendor/cloudframework-io/appengine-php-core-7.4/runscript.php _create_api"
     ],
     "credentials": [
       "@clean",
@@ -17,10 +26,10 @@
       "echo \"Add in config.json -> \\\"core.gcp.project_id\\\":\\\"<your-gcp-project-id>\\\"\""
     ],
     "serve": [
-      "php -S 0.0.0.0:8080 vendor/cloudframework-io/appengine-php-core-7.3/src/dispatcher.php"
+      "php -S 0.0.0.0:8080 vendor/cloudframework-io/appengine-php-core-7.4/src/dispatcher.php"
     ],
     "script": [
-      "php vendor/cloudframework-io/appengine-php-core-7.3/runscript.php"
+      "php vendor/cloudframework-io/appengine-php-core-7.4/runscript.php"
     ]
   },
   "config": {
