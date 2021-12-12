@@ -80,7 +80,7 @@ $show_path = str_replace($rootPath,'.',$path);
 
 //region CHECK if $script_name is empty
 echo " - root_path: {$rootPath}\n - app_path: {$show_path}".(($core->config->get('core.scripts.path'))?" set in config var: 'core.scripts.path'":'')."\n";
-if(!$script_name) die (' - !!! Missing Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
+if(!isset($script_name) || !$script_name) die (' - !!! Missing Script name: Use php vendor/cloudframework-io/appengine-php-core/runscript.php {script_name}[/params[?formParams]] [--options]'."\n\n");
 echo " - script: {$show_path}/{$script_name}.php\n";
 echo " - Initial Logs:\n";
 echo "   #".implode("\n   #",$core->logs->data)."\n";
