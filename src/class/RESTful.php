@@ -792,7 +792,6 @@ if (!defined("_RESTfull_CLASS_")) {
             }
         }
 
-
         /**
          * Echo the result
          * @param bool $pretty if true, returns the JSON string with JSON_PRETTY_PRINT

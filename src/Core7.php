@@ -111,7 +111,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00125';
+        var $_version = 'v74.00141';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -536,6 +536,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             return $arr;
         }
+
     }
 
     /**
@@ -2916,10 +2917,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region GET from cache $keys if we are in production servers
-            if($this->core->is->production())
+            // In production we store data in cache
+            if($this->core->is->production()){
                 $keys = $this->core->cache->get($key_cache,3600*24,date('Y-m-d'));
-            else
+            }
+            // In development (localhost) we store in session
+            else {
                 $keys = $this->core->session->get($key_cache);
+            }
             //endregion
 
             //region CALL $url and SET $keys if empty $keys
