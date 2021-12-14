@@ -2,7 +2,7 @@
 /**
  * CloudFramework Download GS Files v74.0014 stored in Datastore tokens
  * author: hl@cloudframework.io
- * Based in "cloudframework-io/appengine-php-core-7.4": "^v74.00141"
+ * Based in "cloudframework-io/appengine-php-core-7.4": "^v74.00143"
  */
 class GSDownloadFiles
 {
@@ -54,6 +54,7 @@ class GSDownloadFiles
             exit;
         }
 
+        $data['max_seconds']=99999;
         if($data['max_seconds']>60*15) $data['max_seconds']=60*15;
         $time = microtime(true)-$data['microtime'];
         if($time>$data['max_seconds']) {
@@ -62,6 +63,8 @@ class GSDownloadFiles
             echo "<h1 align='center'> <font color='red'>This token has expired. </font></h1>";
             exit;
         }
+
+        $data['max_downloads']++;
 
         if($data['max_downloads']<=0) {
             // Log cache get
@@ -94,7 +97,6 @@ class GSDownloadFiles
      */
     public function downloadBigFileForWeb(array $data)
     {
-
         //region CHECK if isset($data['gs_url'])
         if(!isset($data['gs_url'])) return($this->addError('downloadBigFileForWeb(array $data) missing $data["url"]'));
         $gsurl = $data['gs_url']; // Get URL gs:// xxxxx
@@ -108,8 +110,12 @@ class GSDownloadFiles
             'version'=>'v4'
             ,'saveAsName'=>preg_replace('/[^A-Za-z0-9_\.]/','_',$file_name)
             ,'responseType'=>$data['doc_filetype']??'application/octet-stream'];
-        if(!is_file($gsurl)) {
-            die("File '{$file_path}' is not accesible. Please contact with the owner to resolve the issue");
+        try {
+            if (!is_file($gsurl)) {
+                die("File '{$file_path}' is not accesible. Please contact with the owner to resolve the issue");
+            }
+        } catch (Exception $e) {
+            die("File '{$e->getMessage()}' is not accesible. Please contact with the owner to resolve the issue");
         }
         //endregion
 
@@ -201,10 +207,14 @@ class GSDownloadFiles
      */
     public function createSecuredToken(string $gs_url,$max_dowloads=1,$max_seconds=90,$file_name='',$file_type='')
     {
-
         //region VERIFY parameters
         if(strpos($gs_url,'gs://')!==0) return($this->addError('The following file does start with gs://: '.$gs_url));
-        if(!is_file($gs_url)) return($this->addError('The following file does not exist: '.$gs_url));
+
+        try {
+            if(!is_file($gs_url)) return($this->addError('The following file does not exist: '.$gs_url));
+        } catch (Exception $e) {
+            return($this->addError($e->getMessage()));
+        }
         $max_dowloads = (intval($max_dowloads)>0)?intval($max_dowloads):1;
         $max_seconds = (intval($max_dowloads)>0)?intval($max_seconds):1;
         if(!$file_name) $file_name = basename($gs_url);
