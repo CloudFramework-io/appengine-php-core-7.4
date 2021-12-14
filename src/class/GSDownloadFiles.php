@@ -63,9 +63,6 @@ class GSDownloadFiles
             exit;
         }
 
-
-
-        $data['max_downloads']++;
         if($data['max_downloads']<=0) {
             // Log cache get
             $this->core->logs->add("This token has been already used",'Blobs');
