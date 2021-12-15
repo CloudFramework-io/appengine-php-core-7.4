@@ -76,6 +76,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $core->logs->add('gzuncompress() failed. Potential wrong credentials in CoreCache->get() or wrong content in CoreSession->get()','gzumcompress','warning');
                 return;
             }
+            //Catch StreamWrapper::stream_set_option
+            if ($errno == E_WARNING && strpos($errstr,'StreamWrapper::stream_set_option')) {
+                //DO NOTHING. Error of Google\\Cloud\\Storage\\StreamWrapper::stream_set_option is not implemented
+                //Github issue: https://github.com/googleapis/google-cloud-php/issues/4744
+                return;
+            }
 
             if($core)
                 $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
@@ -111,7 +117,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00143';
+        var $_version = 'v74.00151';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5725,16 +5731,74 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Add a LOG entry in CloudFrameWorkBitacora
-         * @param $user
+         * Send a LOG to CF ERP Bitacora
+         * @param string $user
          * @param $action string 'inserted'',updated', 'deleted', 'accessed'.. Try to add a past verb over a Solution/App
-         * @param $solution
-         * @param $app
+         * @param string $solution
+         * @param string $app
          * @param $app_id string Id of the app to which receive and action
-         * @param $title
-         * @param $data null|mixed values to add in bitacora if it is necessary
+         * @param string $title
+         * @param null|mixed $data values to add in bitacora if it is necessary
+         * @return bool|void
          */
-        public function bitacora($user, $action,$solution, $app, $app_id=null, $title=null, $data=null) {
+        public function sendToCFBitacora(string $user, string $action,string $solution, string $app, $app_id='', $title='', $data=null) {
+            $platform_id = $this->core->config->get('core.erp.platform_id');
+            $token = $this->core->config->get('core.erp.integrations.token');
+            $key = $this->core->config->get('core.erp.integrations.key');
+            if(!$platform_id) return($this->addError('Missing core.erp.platform_id config-var from CFILog.sendToCFBitacora()'));
+            if(!$token) return($this->addError('Missing core.erp.integrations.token config-var from CFILog.sendToCFBitacora()'));
+            if(!$key) return($this->addError('Missing core.erp.integrations.key config-var from CFILog.sendToCFBitacora()'));
+
+            //region SET $rewrite_fingerprint
+            $fingerprint = $this->core->system->getRequestFingerPrint();
+            if(!isset($fingerprint['ip'])) $fingerprint['ip'] = $this->core->system->ip;
+            //endregion
+            //region SET $title
+            if(!$title) {
+                $title = "The user {$user} has {$action}";
+                if($app_id) $title.=" [Id: {$app_id}]";
+                $title .= " in {$solution}/{$app}";
+            }
+            //endregion
+
+            //region SET $entity
+            $entity = [];
+            $entity["User"]=$user;
+            $entity["Action"]=$action;
+            $entity["Solution"]=$solution;
+            $entity["App"]=$app;
+            $entity["AppId"]=$app_id;
+            $entity["Fingerprint"]=$fingerprint;
+            $entity["Title"]=$title;
+            $entity["Data"]=[];
+            if($data) {
+                $entity['Data'] = $data;
+            }
+            //endregion
+
+            $service = "https://api.cloudframework.io/erp/bitacora/{$platform_id}/".basename($this->core->system->app_url);
+            $headers = ['X-DS-TOKEN'=>$token,'X-WEB-KEY'=>$key];
+            $this->core->request->post_json_decode($service,$entity,$headers,true);
+            if($this->core->request->error) {
+                return($this->addError($this->core->request->errorMsg));
+            }
+            //endregion
+            return true;
+        }
+
+        /**
+         * Add a LOG entry in CloudFrameWorkBitacora
+         * @param string $user
+         * @param string $action 'inserted'',updated', 'deleted', 'accessed'.. Try to add a past verb over a Solution/App
+         * @param string $solution
+         * @param string $app
+         * @param string $app_id string Id of the app to which receive and action
+         * @param string $title
+         * @param null|mixed $data  values to add in bitacora if it is necessary
+         * @return bool|void
+         */
+        public function bitacora(string $user, string $action, string $solution, $app, string $app_id='', string $title='', $data=null)
+        {
             if(!$this->initDSLogs()) return;
 
             //region SET $rewrite_fingerprint
