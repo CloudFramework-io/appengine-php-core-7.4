@@ -117,7 +117,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00151';
+        var $_version = 'v74.00161';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5707,7 +5707,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $data
          * @param $platform
          * @param $api_key
-         * @param true|false $rewrite_fingerprint  // send the fingerprint of the current call
+         * @param true|false $rewrite_fingerprint // send the fingerprint of the current call
+         * @return bool|void
          */
         public function sendToCFService($app, $action, $title, $method, $user, $data,$platform,$api_key,$rewrite_fingerprint=false) {
             //region SET $entity
@@ -5736,12 +5737,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $action string 'inserted'',updated', 'deleted', 'accessed'.. Try to add a past verb over a Solution/App
          * @param string $solution
          * @param string $app
-         * @param $app_id string Id of the app to which receive and action
-         * @param string $title
+         * @param null|string $app_id  Id of the app to which receive and action
+         * @param null|string $title
          * @param null|mixed $data values to add in bitacora if it is necessary
          * @return bool|void
          */
-        public function sendToCFBitacora(string $user, string $action,string $solution, string $app, $app_id='', $title='', $data=null) {
+        public function sendToCFBitacora(string $user, string $action,string $solution, string $app, string $app_id=null, string $title=null, $data=null) {
             $platform_id = $this->core->config->get('core.erp.platform_id');
             $token = $this->core->config->get('core.erp.integrations.token');
             $key = $this->core->config->get('core.erp.integrations.key');
@@ -5792,12 +5793,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $action 'inserted'',updated', 'deleted', 'accessed'.. Try to add a past verb over a Solution/App
          * @param string $solution
          * @param string $app
-         * @param string $app_id string Id of the app to which receive and action
-         * @param string $title
+         * @param null|string $app_id string Id of the app to which receive and action
+         * @param null|string $title
          * @param null|mixed $data  values to add in bitacora if it is necessary
          * @return bool|void
          */
-        public function bitacora(string $user, string $action, string $solution, $app, string $app_id='', string $title='', $data=null)
+        public function bitacora(string $user, string $action, string $solution, string $app, string $app_id=null, string $title=null, $data=null)
         {
             if(!$this->initDSLogs()) return;
 
