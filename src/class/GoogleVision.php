@@ -277,7 +277,9 @@ class GoogleVision extends CFGoogle
 
             /** @var $item Google_Service_Vision_AnnotateImageResponse $item */
             foreach ($itemFile->getResponses() as $item) {
-                $ret['textAnnotations'][] = ['description'=>$item->getFullTextAnnotation()->getText()];
+                //avoid descriptions if $item->getFullTextAnnotation() returns null
+                if($item->getFullTextAnnotation())
+                    $ret['textAnnotations'][] = ['description'=>$item->getFullTextAnnotation()->getText()];
             }
         }
         return $ret;
