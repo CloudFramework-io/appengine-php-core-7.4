@@ -14,6 +14,7 @@ class DataSQL
     var $page = 0;
     var $offset = 0;
     var $order = '';
+    var $debug = false;
     private $joins = [];
     private $queryFields = '';
     private $queryWhere = [];
@@ -33,6 +34,10 @@ class DataSQL
         // Get core function
         $this->core = $core;
 
+        //Debug logs
+        if($this->core->is->development()) {
+            $this->debug = true;
+        }
         // Name
         $this->entity_name = $model[0];
         if(!is_string($this->entity_name) || !strlen($this->entity_name)) return($this->addError('Missing schema name '));

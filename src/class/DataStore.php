@@ -33,12 +33,18 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $cache_data = null;
         var $project_id = '';
         var $namespace = 'default';
+        var $debug = false;
         var $transformReadedEntities = true; // Transform readed entities
 
         function __construct(Core7 &$core, $params)
         {
             $this->core = $core;
             $this->core->__p->add('DataStore new instance ', $params[0], 'note');
+
+            //Debug logs
+            if($this->core->is->development()) {
+                $this->debug = true;
+            }
 
             $this->entity_name = $params[0];
             $this->namespace = (isset($params[1]) && $params[1])?$params[1]:'default';
@@ -471,6 +477,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             //If the class has any error just return
             if ($this->error) return false;
 
+            // Performance microtime
+            $time = microtime(true);
+
             //region sanetize params: $type , $fields, $where, $order, $limit
             if(!is_string($type)) return($this->addError('fetch($type = "one", $fields = "*", $where = null, $order = null, $limit = null) has received $type as not string'));
             if(!is_string($fields)) return($this->addError('fetch($type = "one", $fields = "*", $where = null, $order = null, $limit = null) has received $fields as not string'));
@@ -620,6 +629,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $query = $this->datastore->gqlQuery($_q,['allowLiterals'=>true,'bindings'=>$bindings]);
                 $result = $this->datastore->runQuery($query,['namespaceId'=>$this->namespace]);
                 $ret = $this->transformResult($result);
+                if($this->debug)
+                    $this->core->logs->add($this->entity_name.".fetch({$this->lastQuery}) [".(round(microtime(true)-$time,4))." secs]",'DataStore');
+
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('fetch');
@@ -635,6 +647,11 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function fetchByKeys($keys)
         {
+
+            //Analyze execution time
+            $time = microtime(true);
+
+            //Global performance
             $this->core->__p->add('ds:fetchByKeys: '.$this->entity_name,  ' keys:' . $this->core->jsonEncode($keys),'note');
             if(!$keys) return;
             $ret = [];
@@ -650,9 +667,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     }
                 }
                 $result = $this->datastore->lookupBatch($entities_keys);
+
                 // $result['found'] is an array of entities.
                 if (isset($result['found'])) {
                     $ret = $this->transformResult($result['found']);
+
+                if($this->debug)
+                    $this->core->logs->add($this->entity_name.".fetchByKeys('\$key=".(json_encode($keys))."') [".(round(microtime(true)-$time,4))." secs]",'DataStore');
 
                 } else {
                     $this->core->__p->add('ds:fetchByKeys: '.$this->entity_name,  '','endnote');
@@ -674,8 +695,11 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         function fetchOneByKey($key)
         {
             if(!$key) return;
+            //Analyze execution time
+            $time = microtime(true);
             $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  ' key:' . $key,'note');
             try {
+
 
                 // force type TYPE_NAME if there is a field KeyName
                 if(isset($this->schema['data']['model']['KeyName'])) {
@@ -684,17 +708,22 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $key_entity = $this->datastore->key($this->entity_name, $key,['namespaceId'=>$this->namespace]);
                 }
 
+
                 $result = $this->datastore->lookup($key_entity);
+
                 // $result['found'] is an array of entities.
                 if ($result) {
                     $result = [$result];
                     $result = $this->transformResult($result)[0];
                     $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  '','endnote');
-                    return($result);
                 } else {
                     $this->core->__p->add('ds:fetchOneByKey: '.$this->entity_name,  '','endnote');
-                    return([]);
                 }
+
+                if($this->debug)
+                    $this->core->logs->add($this->entity_name.".fetchOneByKey('\$key=$key') [".(round(microtime(true)-$time,4))." secs]",'DataStore');
+
+                return($result??[]);
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('query');
@@ -850,7 +879,14 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 foreach ($ret as $item) if(isset($item['KeyId']) || isset($item['KeyName'])) {
                     $keys[] = (isset($item['KeyId']))?$item['KeyId']:$item['KeyName'];
                 }
-                if($keys) $delete = $this->deleteByKeys($keys);
+                if($keys) {
+                    // Performance microtime
+                    $time = microtime(true);
+                    $delete = $this->deleteByKeys($keys);
+                    if($this->debug)
+                        $this->core->logs->add($this->entity_name.".delete('".(implode(',',$keys))."') [".(round(microtime(true)-$time,4))." secs]",'DataStore');
+                }
+
             }
             return $ret;
         }
@@ -862,7 +898,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function deleteByKeys($keys)
         {
+            // If not $keys return
             if(!$keys) return;
+
+            // Performance microtime
+            $time = microtime(true);
+
+            //Convert into an array
             if (!is_array($keys)) $keys = explode(',', $keys);
             $entities_keys = [];
             try {
@@ -875,6 +917,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     }
                 }
                 $ret = $this->datastore->deleteBatch($entities_keys);
+                if($this->debug)
+                    $this->core->logs->add($this->entity_name.".deleteByKeys('".(implode(',',$keys))."') [".(round(microtime(true)-$time,4))." secs]",'DataStore');
+
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('query');
@@ -890,12 +935,17 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function query($_q, $bindings=[])
         {
+            // Performance microtime
+            $time = microtime(true);
             $ret = [];
             $this->lastQuery = $_q . ' /  bindings=' .  $this->core->jsonEncode($bindings)  ;
             try {
                 $query = $this->datastore->gqlQuery($_q,['allowLiterals'=>true,'bindings'=>$bindings]);
                 $result = $this->datastore->runQuery($query,['namespaceId'=>$this->namespace]);
                 $ret = $this->transformResult($result);
+                if($this->debug)
+                    $this->core->logs->add($this->entity_name.".query(\$query='{$_q}') [".(round(microtime(true)-$time,4))." secs]",'DataStore');
+
             } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('fetch');

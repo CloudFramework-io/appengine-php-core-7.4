@@ -117,7 +117,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00211';
+        var $_version = 'v74.00231';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -1424,6 +1424,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             if(!$this->init() || !strlen(trim($key))) return null;
 
+            // Performance microtime
+            $time = microtime(true);
+
             //region SET __p performance paramater
             if (!strlen($expireTime)) $expireTime = -1;
             $encrypted = ($cache_secret_key && $cache_secret_iv)?'/encrypted':'/no-encrypted';
@@ -1484,7 +1487,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
 
                 if($this->debug)
-                    $this->core->logs->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned in namespace ".$this->spacename . ' [time='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+                    $this->core->logs->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned in namespace ".$this->spacename . ' [time='.(round(microtime(true)-$time,4)).' secs]','CoreCache');
 
 
                 $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
@@ -4863,7 +4866,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             if($this->sendSysLogs) {
                 $_time = round(microtime(TRUE) -$_time,4);
-                $this->core->logs->add("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." - {$code} [{$_time} secs]",'CoreRequest');
+                $this->core->logs->add("end request {$verb} {$route} ".(($data === null) ? '{no params}' : '{with params}')." - ".($this->getLastResponseCode())." [{$_time} secs]",'CoreRequest');
             }
             $this->core->__p->add("Request->{$verb}: ", '', 'endnote');
 
