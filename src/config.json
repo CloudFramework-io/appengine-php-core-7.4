@@ -1,5 +1,5 @@
 {
-  "core.api.urls":["/"],
+  "core.api.routes":["/"],
   "core.datastore.on": false,
   "core.datastorage.on": false,
   "restful.logs.allowed_ips": "localhost,127.0.0.1",

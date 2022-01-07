@@ -1,22 +1,4 @@
 <?php
-
-
-/**
- * Opauth
- * Multi-provider authentication framework for PHP
- *
- * @copyright    Copyright © 2012 U-Zyn Chua (http://uzyn.com)
- * @link         http://opauth.org
- * @package      Opauth
- * @license      MIT License
- */
-/**
- * Opauth
- * Multi-provider authentication framework for PHP
- *
- * @package			Opauth
- */
-
 /**
  * Opauth Strategy
  * Individual strategies are to be extended from this class
@@ -510,14 +492,18 @@ class Opauth {
      */
     public $strategyMap;
     /**
-     * Constructor
-     * Loads user configuration and strategies.
-     *
-     * @param array $config User configuration
-     * @param boolean $run Whether Opauth should auto run after initialization.
+     * Core7 object to interact with CloudFramework
      */
     private $core;
 
+    /**
+     * Constructor
+     * Loads user configuration and strategies.
+     *
+     * @param Core7 $core CloudFramework Core object
+     * @param array $config User configuration
+     * @param boolean $run Whether Opauth should auto run after initialization.
+     */
     public function __construct(Core7 &$core,$config = array(), $run = true) {
         $this->core = $core;
         /**

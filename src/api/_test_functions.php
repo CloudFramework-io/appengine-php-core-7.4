@@ -8,7 +8,7 @@ class API extends RESTful
             '$this->core->_version'=> $this->core->_version,
             '$this->core->is->development()'=> $this->core->is->development(),
             '$this->core->is->production()'=> $this->core->is->production(),
-            '$this->core->config->get(\'core.api.urls\')'=> $this->core->config->get('core.api.urls'),
+            '$this->core->config->get(\'core.api.routes\')'=> $this->core->config->get('core.api.routes'),
             '$this->core->cache->spacename'=> $this->core->cache->spacename,
             '$this->core->cache->set(\'var1\',\'value1\')'=> $this->core->cache->set('var1','value1'),
 

@@ -117,7 +117,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.00231';
+        var $_version = 'v74.01071';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -140,6 +140,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $request;
         /** @var CoreLocalization $localization */
         var $localization;
+        /** @var CoreUser $user */
+        var $user;
         /** @var CoreModel $model */
         var $model;
         /** @var CFILog $cfiLog */
@@ -190,6 +192,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->security = new CoreSecurity($this);
             $this->cache = new CoreCache($this);
             $this->request = new CoreRequest($this);
+            $this->user = new CoreUser($this);
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
             $this->cfiLog = new CFILog($this);
@@ -418,9 +421,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @return bool
          */
         private function isApiPath() {
-            if(!$this->config->get('core.api.urls')) return false;
-            $paths = $this->config->get('core.api.urls');
-            if(!is_array($paths)) $paths = explode(',',$this->config->get('core.api.urls'));
+            //backward compatibility with core.api.urls
+            if(!($paths = $this->config->get('core.api.routes')??$this->config->get('core.api.urls'))) return false;
+            if(!is_array($paths)) $paths = explode(',',$paths);
 
             foreach ($paths as $path) {
                 if(strpos($this->system->url['url'], $path) === 0) {
@@ -1011,22 +1014,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
             return ($ret);
-        }
-
-        function crypt($input, $rounds = 7)
-        {
-            $salt = "";
-            $salt_chars = array_merge(range('A', 'Z'), range('a', 'z'), range(0, 9));
-            for ($i = 0; $i < 22; $i++) {
-                $salt .= $salt_chars[array_rand($salt_chars)];
-            }
-            return crypt($input, sprintf('$2a$%02d$', $rounds) . $salt);
-        }
-
-        // Compare Password
-        function checkPassword($passw, $compare)
-        {
-            return (crypt($passw, $compare) == $compare);
         }
 
     }
@@ -1703,278 +1690,185 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     class CoreUser
     {
         private $core;
-        var $isAuth = null;
+        var $isAuth = false;
+        var $token;
         var $namespace;
+        var $id;
         var $data = [];
+        /** @var bool $cached says if the user data has been retrieved from cache */
+        var $cached = false;
+        /** @var int $expirationTime Time to expire a token */
+        var $expirationTime = 3600;
+        /** @var int $maxTokens Max number of tokens in $expirationTime to handle */
+        var $maxTokens = 10;
 
-        function __construct(Core7 &$core, $namespace = 'Default')
+        var $error = false;
+        var $errorCode = null;
+        var $errorMsg = [];
+
+        // URL of the API service to verify token
+        const APIServices = 'https://api.cloudframework.io/core/signin';
+
+        function __construct(Core7 &$core)
         {
             $this->core = $core;
-            $this->namespace = (is_string($namespace) && strlen($namespace)) ? $namespace : 'Default';
+        }
 
-            // Check if the Auth comes from X-CloudFrameWork-AuthToken and there is a hacking.
-            if (strlen($this->core->security->getHeader('X-CloudFrameWork-AuthToken'))) {
-                list($sessionId, $hash) = explode("_", $this->core->security->getHeader('X-CloudFrameWork-AuthToken'), 2);
+        /**
+         * Verify that a token is valid and update the following properties: namespace, userId, userData
+         * It allows to work with several active tokens at the same time
+         * @param string $token Token to verify with CloudFramework ERP
+         * @param string $integration_key Integration Key to call CloudFramework API for signing
+         * @param bool $refresh indicates if we have to ignore cached data with $refresh=true. Default is false
+         * @return false|void
+         */
+        function checkERPToken(string $token, string $integration_key,bool $refresh=false)
+        {
+            //region SET $user,$namespace,$key from token structure or return errorCode: WRONG_TOKEN_FORMAT
+            $tokenParts = explode('__',$token);
+            if(count($tokenParts) != 3
+                || !($namespace=$tokenParts[0])
+                || !($user=$tokenParts[1])
+                || !($key=$tokenParts[2]) )
+                return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
+            //endregion
 
-                // Checking security
-                $_security = '';
-                if (!strlen(trim($hash)) || $hash != $this->core->system->getRequestFingerPrint()[hash]) {
-                    $_security = 'Wrong token.';
-                    if (strlen($hash)) $_security .= ' Violating token integrity, ';
-                } else {
-
-                    $this->core->session->init($sessionId);
-                    if (!$this->isAuth() || $this->getVar('token') != $this->core->security->getHeader('X-CloudFrameWork-AuthToken')) {
-                        $_security = 'Violating session token integrity';
-                        session_destroy();
-                        $_SESSION = array();
-                        session_regenerate_id();
-                        $this->data = [];
+            //region SET $userData trying to get the info from cache deleting expired tokens and checking $this->maxTokens
+            $updateCache = false;
+            $userData = $this->core->cache->get($namespace.'_'.$user);
+            if(!$userData) $userData = ['id'=>null,'tokens'=>[],'data'=>[]];
+            else {
+                $now = microtime(true);
+                foreach ($userData['tokens'] as $tokenId=>$tokenInfo) {
+                    if(($now - $tokenInfo['time']) > $this->expirationTime) {
+                        unset($userData['tokens'][$tokenId]);
+                        $updateCache = true;
                     }
                 }
-                // Informing security issue
-                // This is top level risk
-                if (strlen($_security)) {
-                    // TODO: Report the log
-                    //$this->sendLog('access', 'Hacking', 'X-CloudFrameWork-AuthToken', 'Ilegal token ' . $this->getHeader('X-CloudFrameWork-AuthToken')
-                    //    , 'Error comparing with internal token: ' . $this->getAuthUserData('token') . ' for user: ' . $this->getAuthUserData('email'), $this->getConf('CloudServiceLogEmail'));
-                    die($_security);
+
+                //update Cache with the deleted tokens
+                if($updateCache) $this->core->cache->set($namespace.'_'.$user,$userData);
+
+                // Verify $token is not a token with error
+                if(isset($userData['tokens'][$token]) && $userData['tokens'][$token]['error']) {
+                    return($this->addError('TOKEN_NOT_VALID',['The token already has been used but it is not valid',$userData['tokens'][$token]['error']]));
                 }
+
+                // Verify number of active tokens
+                if(!isset($userData['tokens'][$token]) && count($userData['tokens']) >=$this->maxTokens) {
+                    return($this->addError('MAX_TOKENS_REACHED','The max number of tokens has been reached: '.$this->maxTokens));
+                }
+
+                $this->cached = true;
+
             }
-        }
+            //endregion
 
-        function init($namespace = '')
-        {
-            if (strlen($namespace)) $this->namespace = $namespace;
-            $this->core->session->init();
-            // LOGOUT with $_REQUEST paramter
+            //region CALL CloudFramework API Service IF $token DOEST not exist in $userData OR $refresh
+            if(!isset($userData['tokens'][$token]) || $refresh) {
 
-            if (isset($_GET['_logout']) || isset($_POST['_logout'])) $this->core->session->delete("_User_" . $this->namespace);
-            $this->data[$this->namespace] = $this->core->session->get("_User_" . $this->namespace);
+                $this->cached = false;
+                $userData['tokens'][$token] = ['error'=>null,'time'=>microtime(true)];
+                $cfUserInfo = $this->core->request->post_json_decode(
+                    $this::APIServices.'/'.$namespace.'/check?_update&from_core7_user_object'
+                    ,['Fingerprint'=>$this->core->system->getRequestFingerPrint()]
+                    ,['X-WEB-KEY'=>'Core7UserObject'
+                    ,'X-DS-TOKEN'=>$token
+                    ,'X-EXTRA-INFO'=>$integration_key
+                ]);
 
-            if (null === $this->data[$this->namespace]) $this->data[$this->namespace] = ['__auth' => false];
-        }
-
-        function setVar($var, $data = '')
-        {
-            if (null === $this->data[$this->namespace]) $this->init();
-            if (is_array($var)) {
-                foreach ($var as $key => $value)
-                    $this->data[$this->namespace][$key] = $value;
-            } else {
-                $this->data[$this->namespace][$var] = $data;
+                if($this->core->request->error) {
+                    $userData['tokens'][$token]['error'] = $this->core->request->errorMsg;
+                    if($this->core->request->getLastResponseCode()==401) {
+                        $this->addError('SECURITY_ERROR','Token is not authorized');
+                    } else {
+                        $this->addError('TOKEN_ERROR_'.$this->core->request->getLastResponseCode(),$this->core->request->errorMsg);
+                    }
+                } else {
+                    $userData['data'] =  $cfUserInfo['data'];
+                    $userData['id'] = $cfUserInfo['data']['User']['KeyName'];
+                }
+                $this->core->request->reset();
+                $this->core->cache->set($namespace.'_'.$user,$userData);
+                if($this->error) return;
             }
-            $this->data[$this->namespace]['__auth'] = true;
-            $this->core->session->set("_User_" . $this->namespace, $this->data[$this->namespace]);
+            //endregion
+
+            //region SET $this->{isAuth, namespace, token, id, data}
+            $this->isAuth = true;
+            $this->token = $token;
+            $this->namespace = $namespace;
+            $this->id = $userData['id'];
+            $this->data = $userData['data'];
+            unset($userData);
+            //endregion
+
+            return true;
+
         }
 
-        function getVar($var = '')
-        {
-            if (null === $this->data[$this->namespace]) $this->init();
-            if (!strlen($var))
-                return $this->data[$this->namespace];
-            else
-                return (key_exists($var, $this->data[$this->namespace])) ? $this->data[$this->namespace][$var] : null;
-        }
-
+        /**
+         * Return if the user is Authenticated
+         * @return bool
+         */
         function isAuth()
         {
-            if (null === $this->isAuth) $this->init();
-            return (true === $this->data[$this->namespace]['__auth']);
+            return $this->isAuth;
         }
 
-        function setAuth($bool)
-        {
-            if ($bool) $this->setData('__auth', true);
-            else {
-                $this->data[$this->namespace] = ['__auth' => false];
-                $this->core->session->set("_User_" . $this->namespace, $this->data[$this->namespace]);
-            }
-        }
 
-        /*
-        * Manage User Organizations
-        */
-
-        function addOrganization($orgId, $orgData, $group = '')
-        {
-            $_userOrganizations = $this->getVar("userOrganizations");
-            if (empty($_userOrganizations))
-                $_userOrganizations = array();
-
-
-            // Default Organization
-            if (count($_userOrganizations) == 0)
-                $_userOrganizations['__org__'] = $orgId;
-
-            $_userOrganizations['__orgs__'][$orgId] = $orgData;
-            if (!strlen($group)) $group = '__OTHER__';
-            $_userOrganizations['__groups__'][$group][$orgId] = true;
-
-            $this->setVar("userOrganizations", $_userOrganizations);
-        }
-
-        function setOrganizationDefault($orgId)
-        {
-            if (strlen($orgId)) {
-                $_userOrganizations = $this->getVar("userOrganizations");
-                if (is_array($_userOrganizations) && isset($_userOrganizations['__orgs__'][$orgId])) {
-                    $_userOrganizations['__org__'] = $orgId;
-                    $this->setVar("userOrganizations", $_userOrganizations);
-                }
-            }
-        }
-
-        function getOrganizationDefault()
-        {
-            $_userOrganizations = $this->getVar("userOrganizations");
-            if (is_array($_userOrganizations) && isset($_userOrganizations['__org__']))
-                return $_userOrganizations['__org__'];
-            else return '__orgNotNefined__';
-        }
-
-        function getOrganizations()
-        {
-            $_userOrganizations = $this->getVar("userOrganizations");
-
-            if (empty($_userOrganizations)
-                || (!isset($_userOrganizations['__orgs__']))
-            )
-                return array();
-
-            return $_userOrganizations['__orgs__'];
-        }
-
-        function getOrganizationsGroups()
-        {
-            $_userOrganizations = $this->getVar("userOrganizations");
-
-            if (empty($_userOrganizations)
-                || (!isset($_userOrganizations['__groups__']))
-            )
-                return array();
-
-            return $_userOrganizations['__groups__'];
-        }
-
-        function getOrganization($id = '')
-        {
-            if (!strlen($id)) $id = $this->getOrganizationDefault();
-            $orgs = $this->getOrganizations();
-            if (isset($orgs[$id])) return ($orgs[$id]);
-            else return null;
-        }
-
-        function resetOrganizations()
-        {
-            $this->setVar("userOrganizations", array());
-        }
-
-        /*
-         * Manage User Roles
+        /**
+         * Set a privilege for a user
+         * @param $privilege
+         * @param bool $active
          */
-
-        function setRole($rolId, $rolName = '', $org = '')
+        function setPrivilege($privilege,$active=true)
         {
-            if (!strlen($org)) $org = $this->getOrganizationDefault();
-            if (!strlen($rolName)) $rolName = $rolId;
-
-            $_userRoles = $this->getVar("UserRoles");
-            if (empty($_userRoles))
-                $_userRoles = array();
-
-            $_userRoles[$org]['byId'][$rolId] = $rolName;
-            $_userRoles[$org]['byName'][$rolName] = $rolId;
-            $this->setVar("UserRoles", $_userRoles);
+            if(!isset($this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'] = [];
+            if(!in_array($privilege,$this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'][] = $privilege;
         }
 
-        function hasRoleId($rolId, $org = '')
-        {
-            if (!strlen($org)) $org = $this->getOrganizationDefault();
-            $_userRoles = $this->getVar("UserRoles");
-            if (empty($_userRoles))
-                $_userRoles = array();
-
-            if (!is_array($rolId))
-                $rolId = array($rolId);
-            $ret = false;
-            foreach ($rolId as $key => $value) {
-                if (strlen($value) && !empty($_userRoles[$org]['byId'][$value]) && strlen($_userRoles[$org]['byId'][$value]))
-                    $ret = true;
-            }
-            return ($ret);
-
-        }
-
-        function hasRoleName($roleName, $org = '')
-        {
-            if (!strlen($org))
-                $org = $this->getOrganizationDefault();
-            $_userRoles = $this->getVar("UserRoles");
-            if (empty($_userRoles))
-                $_userRoles = array();
-
-            if (!is_array($roleName))
-                $roleName = array($roleName);
-            $ret = false;
-            foreach ($roleName as $key => $value) {
-                if (strlen($value) && !empty($_userRoles[$org]['byName'][$value]) && strlen($_userRoles[$org]['byName'][$value]))
-                    $ret = true;
-            }
-            return ($ret);
-        }
-
-        function resetRoles()
-        {
-            $this->setVar("UserRoles", array());
-        }
-
-        function getRoles($org = '')
-        {
-            if (!strlen($org))
-                $org = $this->getOrganizationDefault();
-
-            $ret = $this->getVar("UserRoles");
-            if ($org == '*') return $ret;
-            else return (isset($ret[$org])) ? $ret[$org] : [];
-        }
-
-
-        /*
-         * Manage User Privileges by App
+        /**
+         * Unset a privilege for a user
+         * @param $privilege
+         * @param bool $active
          */
-
-        function setPrivilege($appId, $privileges = array(), $org = '')
+        function unsetPrivilege($privilege)
         {
-            if (!strlen($org)) $org = $this->getOrganizationDefault();
-
-            $_userPrivileges = $this->getVar("UserPrivileges");
-            if (empty($_userPrivileges))
-                $_userPrivileges = array();
-
-            $_userPrivileges[$org][$appId] = $privileges;
-            $this->setVar("UserPrivileges", $_userPrivileges);
+            if(!isset($this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'] = [];
+            if(($index = array_search($privilege,$this->data['User']['UserPrivileges']))!==false)
+                array_splice($this->data['User']['UserPrivileges'],$index,1);
         }
 
-        function getPrivileges($appId = '', $privilege = '', $org = '')
+        /**
+         * Set a privilege for a user
+         * @param string $privilege
+         * @return bool
+         */
+        function hasPrivilege(string $privilege)
         {
-            if (!strlen($org)) $org = $this->getOrganizationDefault();
-            $_userPrivileges = $this->getVar("UserPrivileges");
-
-            if (empty($_userPrivileges)
-                || (strlen($appId) && !isset($_userPrivileges[$org][$appId]))
-                || (strlen($privilege) && !isset($_userPrivileges[$org][$appId][$privilege]))
-            )
-                return null;
-
-            if (!strlen($appId)) return $_userPrivileges[$org];
-            elseif (!strlen($privilege)) return $_userPrivileges[$org][$appId];
-            else return $_userPrivileges[$org][$appId][$privilege];
+            return (isset($this->data['User']['UserPrivileges']) && in_array($privilege,$this->data['User']['UserPrivileges']));
         }
 
-        function resetPrivileges()
+        /**
+         * Set a privilege for a user
+         * @param string $privilege
+         * @return bool
+         */
+        function getPrivileges()
         {
-            $this->setVar("UserPrivileges", array());
+            return $this->data['User']['UserPrivileges']??[];
+        }
+
+        /**
+         * Add an error Message
+         * @param $value
+         */
+        function addError($code,$message=null)
+        {
+            $this->error = true;
+            $this->errorCode = true;
+            $this->errorMsg[] = $value??$code;
         }
 
 
@@ -2862,7 +2756,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->core->logs->add('checkBasicAuthWithConfig: no "core.system.authorizations" array in config. ');
             } elseif (!isset($auth[$user])) {
                 $this->core->logs->add('checkBasicAuthWithConfig: key  does not match in "core.system.authorizations"');
-            } elseif (!$this->core->system->checkPassword($passw, ((isset($auth[$user]['password']) ? $auth[$user]['password'] : '')))) {
+            } elseif (!$this->core->security->checkCrypt($passw, ((isset($auth[$user]['password']) ? $auth[$user]['password'] : '')))) {
                 $this->core->logs->add('checkBasicAuthWithConfig: password does not match in "core.system.authorizations"');
 
                 // User and password match!!!
@@ -3999,8 +3893,44 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->errorMsg[] = $value;
         }
 
+        /**
+         * One-way string encryption (hashing)
+         * @param string|array $input The string or array to encrypt. If array is provided it will be converted to string with json_encoded. If length of $input > 72 then it returns null
+         * @param int $rounds
+         * @return string|null
+         */
+        function crypt($input, $rounds = 7)
+        {
+            if($input && !is_string($input)) $input = json_encode($input);
+            if(!$input) return null;
+            if(strlen($input)>72) return null; // This method only admin string with max 72 chars
 
+            $salt = "";
+            $salt_chars = array_merge(range('A', 'Z'), range('a', 'z'), range(0, 9));
+            for ($i = 0; $i < 22; $i++) {
+                $salt .= $salt_chars[array_rand($salt_chars)];
+            }
+            return crypt($input, sprintf('$2a$%02d$', $rounds) . $salt);
+        }
 
+        /**
+         * Verify a string with its encrypted value to verify the match
+         * @param string|array $input  original input encrypted
+         * @param string|null $input_encrypted Encrypted string to compare. If null or empty is provided it will try to get the value from $this->core->config->get("core.security.password")
+         * @return bool
+         */
+        function checkCrypt($input, $input_encrypted=null): bool
+        {
+            if($input && !is_string($input)) $input = json_encode($input);
+            if(!$input) return false;
+            if(strlen($input)>72) return false; // This method only admin string with max 72 chars
+
+            // IF $input_encrypted empty try to get it from core.security.password config var
+            if(!$input_encrypted) $input_encrypted = $this->core->config->get("core.security.password");
+
+            if(!$input_encrypted || !is_string($input_encrypted)) return false;
+            return (crypt($input, $input_encrypted) == $input_encrypted);
+        }
     }
 
 
@@ -5218,6 +5148,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             // If the model does not include the '(ds|db):' we add it.
+            $source_object = $object;
             if(!strpos($object,':')) {
                 if(isset($this->models['db:'.$object])) $object = 'db:'.$object;
                 elseif(isset($this->models['ds:'.$object])) $object = 'ds:'.$object;
@@ -5226,7 +5157,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
 
             // Let's find it and return
-            if(!isset($this->models[$object])) return($this->addError("Model $object does not exist",404));
+            if(!isset($this->models[$object])) {
+                return($this->addError("Model $source_object does not exist",404));
+            }
             if(!isset($this->models[$object]['data'])) return($this->addError($object. 'Does not have data',503));
 
             switch ($this->models[$object]['type']) {

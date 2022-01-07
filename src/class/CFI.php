@@ -51,6 +51,7 @@ class CFI
     /**
      * Return the App structure: $this->json_object
      */
+    public function returnData(){return $this->getApp();}
     public function getApp() { return $this->json_object;}
 
     /**

@@ -18,5 +18,25 @@ composer serve
 composer script training/hello
 ```
 
-# Deploy your project
-Comming soon.
+# Deploy your project in GCP Appengine Standard
+## Assumptions
+We understand you know what is GCP Appengine standard and you have the [I AM] provileges
+to create a project and/or to deploy into a project.
+
+## Steps
+* [Create a GCP project](https://console.cloud.google.com/projectcreate) and let's say your project id will be `{my-project}`
+* Execute:
+```
+gcloud app deploy app.yaml --project={my-project}
+# First time it will ask for appengine location. We suggest to use euro-west
+# it wil show: Deployed service [default] to [https://{my-project}.ew.r.appspot.com]
+```
+* Now you can browse: https://{my-project}.ew.r.appspot.com/training/hello
+```
+{
+  "success": true,
+  "status": 200,
+  "code": "ok",
+  "data": "hello World"
+}
+```

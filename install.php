@@ -45,3 +45,8 @@ if(!is_file('./README.md')) {
     echo " - Copying README.md\n";
     copy("vendor/cloudframework-io/appengine-php-core-7.4/README-dist.md", "./README.md");
 } else echo " - Already exist README.md\n";
+
+if(!is_file('./php.ini')) {
+    echo " - Copying php.ini\n";
+    copy("vendor/cloudframework-io/appengine-php-core-7.4/php-dist.ini", "./php.ini");
+} else echo " - Already exist php.ini\n";
