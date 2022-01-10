@@ -8,7 +8,7 @@ class API extends RESTful
 		$showConfig = false;
 		if($this->core->security->existBasicAuth()) {
 			list($key,$value) = $this->core->security->getBasicAuth();
-			$showConfig =  ($key=='core.system.password' && $this->core->system->checkPassword($value,$this->core->config->get($key)));
+			$showConfig =  ($key=='core.system.password' && $this->core->security->checkCrypt($value,$this->core->config->get($key)));
 		} else {
 			$this->setErrorFromCodelib('security-error','if(!$this->existBasicAuth()) return Require Basic Authentication');
 		}

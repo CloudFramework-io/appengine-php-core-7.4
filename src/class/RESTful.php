@@ -196,6 +196,15 @@ if (!defined("_RESTfull_CLASS_")) {
             return ($this->error === 0);
         }
 
+        /**
+         * Validate a $this->formParams[$key] value as mandatory
+         * @param $key
+         * @param string $msg
+         * @param array $values
+         * @param int $min_length
+         * @param null $code
+         * @return false|mixed|string
+         */
         function checkMandatoryFormParam($key, $msg = '', $values=[],$min_length = 1,$code=null)
         {
             if (isset($this->formParams[$key]) && is_string($this->formParams[$key]))
@@ -211,8 +220,8 @@ if (!defined("_RESTfull_CLASS_")) {
                 if(!$code) $code='form-params-error';
                 $this->setError($msg,400,$code,$msg);
             }
-            return ($this->error === 0);
-
+            // Return
+            return (($this->error !== 0)?false:$this->formParams[$key]);
         }
 
         /**
@@ -395,7 +404,7 @@ if (!defined("_RESTfull_CLASS_")) {
             }
 
             // Return
-            return (!$this->error);
+            return ($this->error?false:$this->params[$pos]);
         }
 
         function setError($error, $returnStatus = 400, $returnCode=null, $message='')
