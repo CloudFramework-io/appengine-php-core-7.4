@@ -142,6 +142,10 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
                         // else explore the data.
                     }
+                    elseif ($this->schema['props'][$i][1] == 'boolean') {
+                        $record[$this->schema['props'][$i][0]] = ($value)?true:false;
+                        // else explore the data.
+                    }
                     else {
                         if (is_string($value)) {
                             // date & datetime values
@@ -788,6 +792,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         $row[$key] = intval($value);
                     elseif ($this->schema['props'][$key][1] == 'float')
                         $row[$key] = floatval($value);
+//                    elseif ($this->schema['props'][$key][1] == 'boolean')
+//                        $row[$key] = ($value)?true:false;
                 }
                 $ret[] = $row;
             }
