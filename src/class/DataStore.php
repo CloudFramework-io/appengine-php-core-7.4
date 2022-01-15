@@ -693,8 +693,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
         /**
          * Return entities by key
-         * @param integer|string
-         * @return array with the element
+         * @param integer|string $key
+         * @return array|void with the element
          */
         function fetchOneByKey($key)
         {

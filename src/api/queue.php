@@ -43,7 +43,8 @@ class API extends RESTful
             unset($this->formParams['interactive']);
 
             // In interactive we use CloudService Class to send and receive data with http...
-            $_url = str_replace('/queue/', '/', urldecode($this->core->system->url['host_url_uri']));
+            //$_url = str_replace('/queue/', '/', urldecode($this->core->system->url['host_url_uri']));
+            $_url = str_replace('/queue/', '/', ($this->core->system->url['host_url_uri']));
 
             // Requires to create a complete URL
             $value['url_queued'] = $_url;
@@ -99,7 +100,8 @@ class API extends RESTful
             //endregion
 
             //region SET '$_url'
-            $_url = str_replace('/queue/', '/', urldecode($this->core->system->url['url_uri']));
+            //$_url = str_replace('/queue/', '/', urldecode($this->core->system->url['url_uri']));
+            $_url = str_replace('/queue/', '/', ($this->core->system->url['url_uri']));
             //endregion
 
             //region CREATE $client, $queueName and $task to be queued

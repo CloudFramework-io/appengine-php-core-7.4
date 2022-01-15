@@ -21,10 +21,17 @@ if (!defined ("_Buckets_CLASS_") ) {
         var $isUploaded = false;
         var $vars = [];
         var $gs_bucket = null;
+        var $debug = false;
 
 
         Function __construct (Core7 &$core,$bucket='') {
+
+            //Performance
+            $time = microtime(true);
             $this->core = $core;
+            $this->core->__p->add('Buckets', $bucket, 'note');
+
+            if($this->core->is->development()) $this->debug = true;
 
             if(strlen($bucket)) $this->bucket = $bucket;
             else $this->bucket = $this->core->config->get('bucketUploadPath');
@@ -35,14 +42,27 @@ if (!defined ("_Buckets_CLASS_") ) {
                 $bucket_root = preg_replace('/\/.*/','',str_replace('gs://','',$this->bucket));
                 try {
                     $this->gs_bucket = $this->core->gc_datastorage_client->bucket($bucket_root);
-                    if(!$this->gs_bucket->exists()) return($this->addError('I can not find bucket: '.$this->bucket));
+                    if(!$this->gs_bucket->exists()) $this->addError('I can not find bucket: '.$this->bucket);
                 } catch (Exception $e) {
-                    return($this->addError($e->getMessage()));
+                    $this->addError($e->getMessage());
+                }
+
+                // Add logs for performance
+                if($this->debug)
+                    $this->core->logs->add("Buckets('{$bucket_root}')". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
+
+                if($this->error) {
+                    $this->core->__p->add('Buckets', null, 'endnote');
+                    return;
                 }
             } else {
-                if(!is_dir($this->bucket)) return($this->addError('I can not find bucket: '.$this->bucket));
+                if(!is_dir($this->bucket)) {
+                    $this->core->__p->add('Bucket', null, 'endnote');
+                    return($this->addError('I can not find bucket: '.$this->bucket));
+                }
             }
 
+            $time = microtime(true);
             $this->vars['upload_max_filesize'] = ini_get('upload_max_filesize');
             $this->vars['max_file_uploads'] = ini_get('max_file_uploads');
             $this->vars['file_uploads'] = ini_get('file_uploads');
@@ -62,7 +82,12 @@ if (!defined ("_Buckets_CLASS_") ) {
                     }
                     $this->isUploaded = true;
                 }
+
+                if($this->debug)
+                    $this->core->logs->add("__construct('{$bucket_root}') [storing temporally uploaded files:".count($_FILES)."]". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
+
             }
+            $this->core->__p->add('Buckets', null, 'endnote');
         }
 
         function deleteUploadFiles() {
@@ -76,6 +101,8 @@ if (!defined ("_Buckets_CLASS_") ) {
          */
         function manageUploadFiles($dest_bucket='', $options =[]) {
 
+            $time = microtime(true);
+            $this->core->__p->add('Buckets.manageUploadFiles', $dest_bucket, 'note');
 
             $public=($options['public'])?true:false;
             $ssl=($options['ssl'])?true:false;
@@ -97,14 +124,11 @@ if (!defined ("_Buckets_CLASS_") ) {
                     }
                 }
             } else {
-                if($this->core->is->development()) {
-                    $base_dir = $this->bucket;
-                } else {
-                    $base_dir = $this->bucket;
-                }
+                $base_dir = $this->bucket;
             }
 
             if(!is_dir($base_dir)) {
+                $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
                 return($this->addError('the path to write the files does not exist: '.$base_dir));
             }
 
@@ -134,7 +158,10 @@ if (!defined ("_Buckets_CLASS_") ) {
                                             break;
                                         }
                                     }
-                                if(!$allow) return($this->addError($value['name'].' does not have any of the following extensions: '.$options['allowed_extensions'],'extensions'));
+                                if(!$allow) {
+                                    $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
+                                    return($this->addError($value['name'].' does not have any of the following extensions: '.$options['allowed_extensions'],'extensions'));
+                                }
                             }
 
                             // Do I have allowed content types
@@ -147,7 +174,10 @@ if (!defined ("_Buckets_CLASS_") ) {
                                         break;
                                     }
                                 }
-                                if(!$allow) return($this->addError($value['type'].' does not match with any of the following content-types: '.$options['allowed_content_types'],'content-type'));
+                                if(!$allow) {
+                                    $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
+                                    return($this->addError($value['type'].' does not match with any of the following content-types: '.$options['allowed_content_types'],'content-type'));
+                                }
                             }
 
                             // do not use the original name.. and transform to has+extension
@@ -188,7 +218,6 @@ if (!defined ("_Buckets_CLASS_") ) {
                                 }
 
                             }catch(Exception $e) {
-                                die('bbb');
                                 $this->addError($e->getMessage());
                                 $this->addError(error_get_last());
                                 $this->uploadedFiles[$key][$i]['error'] = $this->errorMsg;
@@ -199,6 +228,11 @@ if (!defined ("_Buckets_CLASS_") ) {
                 }
 
             }
+
+            if($this->debug)
+                $this->core->logs->add("manageUploadFiles('{$dest_bucket}') [processing uploaded files:".count($this->uploadedFiles)."]". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
+
+            $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
             return($this->uploadedFiles);
         }
 
