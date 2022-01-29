@@ -6118,9 +6118,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
         }
 
-        function getUserGoogleAccessToken()
+        /**
+         *
+         * @param string $user optional is the Google user email. If empty it will prompt it
+         * @return array|mixed|void
+         */
+        function getUserGoogleAccessToken(string $user='')
         {
-            $user = $this->getCacheVar('user_readUserGoogleCredentials');
+            if(!$user) $user = $this->getCacheVar('user_readUserGoogleCredentials');
             $user_new='';
             $token=[];
             if($user) $token = $this->getCacheVar($user.'_token_readUserGoogleCredentials');
@@ -6155,6 +6160,22 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->sendTerminal('Using Google Access Token for User: '.$user);
             }
             return($token);
+        }
+
+        function getERPTokenWithGoogleAccessToken($namespace='cloudframework',$user='') {
+
+            if(!$user) {
+                $user = $this->core->security->getGoogleEmailAccount();
+                if($this->core->security->error) return($this->addError($this->core->security->errorMsg));
+            }
+
+            $user_erp_token = $this->getCacheVar($user.'_'.$namespace.'_erp_token');
+            if(!$user_erp_token || (microtime(true)-$user_erp_token['time']> 3500)) {
+
+            }
+
+
+
         }
     }
 }
