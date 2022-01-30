@@ -6125,26 +6125,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function getUserGoogleAccessToken(string $user='')
         {
-            if(!$user) $user = $this->getCacheVar('user_readUserGoogleCredentials');
-            $user_new='';
-            $token=[];
-            if($user) $token = $this->getCacheVar($user.'_token_readUserGoogleCredentials');
-            if (!$user || !$this->core->is->validEmail($user) || !$token || (microtime(true)-$token['time'] > 3500)) {
+            //region VERIFY $user or prompt it
+            if(!$user) {
+                $user = $this->getCacheVar('user_readUserGoogleCredentials');
                 do {
                     $user_new = $this->prompt('Give me your Google User Email: ', $user);
-                } while (!$this->core->is->validEmail($user_new)) ;
+                } while (!$this->core->is->validEmail($user_new));
                 $this->setCacheVar('user_readUserGoogleCredentials',$user_new);
-            }
-
-            if(!$token || ($user_new && $user != $user_new)) {
                 $user = $user_new;
-                $token = $this->getCacheVar($user.'_token_readUserGoogleCredentials');
             }
+            $this->sendTerminal('Gathering Access Token for user: '.$user);
+            //endregion
 
+            //region SET $token from cache or gather a new one if expired
+            $token = $this->getCacheVar($user.'_token_readUserGoogleCredentials');
             if(!$token || (microtime(true)-$token['time'] > 3500)) {
                 $token=[];
                 $gcloud_token_command = 'gcloud auth print-access-token --account='.$user;
-                $this->sendTerminal('Gathering token for account: '.$user);
+                $this->sendTerminal('gcloud auth print-access-token --account='.$user);
                 $auth['token'] = shell_exec($gcloud_token_command);
                 if(!$auth['token']) return($this->addError('The following command does not work: '.$gcloud_token_command));
                 $token_info = $this->core->request->post_json_decode('https://www.googleapis.com/oauth2/v1/tokeninfo',['access_token'=>$auth['token']],['Content-Type'=>'application/x-www-form-urlencoded']);
@@ -6156,25 +6154,68 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $token['email'] = $user;
                 $token['info'] = $token_info;
                 $this->setCacheVar($user.'_token_readUserGoogleCredentials',$token);
-            } else {
-                $this->sendTerminal('Using Google Access Token for User: '.$user);
             }
+            //endregion
+
+            //region RETURN $token
             return($token);
+            //endregion
         }
 
-        function getERPTokenWithGoogleAccessToken($namespace='cloudframework',$user='') {
+        /**
+         * Return the ERP for the user using a Google Access token for specific namespace
+         * @param string $namespace
+         * @param string $user
+         * @return mixed|void
+         */
+        function getERPTokenWithGoogleAccessToken($namespace='',$user='') {
 
-            if(!$user) {
+            //region VERIFY $namespace
+            if(!$namespace && !( $namespace = $this->core->config->get('core.erp.platform_id')))
+                return($this->addError('Missing $namespace var or core.erp.platform_id config var'));
+            //endregion
+
+            //region VERIFY $user or GET it from CACHE or GET it from getGoogleEmailAccount()
+            if(!$user && !($user = $this->getCacheVar($namespace.'_erp_user'))) {
                 $user = $this->core->security->getGoogleEmailAccount();
                 if($this->core->security->error) return($this->addError($this->core->security->errorMsg));
+                $this->setCacheVar($namespace.'_erp_user',$user);
             }
+            //endregion
 
+            //region SET $user_erp_token from cache expiring in 23h or get it from https://api.cloudframework.io/core/signin
             $user_erp_token = $this->getCacheVar($user.'_'.$namespace.'_erp_token');
-            if(!$user_erp_token || (microtime(true)-$user_erp_token['time']> 3500)) {
+            if(!$user_erp_token || (microtime(true)-$user_erp_token['time']> 60*60*23)) {
 
+                //region GET $access_token from Google
+                // https://app.cloudframework.app/app.html#https://core20.web.app/ajax/ecm.html?page=/scripts/auth/erp-login-with-google-credentials
+                if(!($access_token = $this->getUserGoogleAccessToken($user))) return;
+                $token = $access_token['token'];
+                //endregion
+
+                //region SET $payload and POST: https://api.cloudframework.io/core/signin/cloudframework/in
+                $payload = [
+                    'user'=>$user,
+                    'token'=> $token,
+                    'type'=>'google_token'
+                ];
+                //endregion
+
+                $this->sendTerminal('Calling [https://api.cloudframework.io/core/signin/'.$namespace.'/in] with Google access token');
+                //region SET $user_erp_token CALLING https://api.cloudframework.io/core/signin/cloudframework/in to get ERP Token
+                $ret = $this->core->request->post_json_decode('https://api7.cloudframework.io/core/signin/'.$namespace.'/in',$payload, ['X-WEB-KEY'=>'getERPTokenWithGoogleAccessToken']);
+                if($this->core->request->error) return($this->addError($this->core->request->errorMsg));
+                $user_erp_token = [
+                    'time'=>microtime(true),
+                    'token'=>$ret['data']['dstoken']];
+                $this->setCacheVar($user.'_'.$namespace.'_erp_token',$user_erp_token);
+                //endregion
             }
+            //endregion
 
-
+            //region RETURN $user_erp_token['token']
+            return $user_erp_token['token'];
+            //endregion
 
         }
     }
