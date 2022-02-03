@@ -3,10 +3,16 @@ Following [CloudFramework Instructions](https://www.notion.so/cloudframework/app
 ```shell
 # lines you have executed
 composer require cloudframework-io/appengine-php-core-7.4
-sh vendor/cloudframework-io/appengine-php-core-7.4/copy-basic-files-to-start.sh
+php vendor/cloudframework-io/appengine-php-core-7.4/install.php
 
 # create temporal local data directory: ./local_data/cache
 composer clean
+
+# To develop locally with CloudFramework ERP and to interact With Datastore, Datastorage, etc.. products you need to apply your 
+# GCP credentials. Todo do that:
+# It is necessary that your user have right credentials to access the different solutions
+# This step is optional
+composer credentials
 
 # To work with APIs. Try now http://localhost:8080/training/hello
 # you will find a file api/training/hello.php
