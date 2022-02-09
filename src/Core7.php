@@ -5166,7 +5166,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 case "db":
                     list($type,$table) = explode(':',$object,2);
 
-                    if(isset($this->models[$object]['data']['extends'])) {
+                    if(isset($this->models[$object]['data']['extends']) && $this->models[$object]['data']['extends']) {
                         $model_extended = 'db:'.$this->models[$object]['data']['extends'];
                         if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $object does not exist",404));
 
@@ -5179,7 +5179,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         if(isset($this->models[$object]['data']['interface']) && $this->models[$object]['data']['interface']) foreach ($this->models[$object]['data']['interface'] as $object_property=>$data) {
                             $this->models[$model_extended]['data']['interface'][$object_property] = $data;
                         }
-                        $this->models[$object]['data'] = array_merge(['extended_from'=>$table],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
+                        $this->models[$object]['data'] = array_merge(['extended_from'=>$this->models[$object]['data']['extends']],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
 
                     }
                     // rewrite name of the table
@@ -5198,7 +5198,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] paramater'));
 
                     //region EVALUATE extends the object from others
-                    if(isset($this->models[$object]['data']['extends'])) {
+                    if(isset($this->models[$object]['data']['extends']) && $this->models[$object]['data']['extends']) {
                         // look for the model
                         $model_extended = 'ds:'.$this->models[$object]['data']['extends'];
                         if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $object does not exist",404));
@@ -5213,7 +5213,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                             $this->models[$model_extended]['data']['interface'][$object_property] = $data;
                         }
 
-                        $this->models[$object]['data'] = array_merge(['extended_from'=>$entity],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
+                        $this->models[$object]['data'] = array_merge(['extended_from'=>$this->models[$object]['data']['extends']],array_merge($this->models[$model_extended]['data'],array_merge($this->models[$object]['data'],$this->models[$model_extended]['data'])));
                         $entity = $this->models[$object]['data']['extends'];
                     }
                     //endregion
