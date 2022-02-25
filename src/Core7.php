@@ -117,7 +117,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.01261';
+        var $_version = 'v74.02251';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2795,6 +2795,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function readERPDeveloperEncryptedSubKeys($erp_platform_id='',$erp_user='')
         {
+
             //region CHECK $erp_platform_id value
             if(!$erp_platform_id || !is_string($erp_platform_id)) {
                 $erp_platform_id = $this->core->config->get('core.erp.platform_id');
@@ -2900,12 +2901,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /**
          * Return a secret var stored in CloudFramework Secret Manager through the ERP/BPA
          * $this->get('core.gcp.secrets.env_vars') in the $this->get('core.gcp.secrets.project_id')
-         * @param string $var name of the var contained in the secret
-         * @param string optional $cf_secret_id CF secretId defined in the ERP. Default value is $this->get('core.erp.secrets.secret_id')
-         * @param string optional $cf_secret_token CF secretToken defined in the ERP. Default value is $this->get('core.erp.secrets.secret_token'
-         * @param string optional $platform_id of the ERP. Default value is $this->get('core.erp.platform_id'
-         * @param string optional $user_token User token when is required from the following command: gcloud auth print-access-token --account={{personal_user}}
-         * @return mixed|null if the env var $var exist it returns the contenct and it can be any type
+         * @param string $erp_secret_id ID of the secret in the ERP. If this ID match with with
+         * @param string $erp_platform_id ID of the platform to look for the secret
+         * @param string $erp_user ID of the user who reads the secret
+         * @return mixed|null if the env var $var exist it returns the content and it can be any type
          */
         public function readERPSecretVars($erp_secret_id='',$erp_platform_id='',$erp_user='') {
 
@@ -2929,9 +2928,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
                     $erp_user = $this->core->security->getGoogleEmailAccount();
                 }
-                if(!$erp_user) return($this->addError('readERPSecretVars(..) missing function-var($erp_platform_id) or config-var(core.erp.platform_id)'));
+                if(!$erp_user) return($this->addError('readERPSecretVars(..) missing function readERPSecretVars(..,$erp_user) or config-var(core.erp.user_id.{platform_id})'));
             }
             //endregion
+
+            if(!$this->readERPDeveloperEncryptedSubKeys($erp_platform_id,$erp_user))
+                return($this->addError('Called from readERPSecretVars(..)'));
 
             //region READ $user_secrets from cache and RETURN it if it exist
             $key = 'getMyERPSecrets_'.$this->core->gc_project_id.'_'.$erp_platform_id.'_'.$erp_secret_id;
@@ -2957,7 +2959,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $token_info = $this->getGoogleTokenInfo($token);
             if(isset($token_info['error'])) return($this->addError($token_info));
             // If the token_info does not contains email attribute the we trust the email sent in the header.
-            if(!isset($token_info['email']) && !isset($token_info['sub'])) return($this->addError('CoreSecurity.getMyERPSecrets() has not got a token with email or $token attributes'));
+            if(!isset($token_info['email']) && !isset($token_info['sub'])) return($this->addError('CoreSecurity.readERPSecretVars() has not got a token with email or $token attributes'));
 
             $user_secrets['id'] = (isset($token_info['email']))?$token_info['email']:$token_info['sub'];
             $user_secrets['token'] = $token_info;
@@ -3802,6 +3804,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public function readCache($security_group = 'default') {
             if(!isset($this->cache[$security_group]))
                 $this->cache[$security_group] = ($this->core->cache->get('Core7.CoreSecurity.'.$security_group,3600*24,null,$this->cache_key,$this->cache_iv))?:[];
+        }
+
+        /**
+         * Reset Cache of the module
+         */
+        public function resetCacheForERPSecretVars() {
+            $this->resetCache('ERP.secrets');
         }
 
         /**
@@ -5029,6 +5038,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $error = false;
         var $errorMsg = null;
         var $errorCode = null;
+        var $dbConnections = [];
+        var $dbConnection = 'default';
         /** @var CloudSQL $db  */
         var $db = null;
         /** @var DataMongoDB $mongoDB  */
@@ -5276,15 +5287,34 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Init a DB connection
+         * @param string $connection optional connection to use. By default $this->dbConnection
          * @return bool
          */
-        public function dbInit() {
+        public function dbInit($connection =''): bool
+        {
 
-            if(null === $this->db) {
-                $this->db = $this->core->loadClass('CloudSQL');
-                if(!$this->db->connect()) $this->addError($this->db->getError());
+            //region EVALUATE $connection
+            if($connection) $this->dbConnection = $connection;
+            //endregion
+
+            //region VERIFY $this->dbConnections[$this->dbConnection] exist
+            if(!isset($this->dbConnections[$this->dbConnection])) {
+                if(class_exists('CloudSQL'))
+                    $this->dbConnections[$this->dbConnection] = new CloudSQL($this->core);
+                else
+                    $this->dbConnections[$this->dbConnection] = $this->core->loadClass('CloudSQL');
+
+                if(!$this->dbConnections[$this->dbConnection]->connect()) $this->addError($this->dbConnections[$this->dbConnection]->getError());
             }
+            //endregion
+
+            //region SET $this->db = &$this->dbConnections[$this->dbConnection];
+            $this->db = &$this->dbConnections[$this->dbConnection];
+            //endregion
+
+            //region RETURN !$this->db->error();
             return !$this->db->error();
+            //endregion
         }
 
         /**
@@ -5299,6 +5329,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(!is_string($SQL)) return($this->addError('Wrong $SQL method parameter in: dbQuery($title, $SQL, $params=[]) '));
             // Verify we have the object created
             if(!$this->dbInit()) return($this->errorMsg);
+
 
             // Execute the query
             $ret = $this->db->getDataFromQuery($SQL,$params);
@@ -5456,8 +5487,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return true;
         }
 
-        public function dbClose() {
-            if(is_object($this->db)) $this->db->close();
+        /**
+         * Close Database connections.
+         * @param string $connection Optional it specify to close a specific connection instead of all
+         */
+        public function dbClose(string $connection='') {
+            foreach (array_keys($this->dbConnections) as $key) {
+                if(!$connection || $connection==$key) $this->dbConnections[$key]->close();
+            }
         }
 
         /**

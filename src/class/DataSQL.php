@@ -2,6 +2,8 @@
 
 class DataSQL
 {
+    /** @var Core7  */
+    var $core;
     var $error = false;
     var $errorMsg = '';
     var $entity_schema = null;
@@ -15,6 +17,8 @@ class DataSQL
     var $offset = 0;
     var $order = '';
     var $debug = false;
+    var $dbConnections = [];
+    var $dbCredentials = [];
     private $joins = [];
     private $queryFields = '';
     private $queryWhere = [];
@@ -25,25 +29,34 @@ class DataSQL
 
     /**
      * DataSQL constructor.
-     * @param Core $core
-     * @param array $model where [0] is the table name and [1] is the model ['model'=>[],'mapping'=>[], etc..]
+     * @param Core7 $core
+     * @param array $params where [0] is the table name and [1] is the model ['model'=>[],'mapping'=>[], etc..], 2 optionally is the connection name to have more than one connection
      */
-    function __construct(Core7 &$core, $model)
+    function __construct(Core7 &$core, array $params)
     {
 
-        // Get core function
+        //region SET $this->core = core
         $this->core = $core;
+        //endregion
 
-        //Debug logs
+        //region SET $this->debug = true; by default when we are developing in localhost
         if($this->core->is->development()) {
             $this->debug = true;
         }
-        // Name
-        $this->entity_name = $model[0];
-        if(!is_string($this->entity_name) || !strlen($this->entity_name)) return($this->addError('Missing schema name '));
+        //endregion
 
-        // Model
-        $this->entity_schema = $model[1];
+        //region CHECK $params has the right structure
+        if(!isset($params[0]) || !isset($params[1]['model']))
+            return($this->addError('Missing $params with the folling structure: [{table_name},[{model=>[]}]]'));
+        //endregion
+
+        //region SET $this->entity_name
+        $this->entity_name = $params[0];
+        if(!is_string($this->entity_name) || !strlen($this->entity_name)) return($this->addError('Missing schema name '));
+        //endregion
+
+        //region SET $this->entity_schema and verify that exist any Key in the model
+        $this->entity_schema = $params[1];
         if(!is_array($this->entity_schema)) return($this->addError('Missing schema in '.$this->entity_name));
         foreach ($this->entity_schema['model'] as $field =>$item) {
             if(stripos($item[1],'isKey')!==false) {
@@ -63,14 +76,7 @@ class DataSQL
             )?'int':'char';
         }
         if(!count($this->keys)) return($this->addError('Missing Keys in the schema: '.$this->entity_name));
-
-        if(isset($this->entity_schema['mapping'])) {
-            foreach ($this->entity_schema['mapping'] as $field => $item) {
-                if ($item['field']) {
-                    $this->mapping[$item['field']] = $field;
-                }
-            }
-        }
+        //endregion
 
     }
 

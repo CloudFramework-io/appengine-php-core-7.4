@@ -14,17 +14,21 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
     class DataBQ
     {
         var $core = null;                   // Core7 reference
+        var $project_id = null;             // project_id
         /** @var BigQueryClient|null  */
         var $client = null;                 // BQ Client
+        // table to write Data
+        var $dataset_name = null;           //dataset name to be used
+        var $table_name = null;             //table name to be used
         /** @var \Google\Cloud\BigQuery\Dataset $dataset */
-        var $dataset=null;                  // Dataset to write Data
+        var $dataset=null;                  // Dataset apply data
+        /** @var \Google\Cloud\BigQuery\Table $table */
+        var $table=null;
+        var $key = null;
 
-        var $project_id = null;             // project_id
-        var $dataset_name = null;
         var $error = false;
-        var $errorMsg = '';
+        var $errorMsg = [];
         var $entity_schema = null;
-        var $keys = [];
         var $fields = [];
         var $mapping = [];
         private $use_mapping = false;
@@ -55,46 +59,52 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $this->core = $core;
             $this->core->__p->add('DataBQ new instance ', $params[0], 'note');
 
-            $this->dataset_name = (isset($params[0]))?$params[0]:null;
-            $this->entity_schema =  (isset($params[1])) ? $params[1] : null; // Prepare $this->schema
-            if(isset($this->entity_schema['model'] ) && is_array($this->entity_schema['model']))
-                foreach ($this->entity_schema['model'] as $field =>$item) {
-                    if(stripos($item[1],'isKey')!==false) {
-                        $this->keys[] = [$field,(stripos($item[0],'int')!== false
-                            || stripos($item[0],'bit')!== false
-                            || stripos($item[0],'float')!== false
-                            || stripos($item[0],'double')!== false
-                            || stripos($item[0],'number')!== false)?'int':'char'];
-                    }
+            //region INIT $this->dataset_name,$this->table_name if isset($params[0]) and strpos($params[0],'.')
+            if(isset($params[0]) && strpos($params[0],'.'))
+                list($this->dataset_name,$this->table_name) = explode('.',$params[0],2);
+            //endregion
 
-                    // Detect numbers
-                    $this->fields[$field] = (stripos($item[0],'int')!== false
-                        || stripos($item[0],'bit')!== false
-                        || stripos($item[0],'float')!== false
-                        || stripos($item[0],'double')!== false
-                        || stripos($item[0],'number')!== false
-                    )?'int':'char';
-                }
+            //region SET $this->entity_schema if isset($params[1])
+            if(isset($params[1])) $this->processSchema($params[1]);
+            //endregion
 
+            //region SET $options and read $params[2] if it exist
             $options = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
             $this->project_id = $this->core->gc_project_id;
             if(isset($options['projectId'])) $this->project_id = $options['projectId'];
             else $options['projectId'] = $this->project_id;
+            //endregion
 
-            // SETUP DatastoreClient
+            //region SET $this->client and ($this->dataset, $this->table if $this->dataset_name and $this->table_name exist)
             try {
                 $this->client = new BigQueryClient($options);
                 if($this->dataset_name) {
-                    /** @var \Google\Cloud\BigQuery\Dataset $dataset */
                     $this->dataset = $this->client->dataset($this->dataset_name);
+                    if($this->table_name) {
+                        $this->table =$this->dataset->table($this->table_name);
+                    }
                 }
             } catch (Exception $e) {
                 return($this->addError($e->getMessage()));
             }
+            //endregion
 
             $this->core->__p->add('DataBQ new instance ', '', 'endnote');
             return true;
 
+        }
+
+        private function processSchema($schema) {
+            if(!is_array($schema)) return;
+            $this->entity_schema = $schema;
+            if(isset($this->entity_schema['model'])) foreach ($this->entity_schema['model'] as $field => $item) {
+                if(isset($item[1]) && stripos($item[1],'isKey')!==false) {
+                    if($this->key) return($this->addError('There is two keys in the model: '.$this->key.','.$field));
+                    $this->key = $field;
+                }
+                $this->fields[$field] = $item[0]??'string';
+            }
+            return true;
         }
 
         /**
@@ -123,6 +133,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @return array|void
          */
         public function dbQuery($title,$_q,$params=[]) {
+            return $this->_query($_q,$params);
+        }
+        public function query($title,$_q,$params=[]) {
             return $this->_query($_q,$params);
         }
 
@@ -273,6 +286,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $this->virtualFields = [];
             $this->groupBy = '';
             $this->view = null;
+            $this->error = false;
+            $this->errorMsg = [];
+
         }
 
         /**
@@ -280,7 +296,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @return array|null
          */
         function getFields() {
-            return array_keys($this->fields);
+            return $this->fields?array_keys($this->fields):['*'];
         }
 
         /**
@@ -298,43 +314,26 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          */
         function getSQLSelectFields($fields=null) {
             if(null === $fields || empty($fields)) {
-                if($this->use_mapping)
-                    $fields = $this->getMappingFields();
-                else
-                    $fields = $this->getFields();
+                $fields = $this->getFields();
             }
-            if(!$this->use_mapping || !count($this->mapping)) {
-                $ret='';
-                foreach ($fields as $i=>$field) {
-                    if($ret) $ret.=',';
-                    if(strpos($field,'(')!==false) {
-                        $ret.=str_replace('(','(`'.$this->dataset_name.'`.',$field);
-                    } else {
-                        //JSON workaround https://bugs.php.net/bug.php?id=70384
-                        if(isset($this->entity_schema['model'][$field][0]) && $this->entity_schema['model'][$field][0]=='json') {
-                            $ret.='CAST(`'.$this->dataset_name.'`.'.$field.' as CHAR) as '.$field;
-                        }elseif(isset($this->entity_schema['model'][$field][0])) {
-                            $ret.='`'.$this->dataset_name.'`.'.$field;
-                        }else{
-                            $ret.=$field;
-                        }
+
+            $ret='';
+            foreach ($fields as $i=>$field) {
+                if($ret) $ret.=',';
+                if(strpos($field,'(')!==false) {
+                    $ret.=str_replace('(','(`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.',$field);
+                } else {
+                   if(isset($this->entity_schema['model'][$field][0])) {
+                        $ret.='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.'.$field;
+                    } else{
+                        $ret.=$field;
                     }
-
                 }
-                return $ret;
-                //$this->dataset_name.'.'.implode(','.$this->dataset_name.'.',$fields);
-            }
-            else {
-                $ret = '';
-                foreach ($this->mapping as $field=>$fieldMapped) {
-                    if(null != $fields && !in_array($fieldMapped,$fields)) continue;
 
-                    if($this->view && (!isset($this->entity_schema['mapping'][$fieldMapped]['views']) || !in_array($this->view,$this->entity_schema['mapping'][$fieldMapped]['views']))) continue;
-                    if($ret) $ret.=',';
-                    $ret .= "`{$this->dataset_name}`.{$field} AS {$fieldMapped}";
-                }
-                return $ret;
             }
+            return $ret;
+            //$this->dataset_name.'.'.implode(','.$this->dataset_name.'.',$fields);
+
         }
 
         /**
@@ -356,37 +355,32 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          */
         function fetchByKeys($keysWhere, $fields=null) {
             if($this->error) return;
+            if(!$this->key) return($this->addError('fetchByKeys($keysWhere, $fields=null) has been called but there is no key in the data model'));
 
             // Keys to find
             if(!is_array($keysWhere)) $keysWhere = [$keysWhere];
 
             // Where condition for the SELECT
-            $where = ''; $params = [];
-            foreach ($this->keys as $i=>$key) {
-
-                if($where) $where.=' AND ';
-                $where.=" `{$this->dataset_name}`.{$key[0]} IN ( ";
-                $values = '';
-                foreach ($keysWhere as $keyWhere) {
-                    if(!is_array($keyWhere)) $keyWhere = [$keyWhere];
-                    if($values) $values.=', ';
-                    if($key[1]=='int') $values.='%s';
-                    else $values.="'%s'";
-                    $params[] = $keyWhere[$i];
-                }
-
-                $where.= "{$values} )";
+            $where = " `{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$this->key} IN ( ";
+            $params = [];
+            $values = '';
+            foreach ($keysWhere as $keyWhere) {
+                if($values) $values.=', ';
+                if($this->entity_schema['model'][$this->key][0]=='integer') $values.='%s';
+                else $values.="'%s'";
+                $params[] = $keyWhere;
             }
+
+            $where.= "{$values} )";
 
             // Fields to returned
             $sqlFields = $this->getQuerySQLFields($fields);
             $from = $this->getQuerySQLFroms();
 
             // Query
-            $SQL = "SELECT {$sqlFields} FROM {$from} WHERE {$where}";
+            $_sql = "SELECT {$sqlFields} FROM {$from} WHERE {$where}";
             if(!$sqlFields) return($this->addError('No fields to select found: '.json_encode($fields)));
-
-            return $this->_query($SQL,$params);
+            return $this->_query($_sql,$params);
 
         }
 
@@ -476,7 +470,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         }
         /**
          * Return records [0..n][record_structure] from the db object
-         * @param array $keysWhere
+         * @param array|string $keysWhere
          * @param null $fields
          * @return array|void
          */
@@ -552,51 +546,53 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             return($ret);
         }
 
-        /**
+        /**dele
          * Update a record in db
+         * It requires to add always the following condition: and _created < TIMESTAMP_SUB(_created, INTERVAL 30 MINUTE)
+         * because you can not update or delete records inserted before 30' has passed
          * @param $data
          * @return bool|null|void
          */
-        public function update(&$data) {
+        public function update($data) {
             if(!is_array($data) ) return($this->addError('update($data) $data has to be an array with key->value'));
+            if(!isset($this->entity_schema['model'])) return $this->addError('update($data) there is no model defined');
+            if(!$this->key) return $this->addError('update($data) there is no $this->key defined');
+            if(!isset($data[$this->key]) || !$data[$this->key]) return $this->addError('update($data) missing key field in $data: '.$this->key);
+            if(count($data)<2) return $this->addError('update($data) there is no fields to update ');
 
-            // Let's convert from Mapping into SQL fields
-            if($this->use_mapping) {
-                $mapdata = $data;
-                $data = [];
-                foreach ($mapdata as $key=>$value) {
-                    if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('update($data) $data contains a wrong mapped key: '.$key));
-                    $data[$this->entity_schema['mapping'][$key]['field']] = $value;
+            $ret = $this->fetchByKeys($data[$this->key]);
+            if($this->error) return($this->addError('update($data) error calling $this->fetchByKeys($data[$this->key])'));
+            if(!$ret) return($this->addError('update($data) contains a key that does not exist in the dataset: '.$this->key.'='.$data[$this->key]));
+
+            $_sql = "UPDATE `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` SET ";
+            $set = "";
+            $params = [];
+            foreach ($data as $field=>$value) if($field!=$this->key) {
+                if(isset($this->entity_schema['model']) && !isset($this->entity_schema['model'][$field]))
+                    return $this->addError('update($data) has received a field not included in the model: '.$field);
+
+                if($set) $set.=', ';
+                $set.= " {$field}=";
+
+                //region EVALUATE string values VS boolean or number values
+                if(isset($this->entity_schema['model'][$field][0]) &&  in_array($this->entity_schema['model'][$field][0],['integer','float','boolean'])) $set.='%s';
+                else $set.='"%s"';
+                //endregion
+
+                //region modify boolean values
+                if(isset($this->entity_schema['model'][$field][0]) &&$this->entity_schema['model'][$field][0]=='boolean') {
+                    $value=$value?'true':'false';
                 }
+                //endregion
+                $params[] = $value;
+
             }
 
-            $ret= $this->core->model->dbUpdate($this->dataset_name.' update record: '.json_encode($data),$this->dataset_name,$data);
-            if($this->core->model->error) $this->addError($this->core->model->errorMsg);
-            return($ret);
-
-        }
-
-        /**
-         * Update a record in db
-         * @param $data
-         * @return bool|null|void
-         */
-        public function upsert($data) {
-            if(!is_array($data) ) return($this->addError('upsert($data) $data has to be an array with key->value'));
-
-            // Let's convert from Mapping into SQL fields
-            if($this->use_mapping) {
-                $mapdata = $data;
-                $data = [];
-                foreach ($mapdata as $key=>$value) {
-                    if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('upsert($data) $data contains a wrong mapped key: '.$key));
-                    $data[$this->entity_schema['mapping'][$key]['field']] = $value;
-                }
-            }
-
-            $ret= $this->core->model->dbUpSert($this->dataset_name.' upsert record: '.json_encode($data),$this->dataset_name,$data);
-            if($this->core->model->error) $this->addError($this->core->model->errorMsg);
-            return($ret);
+            $_sql.=$set." WHERE {$this->key}=";
+            if(isset($this->entity_schema['model'][$this->key][0]) &&  in_array($this->entity_schema['model'][$this->key][0],['integer','float','boolean'])) $_sql.='%s';
+            else $_sql.='"%s"';
+            $params[] = $data[$this->key];
+            return $this->_query($_sql,$params);
 
         }
 
@@ -607,21 +603,92 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          */
         public function insert($data) {
             if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
+            if(!isset($this->entity_schema['model'])) return $this->addError('insert($data) there is no model defined');
+            if(!$this->key) return $this->addError('insert($data) there is no $this->key defined');
+            if(!isset($data[$this->key]) || !$data[$this->key]) return $this->addError('insert($data) missing key field in $data: '.$this->key);
 
-            // Let's convert from Mapping into SQL fields
-            if($this->use_mapping) {
-                $mapdata = $data;
-                $data = [];
-                foreach ($mapdata as $key=>$value) {
-                    if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('insert($data) $data contains a wrong mapped key: '.$key));
-                    $data[$this->entity_schema['mapping'][$key]['field']] = $value;
+            $ret = $this->fetchByKeys($data[$this->key]);
+            if($this->error) return($this->addError('insert($data) error calling $this->fetchByKeys($data[$this->key])'));
+            if($ret) return($this->addError('insert($data) contains a key that already exist in the dataset: '.$this->key.'='.$data[$this->key]));
+
+            $_sql = "INSERT INTO  `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` (".implode(',',array_keys($data)).",_created) values(";
+            $set = "";
+            $params = [];
+            foreach ($data as $field=>$value) {
+                if(isset($this->entity_schema['model']) && !isset($this->entity_schema['model'][$field]))
+                    return $this->addError('update($data) has received a field not included in the model: '.$field);
+
+                if($set) $set.=', ';
+
+                //region EVALUATE string values VS boolean or number values
+                if(isset($this->entity_schema['model'][$field][0]) &&  in_array($this->entity_schema['model'][$field][0],['integer','float','boolean'])) $set.='%s';
+                else $set.='"%s"';
+                //endregion
+
+                //region modify boolean values
+                if(isset($this->entity_schema['model'][$field][0]) &&$this->entity_schema['model'][$field][0]=='boolean') {
+                    $value=$value?'true':'false';
+                }
+                //endregion
+                $params[] = $value;
+
+            }
+            $_sql.=$set.',CURRENT_TIMESTAMP())';
+            return $this->_query($_sql,$params);
+
+        }
+
+        /**
+         * Insert a record in dataset.table
+         * @param $data
+         * @return bool|null|void
+         */
+        public function insertWithStreamingBuffer($data) {
+            if(!$this->table ) return($this->addError('insert($data) called but there is not $this->table assigned'));
+            if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
+            if(!isset($data[0])) $data = [$data];
+
+            //region PREPARE $bq_data from $data to be inserted and adding _created field
+            $bq_data = [];
+            $keys = [];
+            foreach ($data as $i=>$foo) {
+                //region ADD _created field required from CLOUDFRAMEWORK
+                $data[$i]['_created'] = 'AUTO';
+                //endregion
+                $bq_data[] = ['data'=>&$data[$i]];
+                if($this->key){
+                    if(!isset($data[$i][$this->key])) return($this->addError('insert($data) missing key field in $data: '.$this->key));
+                    $keys[]= $data[$i][$this->key];
                 }
             }
+            //endregion
 
-            $ret= $this->core->model->dbInsert($this->dataset_name.' insert record: '.json_encode($data),$this->dataset_name,$data);
-            if($this->core->model->error) $this->addError($this->core->model->errorMsg);
-            return($ret);
+            //region IF $keys verify the records does not exist in the table
+            if($keys) {
+                $data = $this->fetchByKeys($keys,$this->key);
+                if($this->error) return($this->addError(' insert($data) error calling $this->fetchByKeys($keys)'));
+                if($data) return($this->addError(['error'=>'There are records with the same ids','data'=>$data]));
+            }
+            //endregion
 
+            //region INSERT $bq_data
+            try {
+                $insertResponse = $this->table->insertRows($bq_data);
+                if (!$insertResponse->isSuccessful()) {
+                    foreach ($insertResponse->failedRows() as $row) {
+                        foreach ($row['errors'] as $error) {
+                            $this->addError($error);
+                        }
+                    }
+                    return;
+                }
+            }  catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                return($this->addError($error));
+            }
+            //endregion
+
+            return($data);
         }
 
         /**
@@ -631,21 +698,26 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          */
         public function delete($data) {
             if(!is_array($data) ) return($this->addError('delete($data) $data has to be an array with key->value'));
+            if(!isset($this->entity_schema['model']))
+                return $this->addError('delete(&$data) there is no model defined');
 
-            // Let's convert from Mapping into SQL fields
-            if($this->use_mapping) {
-                $mapdata = $data;
-                $data = [];
-                foreach ($mapdata as $key=>$value) {
-                    if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('delete($data) $data contains a wrong mapped key: '.$key));
-                    $data[$this->entity_schema['mapping'][$key]['field']] = $value;
-                }
+            $_sql = "DELETE FROM `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` WHERE ";
+            $where = "";
+            $params = [];
+            foreach ($data as $field=>$value) {
+                if(isset($this->entity_schema['model']) && !isset($this->entity_schema['model'][$field]))
+                    return $this->addError('delete($data) has received a field not included in the model: '.$field);
+
+                if($where) $where.=' and ';
+                $where.= " {$field}=";
+                if(isset($this->entity_schema['model'][$field][0]) && in_array($this->entity_schema['model'][$field][0],['integer','float','boolean'])) $where.='%s';
+                else $where.='"%s"';
+                $params[] = $value;
+
             }
-
-            $ret= $this->core->model->dbDelete($this->dataset_name.' delete record: '.json_encode($data),$this->dataset_name,$data);
-            if($this->core->model->error) $this->addError($this->core->model->errorMsg);
-            return($ret);
-
+            //endregion
+            $_sql.=$where;
+            return $this->_query($_sql,$params);
         }
 
 
@@ -674,7 +746,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
                 if(isset($this->fields[$field]))  {
                     if(strlen($this->order)) $this->order.=', ';
-                    $this->order.= '`'.$this->dataset_name.'`.'.$field.((strtoupper(trim($type))=='DESC')?' DESC':' ASC');
+                    $this->order.= '`'.$this->table_name.'`.'.$field.((strtoupper(trim($type))=='DESC')?' DESC':' ASC');
                 } else {
                     $this->addError($field.' does not exist to order by');
                 }
@@ -691,7 +763,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             // Custom query rewrites previous where.
             if(!count($keysWhere)) $keysWhere = $this->queryWhere;
-
 
             // Loop the wheres
             if(is_array($keysWhere))
@@ -715,20 +786,15 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                     }
                     // Simple where
                     else {
-                        // TODO: support >,>=
-                        if($this->use_mapping) {
-                            if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong mapped key: '.$key));
-                            $key = $this->entity_schema['mapping'][$key]['field'];
-                        } else {
-                            if(!isset($this->fields[$key])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong key: '.$key));
-                        }
+                        // TODO: support >,>=,<,<=
+                        if(!isset($this->fields[$key])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong field: '.$key));
                     }
 
                     if($where) $where.=' AND ';
 
                     //region SET $is_date,$field
                     $is_date = isset($this->entity_schema['model'][$key][0]) && in_array($this->entity_schema['model'][$key][0],['date', 'datetime', 'datetimeiso','timestamp']);
-                    $field = "`{$this->dataset_name}`.{$key}";
+                    $field = "`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key}";
                     //endregion
 
                     switch (strval($value)) {
@@ -749,7 +815,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                         default:
                             // IN
                             if(is_array($value)) {
-                                if($this->fields[$key]=='int') {
+                                if(in_array($this->fields[$key],['integer','float'])) {
                                     $where.="{$field} IN (%s)";
                                     $params[] = implode(',',$value);
                                 }
@@ -766,10 +832,8 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                             }
                             // =
                             else {
-
                                 //region IF $is_date create a special query a continue;
                                 if($is_date) {
-
                                     // Evaluate a date field
                                     if(strpos($value,'/')===false) {
                                         $from = $value;
@@ -779,11 +843,11 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                     }
 
                                     if(strlen($from) == 4) {
-                                        $field = "FORMAT_DATE('%Y',`{$this->dataset_name}`.{$key})";
+                                        $field = "FORMAT_DATE('%Y',`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key})";
                                     } elseif(strlen($from) == 7) {
-                                        $field = "FORMAT_DATE('%Y-%m',`{$this->dataset_name}`.{$key})";
+                                        $field = "FORMAT_DATE('%Y-%m',`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key})";
                                     } elseif(strlen($from) == 10) {
-                                        $field = "FORMAT_DATE('%Y-%m-%d',`{$this->dataset_name}`.{$key})";
+                                        $field = "FORMAT_DATE('%Y-%m-%d',`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key})";
                                     } else {
                                         break;
                                     }
@@ -795,11 +859,11 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                         $params[] = $from;
                                         if($to) {
                                             if(strlen($to) == 4) {
-                                                $field = "FORMAT_DATE('%Y',`{$this->dataset_name}`.{$key})";
+                                                $field = "FORMAT_DATE('%Y',`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key})";
                                             } elseif(strlen($to) == 7) {
-                                                $field = "FORMAT_DATE('%Y-%m',`{$this->dataset_name}`.{$key})";
+                                                $field = "FORMAT_DATE('%Y-%m',`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key})";
                                             } elseif(strlen($to) == 10) {
-                                                $field = "FORMAT_DATE('%Y-%m-%d',`{$this->dataset_name}`.{$key})";
+                                                $field = "FORMAT_DATE('%Y-%m-%d',`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`.{$key})";
                                             } else {
                                                 break;
                                             }
@@ -810,10 +874,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                     break;
                                 }
                                 //endregion
-                                //region ELSE evaluate operators
+                                //region ELSE evaluate operators for ['integer','float','boolean'] value types
                                 else {
                                     $op = '=';
-                                    if($this->fields[$key]=='int') {
+                                    if(in_array($this->fields[$key],['integer','float','boolean'])) {
+
+                                        //region EVALUATE $op: >=,>,<=,<,!=
                                         // Add operators
                                         if(strpos($value,'>=')===0) {
                                             $op='>=';
@@ -831,7 +897,15 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                                             $op='!=';
                                             $value = str_replace('!=','',$value);
                                         }
+                                        //endregion
+
+                                        //region EVALUATE boolean value
+                                        if($this->fields[$key]=='boolean') $value = ($value)?'true':'false';
+                                        //endregion
+
+                                        //region SET $where
                                         $where.="{$field} {$op} %s";
+                                        //endregion
                                     }
                                     else {
                                         if(strpos($value,'%')!==false) {
@@ -848,10 +922,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
                                         $where.="{$field} {$op} '%s'";
                                     }
+
+                                    //region ASSIGN $value to $params[]
                                     $params[] = $value;
+                                    //endregion
                                 }
                                 //endregion
-
                             }
 
                             break;
@@ -882,13 +958,13 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if($fields && is_string($fields)) $fields = explode(',',$fields);
 
             $ret =  $this->getSQLSelectFields($fields);
-            if($ret=='*') $ret='`'.$this->dataset_name.'`.*';
+            if($ret=='*') $ret='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.*';
 
             foreach ($this->joins as $i=>$join) {
 
                 /** @var DataBQ $object */
                 $object = $join[1];
-                $ret.=','.str_replace('`'.$object->dataset_name.'`.',"_j{$i}.",$object->getQuerySQLFields());
+                $ret.=','.str_replace('`'.$object->project_id.'.'.$object->dataset_name.'.'.$object->table_name.'`.',"_j{$i}.",$object->getQuerySQLFields());
 
             }
 
@@ -896,11 +972,11 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         }
 
         function getQuerySQLFroms() {
-            $from = "`{$this->dataset_name}`";
+            $from = "`{$this->project_id}.{$this->dataset_name}.{$this->table_name}`";
             foreach ($this->joins as $i=>$join) {
                 /** @var DataBQ $object */
                 $object = $join[1];
-                $from.=" {$join[0]}  JOIN `{$object->dataset_name}` _j{$i} ON (`{$this->dataset_name}`.{$join[2]} = _j{$i}.{$join[3]})";
+                $from.=" {$join[0]}  JOIN `$this->project_id}.{$this->dataset_name}.{$object->table_name}` _j{$i} ON (`{$this->project_id}.{$this->dataset_name}.$this->table_name}`.{$join[2]} = _j{$i}.{$join[3]})";
             }
 
             return $from;
@@ -963,7 +1039,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $this->error = true;
             if(!is_array($this->errorMsg)) $this->errorMsg = [$this->errorMsg];
             $this->errorMsg[] = $value;
-            $this->core->errors->add(['DataBQ'=>$value]);
         }
 
         /**
@@ -993,13 +1068,8 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if(!is_array($data) || !count($data)) return($this->addError('getCheckedArrayToInsert: empty or not valid data'));
 
             $schema_to_validate = [];
-            if($this->use_mapping) {
-                if(!isset($this->entity_schema['mapping']) || !count($this->entity_schema['mapping'])) return($this->addError('getCheckedArrayToInsert: There is not mapping into '.$this->dataset_name));
-                $schema_to_validate =  $this->entity_schema['mapping'];
-            }
-            else foreach ($this->entity_schema['model'] as $field=>$item) {
-                list($type,$foo) = explode('|',$item[1],2);
-                $schema_to_validate[$field] = ['type'=>$type,'validation'=>$item[1]];
+            foreach ($this->entity_schema['model'] as $field=>$item) {
+                $schema_to_validate[$field] = ['type'=>$item[0],'validation'=>$item[1]??''];
             }
 
             $dataValidated = [];
@@ -1017,7 +1087,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             /* @var $dv DataValidation */
             $dv = $this->core->loadClass('DataValidation');
             if(!$dv->validateModel($schema_to_validate,$dataValidated,$dictionaries,$all)) {
-                $this->addError($this->dataset_name.': error validating Data in Model.: {'.$dv->field.'}. '.$dv->errorMsg);
+                $this->addError($this->table_name.': error validating Data in Model.: {'.$dv->field.'}. '.$dv->errorMsg);
             }
 
             return ($dataValidated);
@@ -1060,7 +1130,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          */
         public function getSimpleModelFromTable() {
             if(!$this->core->model->dbInit()) return;
-            return($this->core->model->db->getSimpleModelFromTable($this->dataset_name));
+            return($this->core->model->db->getSimpleModelFromTable($this->table_name));
         }
     }
 }

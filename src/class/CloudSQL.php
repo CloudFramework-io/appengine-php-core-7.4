@@ -536,8 +536,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         /** Assign an error */
         function setError($err) {
             $this->_error[] = $err;
-            $this->core->errors->add($err);
-            if($this->_debug) _print($err);
+            //$this->core->errors->add($err);
+            //if($this->_debug) _print($err);
 
         }
 
