@@ -220,7 +220,7 @@ class CFACompenentTitles
     public function subtitle($data) {$this->data[$this->index]['subtitle'] = $data; return $this;}
     public function active($data) {$this->data[$this->index]['active'] = (bool)$data; return $this;}
     public function onclick($data) {$this->data[$this->index]['onclick'] = $data; return $this;}
-    public function addBadge($title,$color='',$border=false) {if(!isset($this->data[$this->index]['badges'])) $this->data[$this->index]['badges']=[]; $this->data[$this->index]['badges'][] = ['title'=>$title,'color'=>$color,'border'=>(bool)$border]; return $this;}
+    public function addBadge($title,$color='',$border=false,$pill=false) {if(!isset($this->data[$this->index]['badges'])) $this->data[$this->index]['badges']=[]; $this->data[$this->index]['badges'][] = ['title'=>$title,'color'=>$color,'border'=>(bool)$border,'pill'=>(bool)$pill]; return $this;}
     public function addLeftPhoto($src,$alt='') {if(!isset($this->data[$this->index]['left-photos'])) $this->data[$this->index]['left-photos']=[]; $this->data[$this->index]['left-photos'][] = ['url'=>$src,'alt'=>$alt]; return $this;}
     public function addRightPhoto($src,$alt='') {if(!isset($this->data[$this->index]['right-photos'])) $this->data[$this->index]['right-photos']=[]; $this->data[$this->index]['right-photos'][] = ['url'=>$src,'alt'=>$alt]; return $this;}
     public function addPhoto($src,$alt='') {if(!isset($this->data[$this->index]['photos'])) $this->data[$this->index]['photos']=[]; $this->data[$this->index]['photos'][] = ['url'=>$src,'alt'=>$alt]; return $this;}
@@ -346,12 +346,12 @@ class CFACompenentTabs
     var $index = 0;
     var $data = [];
 
-    public function add($label, $title, $ico = "",$active=false)
+    public function add($label, $title, $icon = "",$active=false)
     {
         if (isset($this->data[$this->index]) && $this->data[$this->index]) $this->index++;
         $this->data[$this->index]['label'] = $label;
         $this->data[$this->index]['title'] = $title;
-        if ($ico) $this->data[$this->index]['ico'] = $ico;
+        if ($icon) $this->data[$this->index]['ico'] = $icon;
         if ($active) $this->data[$this->index]['active'] = true;
         return $this;
     }
@@ -408,4 +408,11 @@ class CFACompenentAlerts
     public function label($data) {$this->data[$this->index]['label'] = $data; return $this;}
     public function content($data) {$this->data[$this->index]['content'] = $data; return $this;}
     public function color($data) {$this->data[$this->index]['color'] = $data; return $this;}
+    public function icon($data) {$this->data[$this->index]['ico'] = $data; return $this;}
+    public function onclick($data) {$this->data[$this->index]['onclick'] = $data; return $this;}
+    public function addPhoto($src,$alt='') {if(!isset($this->data[$this->index]['photo'])) $this->data[$this->index]['photo']=[]; $this->data[$this->index]['photo'][] = ['url'=>$src,'alt'=>$alt]; return $this;}
+    public function jsIconCall($js_function,$icon) {$this->data[$this->index]['js-call'] = $js_function;$this->data[$this->index]['js-ico'] = $icon; return $this;}
+    public function addBadge($title,$color='',$border=false,$pill=false) {if(!isset($this->data[$this->index]['badges'])) $this->data[$this->index]['badges']=[]; $this->data[$this->index]['badges'][] = ['title'=>$title,'color'=>$color,'border'=>(bool)$border,'pill'=>(bool)$pill]; return $this;}
+
+
 }
