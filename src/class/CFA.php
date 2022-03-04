@@ -104,6 +104,12 @@ class CFACompenent
         return($this->component);
     }
 
+    public function html() {
+        if(!is_object($this->component) || get_class($this->component)!= 'CFACompenentHTML')
+            $this->component = new CFACompenentHTML();
+        return($this->component);
+    }
+
     public function cols() {
         if(!is_object($this->component) || get_class($this->component)!= 'CFACompenentCols')
             $this->component = new CFACompenentCols();
@@ -197,11 +203,30 @@ class CFACompenentHeader
         'js-ico'=>null,
     ];
 
-    public function ico($data) {$this->data['ico'] = $data; return $this;}
+    public function icon($data) {$this->data['ico'] = $data; return $this;}
     public function title($data) {$this->data['title'] = $data; return $this;}
     public function subtitle($data) {$this->data['subtitle'] = $data; return $this;}
     public function jsIconCall($js_function,$icon) {$this->data['js-call'] = $js_function;$this->data['js-ico'] = $icon; return $this;}
 }
+
+
+
+
+/**
+ * CFACompenentButtons Class component
+ */
+class CFACompenentHTML
+{
+    var $type = 'html';
+    var $data = [];
+    public function plain($data) {$this->data['html'] = $data;return $this;}
+    public function h1($data,$label='') {$this->data['html'] = "<h1".(($label)?' id="'.$label.'"':'').">{$data}</h1>";return $this;}
+    public function h2($data,$label='') {$this->data['html'] = "<h2".(($label)?' id="'.$label.'"':'').">{$data}</h2>";return $this;}
+    public function h3($data,$label='') {$this->data['html'] = "<h3".(($label)?' id="'.$label.'"':'').">{$data}</h3>";return $this;}
+    public function div($data,$label='') {$this->data['html'] = "<div".(($label)?' id="'.$label.'"':'').">{$data}</div>";return $this;}
+
+}
+
 /**
  * CFACompenentBoxes Class component
  */
