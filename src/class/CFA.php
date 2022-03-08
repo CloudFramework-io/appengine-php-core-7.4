@@ -70,15 +70,22 @@ class CFA
     /**
      * Return the CFA structure $this->data
      */
-    public function getData(){
-        foreach ($this->labels as $label=>$content) {
+    public function getData($only_label=''){
+        foreach ($this->labels as $label=>$content) if(!$only_label || $only_label==$label) {
             $this->data['components'][] = [
                 'label'=>$label,
                 'component'=>$content->component->type,
                 'content'=>$content->component->data
             ];
         }
-        return $this->data;
+        return $only_label?['components'=>$this->data['components']]:$this->data;
+    }
+
+    /**
+     * Return the CFA structure $this->data
+     */
+    public function getJSON($only_label=''){
+        return(json_encode($this->getData($only_label),JSON_PRETTY_PRINT));
     }
 
 }
@@ -218,12 +225,28 @@ class CFACompenentHeader
 class CFACompenentHTML
 {
     var $type = 'html';
-    var $data = [];
-    public function plain($data) {$this->data['html'] = $data;return $this;}
-    public function h1($data,$label='') {$this->data['html'] = "<h1".(($label)?' id="'.$label.'"':'').">{$data}</h1>";return $this;}
-    public function h2($data,$label='') {$this->data['html'] = "<h2".(($label)?' id="'.$label.'"':'').">{$data}</h2>";return $this;}
-    public function h3($data,$label='') {$this->data['html'] = "<h3".(($label)?' id="'.$label.'"':'').">{$data}</h3>";return $this;}
-    public function div($data,$label='') {$this->data['html'] = "<div".(($label)?' id="'.$label.'"':'').">{$data}</div>";return $this;}
+    var $data = ['html'=>''];
+    public function plain($data) {$this->data['html'].= $data;return $this;}
+    public function h1($data,$label='') {$this->data['html'].= "<h1".(($label)?' id="'.$label.'"':'').">{$data}</h1>";return $this;}
+    public function h2($data,$label='') {$this->data['html'].= "<h2".(($label)?' id="'.$label.'"':'').">{$data}</h2>";return $this;}
+    public function h3($data,$label='') {$this->data['html'].= "<h3".(($label)?' id="'.$label.'"':'').">{$data}</h3>";return $this;}
+    public function div($data,$label='') {$this->data['html'].= "<div".(($label)?' id="'.$label.'"':'').">{$data}</div>";return $this;}
+    public function p($data,$label='') {$this->data['html'].= "<p".(($label)?' id="'.$label.'"':'').">{$data}</p>";return $this;}
+    public function pre($data,$label='') {$this->data['html'].= "<pre".(($label)?' id="'.$label.'"':'').">{$data}</pre>";return $this;}
+    public function textarea($data,$label='') {$this->data['html'].= "<textarea cols='90' rows='10'".(($label)?' id="'.$label.'"':'').">{$data}</textarea>";return $this;}
+    public function testComponents($id,$json,$php) {
+        $id=uniqid('test');
+        $this->data['html'].= "
+            <div  class='row'>
+            <div  class='col-xl-6'>
+            <textarea cols='90' rows='10' id='{$id}_code'>{$json}</textarea><br><input type='button' onclick='alert(\"sending\")' value='Test >'>
+            </div>
+            <div  class='col-xl-6'>
+            <div  id='{$id}'>".htmlentities("<div  id='{$id}'></div>")."</div>
+             </div>
+             </div>
+            ";return $this;
+        }
 
 }
 
