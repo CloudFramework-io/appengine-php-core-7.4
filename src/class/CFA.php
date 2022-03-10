@@ -232,21 +232,24 @@ class CFACompenentHTML
     public function h3($data,$label='') {$this->data['html'].= "<h3".(($label)?' id="'.$label.'"':'').">{$data}</h3>";return $this;}
     public function div($data,$label='') {$this->data['html'].= "<div".(($label)?' id="'.$label.'"':'').">{$data}</div>";return $this;}
     public function p($data,$label='') {$this->data['html'].= "<p".(($label)?' id="'.$label.'"':'').">{$data}</p>";return $this;}
+    public function hr($label='') {$this->data['html'].= "<hr".(($label)?' id="'.$label.'"':'')."/>";return $this;}
     public function pre($data,$label='') {$this->data['html'].= "<pre".(($label)?' id="'.$label.'"':'').">{$data}</pre>";return $this;}
     public function textarea($data,$label='') {$this->data['html'].= "<textarea cols='90' rows='10'".(($label)?' id="'.$label.'"':'').">{$data}</textarea>";return $this;}
     public function testComponents($id,$json,$php) {
-        $id=uniqid('test');
         $this->data['html'].= "
             <div  class='row'>
             <div  class='col-xl-6'>
-            <textarea cols='90' rows='10' id='{$id}_code'>{$json}</textarea><br><input type='button' onclick='alert(\"sending\")' value='Test >'>
+            <small>textarea id: {$id}_code</small><br/>
+            <textarea cols='90' rows='10' id='{$id}_code'>{$json}</textarea><br>
+            <input type='button' onclick=\"CloudFrameWorkCFA.renderComponents(JSON.parse($('#{$id}_code').text()))\" value=\"CloudFrameWorkCFA.renderComponents(JSON.parse($('#{$id}_code').text()))\">
             </div>
             <div  class='col-xl-6'>
             <div  id='{$id}'>".htmlentities("<div  id='{$id}'></div>")."</div>
              </div>
              </div>
-            ";return $this;
-        }
+            ";
+        return $this;
+    }
 
 }
 
