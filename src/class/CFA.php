@@ -182,6 +182,12 @@ class CFACompenent
             $this->component = new CFACompenentSearchCards();
         return($this->component);
     }
+
+    public function calendar() {	
+        if(!is_object($this->component) || get_class($this->component)!= 'CFACompenentCalendar')	
+            $this->component = new CFACompenentCalendar();	
+        return($this->component);	
+    }
 }
 /**
  * CFAColors Class component
@@ -466,4 +472,19 @@ class CFACompenentAlerts
     public function addBadge($title,$color='',$border=false,$pill=false) {if(!isset($this->data[$this->index]['badges'])) $this->data[$this->index]['badges']=[]; $this->data[$this->index]['badges'][] = ['title'=>$title,'color'=>$color,'border'=>(bool)$border,'pill'=>(bool)$pill]; return $this;}
 
 
+}
+
+/**	
+ * CFACompenentSearchCards Class component	
+ */	
+class CFACompenentCalendar	
+{	
+    var $type = 'calendar';	
+    var $index = 0;	
+    var $data = [];	
+    	
+    public function title($data) {$this->data['calendar'][$this->index]['title'] = $data; return $this;}	
+    public function subtitle($data) {$this->data['calendar'][$this->index]['subtitle'] = $data; return $this;}	
+    // public function events($data) {$this->data['calendar'][$this->index]['events'] = json_decode('[{"title":"Product daily CFW", "start":"2022-03-07T16:00:00", "description":"Event description", "className":"border-warning bg-warning text-dark"}]'); return $this;}	
+    public function events($data) {$this->data['calendar'][$this->index]['events'] = $data; return $this;}	
 }
