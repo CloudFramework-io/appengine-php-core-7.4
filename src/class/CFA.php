@@ -188,6 +188,12 @@ class CFACompenent
             $this->component = new CFACompenentCalendar();	
         return($this->component);	
     }
+
+    public function accordion() {
+        if(!is_object($this->component) || get_class($this->component)!= 'CFACompenentAccordion')
+            $this->component = new CFACompenentAccordion();
+        return($this->component);
+    }
 }
 /**
  * CFAColors Class component
@@ -425,6 +431,8 @@ class CFACompenentSearchCards
         'search_placeholder'=>null,
         'cards'=>[],
     ];
+
+
     public function searchPlaceHolder($data) {$this->data['search_placeholder'] = $data; return $this;}
     public function add() { if (isset($this->data['cards'][$this->index]) && $this->data['cards'][$this->index]) $this->index++;$this->data['cards'][$this->index] = [];return $this;}
     public function avatar($data) {$this->data['cards'][$this->index]['avatar'] = $data; return $this;}
@@ -481,10 +489,39 @@ class CFACompenentCalendar
 {	
     var $type = 'calendar';	
     var $index = 0;	
-    var $data = [];	
-    	
-    public function title($data) {$this->data['calendar'][$this->index]['title'] = $data; return $this;}	
-    public function subtitle($data) {$this->data['calendar'][$this->index]['subtitle'] = $data; return $this;}	
-    // public function events($data) {$this->data['calendar'][$this->index]['events'] = json_decode('[{"title":"Product daily CFW", "start":"2022-03-07T16:00:00", "description":"Event description", "className":"border-warning bg-warning text-dark"}]'); return $this;}	
-    public function events($data) {$this->data['calendar'][$this->index]['events'] = $data; return $this;}	
+    var $data = [];
+
+    // public function events($data) {$this->data['calendar'][$this->index]['events'] = json_decode('[{"title":"Product daily CFW", "start":"2022-03-07T16:00:00", "description":"Event description", "className":"border-warning bg-warning text-dark"}]'); return $this;}
+    public function __construct()
+    {
+        $this->data['id'] = uniqid('calendar');
+    }
+    public function setCalendarClass($data) {$this->data['class'] = $data; return $this;}
+    public function setCalendarId($data) {$this->data['id'] = $data; return $this;}
+    public function add($title,$start,$end='') {if(isset($this->data['events'][$this->index]) && $this->data['events'][$this->index]) $this->index++; $this->data['events'][$this->index]['title']=$title;$this->data['events'][$this->index]['start']=$start; if($end)$this->data['events'][$this->index]['end']=$end; return $this;}
+    public function title($data) {$this->data['events'][$this->index]['title'] = $data; return $this;}
+    public function description($data) {$this->data['events'][$this->index]['description'] = $data; return $this;}
+    public function start($data) {$this->data['events'][$this->index]['start'] = $data; return $this;}
+    public function end($data) {$this->data['events'][$this->index]['end'] = $data; return $this;}
+    public function javascript($data) {$this->data['events'][$this->index]['url'] = "javascript:".$data; return $this;}
+    public function url($data) {$this->data['events'][$this->index]['url'] = $data; return $this;}
+    public function color($bg,$text='',$border='') {
+        if(!$border) $border=$bg;
+        if(!$text) $text='white';
+        $this->data['events'][$this->index]['className'] = "bg-{$bg} border-{$border} text-{$text}"; return $this;}
+
+}
+
+/**
+ * CFACompenentAccordion Class component
+ */
+class CFACompenentAccordion
+{
+    var $type = 'accordion';
+    var $index = 0;
+    var $data = [];
+    public function __construct() { $this->data['id'] = uniqid('accordion');}
+    public function add($label) {if(isset($this->data['cards'][$this->index]) &&$this->data['cards'][$this->index]) $this->index++; if($label) $this->data['cards'][$this->index]['label']=$label; return $this;}
+    public function title($data) {$this->data['cards'][$this->index]['title'] = $data; return $this;}
+    public function subtitle($data) {$this->data['cards'][$this->index]['subtitle'] = $data; return $this;}
 }
