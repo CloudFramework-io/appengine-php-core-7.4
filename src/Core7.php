@@ -3036,7 +3036,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     }
                     array_shift($lines);
                 } while($lines && !$user);
-                if(!$user) return($this->addError("getGoogleUserEmailAccount() has not found an active user with '{$gcloud_auth_list}'. Verify the programming of this method"));
+                if(!$user) return($this->addError("getGoogleEmailAccount() has not found an active user with '{$gcloud_auth_list}'. Verify the programming of this method"));
                 return $user;
             } else {
                 try {
