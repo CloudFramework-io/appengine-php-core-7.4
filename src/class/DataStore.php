@@ -24,7 +24,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $limit = 0;
         var $cursor = '';
         var $last_cursor;
-        var $time_zone = 'UTC';
+        var $default_time_zone_to_read = 'UTC';
+        var $default_time_zone_to_write = 'UTC';
         /** @var CoreCache $cache */
         var $cache = null;
         var $useCache = false;
@@ -74,6 +75,11 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             }
             // SETUP DatastoreClient
 
+            //ASSIGN time zone to read data
+            if(isset($this->core->system->time_zone[0]) && $this->core->system->time_zone[0]) {
+                $this->default_time_zone_to_read = $this->core->system->time_zone[0];
+            }
+
             $this->core->__p->add('DataStore new instance ', '', 'endnote');
             return true;
 
@@ -109,6 +115,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
             // converting $data into n,n dimmensions
             if (!array_key_exists(0, $data) || !is_array($data[0])) $data = [$data];
+
+            // Establish the default time zone to write
+            $tz = new DateTimeZone($this->default_time_zone_to_write);
 
             // loop the array into $row
             foreach ($data as $i => $row) {
@@ -153,8 +162,10 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                 if (strlen($value)) {
                                     // Fix the problem when value is returned as microtime
                                     try {
+                                        // Convert to $this->default_time_zone_to_write
                                         $value_time = new DateTime($value);
-                                        $value = $value_time;
+                                        if($tz) $value = $value_time->setTimezone($tz);
+                                        else $value = $value_time;
                                     } catch (Exception $e) {
                                         $ret[] = ['error' => 'field {' . $this->schema['props'][$i][0] . '} has a wrong date format: ' . $value];
                                         $record = [];
@@ -765,6 +776,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $row['KeyName'] = $entity->key()->path()[0]['name'];
                 }
 
+                //set TimeZone to convert date objects
+                $tz = new DateTimeZone($this->default_time_zone_to_read);
+
                 // Transform result
                 if($this->transformReadedEntities)
                 foreach ($row as $key => $value) {
@@ -782,12 +796,17 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     elseif ($this->schema['props'][$key][1] == 'txt')
                         $row[$key] = $value;
                     elseif ($value instanceof DateTimeImmutable) {
+
+                        // Change timezone of the object
+                        if($tz) $value = $value->setTimezone($tz)??$value;
+
                         if ($this->schema['props'][$key][1] == 'date') {
                             $row[$key] = $value->format('Y-m-d');
                         } elseif ($this->schema['props'][$key][1] == 'datetime')
                             $row[$key] = $value->format('Y-m-d H:i:s');
                         elseif ($this->schema['props'][$key][1] == 'datetimeiso')
                             $row[$key] = $value->format('c');
+
                     } elseif ($this->schema['props'][$key][1] == 'integer')
                         $row[$key] = intval($value);
                     elseif ($this->schema['props'][$key][1] == 'float')

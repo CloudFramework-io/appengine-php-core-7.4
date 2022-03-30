@@ -818,6 +818,7 @@ if (!defined("_RESTfull_CLASS_")) {
             $ret['success'] = ($this->error) ? false : true;
             $ret['status'] = $this->getReturnStatus();
             $ret['code'] = $this->getReturnCode();
+            $ret['time_zone'] = $this->core->system->time_zone[0];
             if($this->message) $ret['message'] = $this->message;
             //endregion
 
