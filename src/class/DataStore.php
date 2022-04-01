@@ -543,7 +543,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     if (array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['date', 'datetime', 'datetimeiso'])) {
 
                         // Allow Smart date ranges where comp = '='
-                        if($comp=='=') {
+                        if($comp=='=' && $value) {
                             //apply filters
                             if(strpos($value,'/')===false) {
                                 $from = $value;
@@ -585,10 +585,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
                             //assign $order to avoid conflicts
                             $order="{$fieldname} DESC";
-                            $order="{$fieldname} DESC";
-
-                        } else {
-                            $where[$key] = new DateTime($value);
+                        }
+                        else {
+                            $where[$key] = ($value)?new DateTime($value):null;
                             if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
                             else $_q .= " AND $fieldname {$comp} @{$key}";
                         }
