@@ -3716,7 +3716,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             //endregion
 
-            //region retur the signature
+            //region return the signature
             $segments[] = $this->urlsafeB64Encode($signature);
             if($this->error) return;
             return implode('.', $segments);
@@ -3729,9 +3729,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * to generate publicKey ../scripts/jwtRS256.sh
          * @return string with a length of 32 chars
          */
-        public function jwt_decode($jwt,$publicKey,$keyId=null,$algorithm='SHA256')
+        public function jwt_decode($jwt,$publicKey=null,$keyId=null,$algorithm='SHA256')
         {
-            if(!is_string($publicKey) || strlen($publicKey)< 10) return($this->addError('Wrong public key'));
 
             $tks = explode('.', $jwt);
             if (count($tks) != 3) {
@@ -3757,12 +3756,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
 
             //region create $signature signing with the privateKey
-            $success = openssl_verify("$headb64.$bodyb64",$sig, $publicKey, $algorithm);
-            if($success!==1) {
-                return($this->addError(['error'=>true,'errorMsg'=>'OpenSSL verification failed. '.openssl_error_string()]));
+            if($publicKey) {
+                if(!is_string($publicKey) || strlen($publicKey)< 10) return($this->addError('Wrong public key'));
+                $success = @openssl_verify("$headb64.$bodyb64",$sig, $publicKey, $algorithm);
+                if($success!==1) {
+                    $this->addError(['error'=>true,'errorMsg'=>'OpenSSL verification failed. '.openssl_error_string()]);
+                }
             }
             //endregion
-            return($payload);
+            return(['header'=>$header,'body'=>$payload]);
         }
 
         /**
