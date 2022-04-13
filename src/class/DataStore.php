@@ -884,8 +884,10 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $total = $this->getCache('total_' . $hash);
             if ($total === null) {
                 $data = $this->fetchAll($distinct, $where);
-                $total = count($data);
-                $this->setCache('total_' . $hash, $total);
+                if(is_array($data)) {
+                    $total = count($data);
+                    $this->setCache('total_' . $hash, $total);
+                }
             }
             return $total;
         }

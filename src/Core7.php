@@ -1,16 +1,12 @@
 <?php
-
 /**
  * @author Héctor López <hlopez@cloudframework.io>
- * @version 2020
+ * @version 2022
  */
-
 
 use Google\Cloud\Logging\Logger;
 use Google\Cloud\Logging\PsrLogger;
 use Google\Cloud\Storage\StorageClient;
-
-
 
 if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     define("_CLOUDFRAMEWORK_CORE_CLASSES_", TRUE);
@@ -117,7 +113,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.04011';
+        var $_version = 'v74.04013';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */

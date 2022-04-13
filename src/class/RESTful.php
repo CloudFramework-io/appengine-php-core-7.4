@@ -833,7 +833,7 @@ if (!defined("_RESTfull_CLASS_")) {
                 //Restrict output
                 if($this->core->config->get('core_api_logs_allowed_ips') || $this->core->config->get('restful.logs.allowed_ips')) {
                     $_allowed_ips = ($this->core->config->get('restful.logs.allowed_ips'))?:$this->core->config->get('core_api_logs_allowed_ips');
-                    if(!$this->core->security->isCron() &&  !strpos($this->core->system->url['url'],'/queue/')) {
+                    if($_allowed_ips!='*' && !$this->core->security->isCron() && !strpos($this->core->system->url['url'],'/queue/')) {
                         if(strpos($_allowed_ips,$this->core->system->ip)===false) {
                             $ret['logs'] = 'only restful.logs.allowed_ips. Current ip: '.$this->core->system->ip;
                         }
