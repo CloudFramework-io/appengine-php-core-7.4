@@ -14,6 +14,11 @@ use GuzzleHttp\Psr7\Request;
 if (!defined ("_GooglePeole_CLASS_") ) {
     define("_GooglePeole_CLASS_", TRUE);
 
+
+    /**
+     * [$gpeople = $this->core->loadClass('GooglePeople');] Class to facilitate GooglePeople integration
+     * @package LabClasses
+     */
     class GooglePeople
     {
         var $core;

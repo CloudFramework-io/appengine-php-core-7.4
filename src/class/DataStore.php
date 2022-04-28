@@ -1,9 +1,5 @@
 <?php
 
-# https://cloud.google.com/datastore/docs/concepts/entities
-# https://cloud.google.com/datastore/docs/concepts/queries#datastore-datastore-limit-gql
-# https://googleapis.github.io/google-cloud-php/#/docs/google-cloud/v0.121.0/datastore/datastoreclient
-# https://github.com/GoogleCloudPlatform/php-docs-samples/blob/master/datastore/api/src/functions/concepts.php
 use Google\Cloud\Datastore\DatastoreClient;
 use Google\Cloud\Datastore\Key;
 use Google\Cloud\Datastore\Transaction;
@@ -11,6 +7,15 @@ use Google\Cloud\Datastore\Transaction;
 if (!defined ("_DATASTORECLIENT_CLASS_") ) {
     define("_DATASTORECLIENT_CLASS_", TRUE);
 
+    /**
+     * [$sql = $this->core->loadClass('DataStore');] Class to Handle Datastore databases with CloudFramework models
+     *
+     * # https://cloud.google.com/datastore/docs/concepts/entities
+     * # https://cloud.google.com/datastore/docs/concepts/queries#datastore-datastore-limit-gql
+     * # https://googleapis.github.io/google-cloud-php/#/docs/google-cloud/v0.121.0/datastore/datastoreclient
+     * # https://github.com/GoogleCloudPlatform/php-docs-samples/blob/master/datastore/api/src/functions/concepts.php
+     * @package CoreClasses
+     */
     class DataStore
     {
         var $core = null;                   // Core7 reference

@@ -3,6 +3,11 @@
 if (!defined ("_SmartDate_CLASS_") ) {
     define("_SmartDate_CLASS_", TRUE);
 
+    /**
+     * Class to facilitate arrays of Dates
+     * author: hl@cloudframework.io
+     * @package LabClasses
+     */
     class SmartDate
     {
         private $core;

@@ -2,7 +2,10 @@
 // Models Class v1
 if (!defined ("_Models_CLASS_") ) {
     define("_Models_CLASS_", TRUE);
-
+    /**
+     * [$models = $this->core->loadClass('Models');] Class to facilitate CloudFramework models integration
+     * @package CoreClasses
+     */
     class Models
     {
         private $core;

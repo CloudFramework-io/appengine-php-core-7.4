@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * [$sql = $this->core->loadClass('DataSQL');] Class to Handle SQL databases with CloudFramework models
+ * @package CoreClasses
+ */
 class DataSQL
 {
     /** @var Core7  */

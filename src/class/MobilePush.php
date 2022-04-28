@@ -3,6 +3,12 @@
 if (!defined ("_mobilePush_CLASS_") ) {
     define("_mobilePush_CLASS_", TRUE);
 
+
+    /**
+     * Class to facilitate in integration with mobile push notifications
+     * author: hl@cloudframework.io
+     * @package LabClasses
+     */
     class MobilePush
     {
         private $core;

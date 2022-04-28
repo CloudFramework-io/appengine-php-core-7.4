@@ -9,8 +9,8 @@ if (!defined ("_RenderTwig_CLASS_") ) {
      * Adaptation of cache for Cloudframework compatible with
      *
      * @author Adrian Martinez <amartinez@adnbp.com>
+     * @ignore
      */
-
     class CloudFrameWork_Twig_Cache implements Twig_CacheInterface
     {
         private $directory;
@@ -92,9 +92,9 @@ if (!defined ("_RenderTwig_CLASS_") ) {
     }
 
     /**
-     * Cloudframework Rendertwig for Cloudframework
-     *
-     * @author Adrian Martinez <amartinez@adnbp.com>
+     * Class to facilitate Twig rendering
+     * author: hl@cloudframework.io
+     * @package LabClasses
      */
     class RenderTwig
     {

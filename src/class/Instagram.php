@@ -3,6 +3,11 @@
 if (!defined ("_Instagram_CLASS_") ) {
     define("_Instagram_CLASS_", TRUE);
 
+    /**
+    * Class to facilitate in integration with Instagram class
+    * author: hl@cloudframework.io
+    * @package LabClasses
+    */
     class Instagram
     {
         private $core;

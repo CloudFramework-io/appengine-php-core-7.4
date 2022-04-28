@@ -5,6 +5,10 @@
 if (!defined ("_DATAVALIDATION_CLASS_") ) {
     define("_DATAVALIDATION_CLASS_", TRUE);
 
+    /**
+     * [$validation = $this->core->loadClass('DataValidation');] Class to facilitate data validation
+     * @package CoreClasses
+     */
     Class DataValidation {
 
         var $field=null;

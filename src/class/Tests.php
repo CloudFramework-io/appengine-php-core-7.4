@@ -4,6 +4,12 @@ include_once __DIR__.'/RESTful.php';
 if (!defined("_Tests_CLASS_")) {
     define("_Tests_CLASS_", TRUE);
 
+    /**
+     * @ignore
+     * @param $data
+     * @param $pattern
+     * @return bool
+     */
     function recursiveCheck(&$data,&$pattern)
     {
         foreach ($data as $key=>$info) {
@@ -13,6 +19,11 @@ if (!defined("_Tests_CLASS_")) {
         return true;
     }
 
+    /**
+     * Class to facilitate Tests creation
+     * author: hl@cloudframework.io
+     * @package LabClasses
+     */
     class Tests extends RESTful
     {
         var $tests;

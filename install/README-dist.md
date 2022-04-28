@@ -3,7 +3,19 @@ Following [CloudFramework Instructions](https://www.notion.so/cloudframework/app
 ```shell
 # lines you have executed
 composer require cloudframework-io/appengine-php-core-7.4
-php vendor/cloudframework-io/appengine-php-core-7.4/install.php
+```
+# Install for replit
+You can see examples to use the framework in: https://replit.com/@cloudframework/php
+```shell
+php vendor/cloudframework-io/appengine-php-core-7.4/install.php replit
+```
+
+Now you can run the replit instance
+
+# Install for appengine
+
+```shell
+php vendor/cloudframework-io/appengine-php-core-7.4/install.php appengine
 
 # create temporal local data directory: ./local_data/cache
 composer clean
@@ -24,12 +36,12 @@ composer serve
 composer script training/hello
 ```
 
-# Deploy your project in GCP Appengine Standard
-## Assumptions
+## Deploy your project in GCP Appengine Standard
+### Assumptions
 We understand you know what is GCP Appengine standard and you have the [I AM] provileges
 to create a project and/or to deploy into a project.
 
-## Steps
+### Steps
 * [Create a GCP project](https://console.cloud.google.com/projectcreate) and let's say your project id will be `{my-project}`
 * Execute:
 ```

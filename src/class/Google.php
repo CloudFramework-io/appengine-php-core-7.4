@@ -6,6 +6,11 @@
 if (!defined ("_Google_CLASS_") ) {
     define("_Google_CLASS_", TRUE);
 
+
+    /**
+     * [$google = $this->core->loadClass('Google');] Class to facilitate Google integration
+     * @package LabClasses
+     */
     class Google
     {
         var $core;

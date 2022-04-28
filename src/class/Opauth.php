@@ -8,11 +8,12 @@
  * @package      Opauth.Strategy
  * @license      MIT License
  */
+
 /**
  * Opauth Strategy
  * Individual strategies are to be extended from this class
  *
- * @package			Opauth.Strategy
+ * @package	CoreClass
  */
 class OpauthStrategy {
     /**

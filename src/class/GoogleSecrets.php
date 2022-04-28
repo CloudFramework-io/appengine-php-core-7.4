@@ -16,6 +16,10 @@ use Google\Cloud\SecretManager\V1\SecretPayload;
 if (!defined ("_GoogleSecrets_CLASS_") ) {
     define("_GoogleSecrets_CLASS_", TRUE);
 
+    /**
+     * [$gsecrets = $this->core->loadClass('GoogleSecrets');] Class to facilitate GoogleSecrets integration
+     * @package LabClasses
+     */
     class GoogleSecrets
     {
 

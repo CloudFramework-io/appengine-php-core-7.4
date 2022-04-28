@@ -1,7 +1,26 @@
 <?php
 /**
+ * Core classes developend in PHP7.x to be used to develop APIs, Scripts, Web Pages
+ *
+ * Core7 class is included in your APIs as $this->core and it includes objects
+ * of other classes to facilitate your developments.
+ * * $this->core = new Core7();
+ * * $this->core->__p = new CorePerformance();
+ * * $this->core->is = new CoreIs();
+ * * $this->core->system = new CoreSystem($root_path);
+ * * $this->core->logs = new CoreLog();
+ * * $this->core->errors = new CoreLog();
+ * * $this->core->config = new CoreConfig($this, __DIR__ . '/config.json');
+ * * $this->core->session = new CoreSession($this);
+ * * $this->core->security = new CoreSecurity($this);
+ * * $this->core->cache = new CoreCache($this);
+ * * $this->core->request = new CoreRequest($this);
+ * * $this->core->user = new CoreUser($this);
+ * * $this->core->localization = new CoreLocalization($this);
+ * * $this->core->model = new CoreModel($this);
+ * * $this->core->cfiLog = new CFILog($this);
  * @author Héctor López <hlopez@cloudframework.io>
- * @version 2022
+ * @package Core
  */
 
 use Google\Cloud\Logging\Logger;
@@ -9,11 +28,14 @@ use Google\Cloud\Logging\PsrLogger;
 use Google\Cloud\Storage\StorageClient;
 
 if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
+    /**
+     * @ignore
+     */
     define("_CLOUDFRAMEWORK_CORE_CLASSES_", TRUE);
 
-    //region debug function
     /**
      * Echo in output a group of vars passed as args
+     * @ignore
      * @param mixed $args Element to print.
      */
     function __print($args)
@@ -44,6 +66,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
+     * @ignore
      * @throws Exception
      */
     function __fatal_handler() {
@@ -107,13 +130,30 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     //endregion
 
     /**
-     * Core Class to build cloudframework applications
-     * @package Core
+     * $this->core Core7 class is included in your APIs as $this->core and it includes objects
+     * of other classes to facilitate your development:
+     *
+     * * $this->core->__p = new CorePerformance();
+     * * $this->core->is = new CoreIs();
+     * * $this->core->system = new CoreSystem($root_path);
+     * * $this->core->logs = new CoreLog();
+     * * $this->core->errors = new CoreLog();
+     * * $this->core->config = new CoreConfig($this, __DIR__ . '/config.json');
+     * * $this->core->session = new CoreSession($this);
+     * * $this->core->security = new CoreSecurity($this);
+     * * $this->core->cache = new CoreCache($this);
+     * * $this->core->request = new CoreRequest($this);
+     * * $this->core->user = new CoreUser($this);
+     * * $this->core->localization = new CoreLocalization($this);
+     * * $this->core->model = new CoreModel($this);
+     * * $this->core->cfiLog = new CFILog($this);
+     *
+     * @package Core.core
      */
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.04013';
+        var $_version = 'v74.04281';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -545,8 +585,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to track performance
-     * @package Core
+     * $this->core->__p Class to track performance
+     * @package Core.perfomance
      */
     class CorePerformance
     {
@@ -669,137 +709,75 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manage session
-     * @package Core
+     * $this->core->is Class to answer is? questions.
+     * @package Core.is
      */
-    class CoreSession
+    class CoreIs
     {
-        /** @var bool $start says if the session has been started */
-        var $start = false;
-        /** @var string $id Id of the session */
-        var $id = '';
-        /** @var bool $debug if true the class will send to $core->logs the use of the methods*/
-        var $debug = false;
-        /** @var Core7 $core */
-        var $core;
-
-        /**
-         * CoreSession constructor
-         * @param Core7 $core Core7 class passed by reference
-         * @param null $debug if true it will send to $core->logs the use of the methods
-         */
-        function __construct(Core7 &$core,$debug=null)
+        function development()
         {
-            $this->core = $core;
-            //region SET $this->>debug. Activate debug based on $debug or if I am in development (local environgmnet)
-            if(null !== $debug) $this->debug = true === $debug;
-            else if($this->core->is->development()) $this->debug = true;
-            //endregion
-
-            //region VERIFY the session is currently active
-            if(session_status() == PHP_SESSION_ACTIVE) {
-                $this->id = session_id();
-                $this->start = true;
-                if($this->core->is->development() && $this->core->is->terminal()) {
-                    $this->core->logs->add("__construct. id [{$this->id}]",'CoreSession');
-                }
-            }
-            //endregion
-
+            return (!(array_key_exists('GAE_SERVICE',$_SERVER)));
         }
 
-        /**
-         * init the session
-         * @param string $id optional paramater to assign a session_id
-         */
-        function init($id = '')
+        function production()
         {
-            // If they pass a session id I will use it.
-            if (!empty($id)) {
-                $this->id = '';
-                $this->start = false;
-
-                if(session_status() == PHP_SESSION_ACTIVE) {
-                    if(session_id() != $id )  {
-                        session_abort();
-                        session_id($id);
-                    }
-                } else {
-                    session_id($id);
-                }
-            }
-
-            // Session start
-            if(session_status() != PHP_SESSION_ACTIVE) {
-                session_start();
-            }
-
-            // Let's keep the session id
-            $this->id = session_id();
-
-            // Initiated.
-            $this->start = true;
-
-            if($this->debug)
-                $this->core->logs->add("init(). id [{$this->id}]",'CoreSession');
-
+            return (array_key_exists('GAE_SERVICE',$_SERVER) );
         }
 
-        /**
-         * get a variable from session
-         * @param $var
-         * @return mixed|null
-         */
-        function get($var)
+        function localEnvironment()
         {
-            if (!$this->start) $this->init();
-            if (key_exists('CloudSessionVar_' . $var, $_SESSION)) {
+            return (!(array_key_exists('GAE_SERVICE',$_SERVER)));
+        }
+
+        function GCPEnvironment()
+        {
+            return (array_key_exists('GAE_SERVICE',$_SERVER) );
+        }
+
+        function script()
+        {
+            return (isset($_SERVER['PWD']) && !isset($_SERVER['GAE_SERVICE']));
+        }
+
+        function dirReadable($dir)
+        {
+            if (strlen($dir)) return (is_dir($dir));
+        }
+
+        function terminal()
+        {
+            return !isset($_SERVER['SERVER_PORT']);
+        }
+
+        function dirWritable($dir)
+        {
+            if (strlen($dir)) {
+                if (!$this->dirReadble($dir)) return false;
                 try {
-                    $ret = unserialize(gzuncompress($_SESSION['CloudSessionVar_' . $var]));
+                    if (@mkdir($dir . '/__tmp__')) {
+                        rmdir($dir . '/__tmp__');
+                        return (true);
+                    }
                 } catch (Exception $e) {
-                    if($this->debug)
-                        $this->core->logs->add("get('\$var=$var') Exception: ".$e->getMessage(),'CoreSession');
-                    return null;
+                    return false;
                 }
-                if($this->debug)
-                    $this->core->logs->add("get('\$var=$var') found",'CoreSession');
-                return $ret;
             }
-            if($this->debug)
-                $this->core->logs->add("get('\$var=$var') not-found",'CoreSession');
-
-            return null;
         }
 
-        /**
-         * set a variable from session
-         * @param $var
-         * @param $value
-         */
-        function set($var, $value)
+        function validEmail($email)
         {
-            if (!$this->start) $this->init();
-            $_SESSION['CloudSessionVar_' . $var] = gzcompress(serialize($value));
-            if($this->debug)
-                $this->core->logs->add("set('\$var=$var') ok",'CoreSession');
+            return (filter_var($email, FILTER_VALIDATE_EMAIL));
         }
 
-        /**
-         * delete a variable from session
-         * @param $var
-         */
-        function delete($var)
+        function validURL($url)
         {
-            if (!$this->start) $this->init();
-            unset($_SESSION['CloudSessionVar_' . $var]);
-            if($this->debug)
-                $this->core->logs->add("delete('\$var=$var') ok",'CoreSession');
+            return (filter_var($url, FILTER_VALIDATE_URL));
         }
     }
 
     /**
-     * Class to interacto with with the System variables
-     * @package Core
+     * $this->core->system Class to interacto with with the System variables
+     * @package Core.system
      */
     class CoreSystem
     {
@@ -1015,12 +993,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manage Logs & Errors
+     * $this->core->logs, $this->core->errors Class to manage Logs & Errors
      * https://cloud.google.com/logging/docs/setup/php
      * $logger->info('This will show up as log level INFO');
      * $logger->warning('This will show up as log level WARNING');
      * $logger->error('This will show up as log level ERROR');
-     * @package Core
+     * @package Core.log
      */
     class CoreLog
     {
@@ -1163,716 +1141,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to answer is? questions
-     * @package Core
-     */
-    class CoreIs
-    {
-        function development()
-        {
-            return (!(array_key_exists('GAE_SERVICE',$_SERVER)));
-        }
-
-        function production()
-        {
-            return (array_key_exists('GAE_SERVICE',$_SERVER) );
-        }
-
-        function localEnvironment()
-        {
-            return (!(array_key_exists('GAE_SERVICE',$_SERVER)));
-        }
-
-        function GCPEnvironment()
-        {
-            return (array_key_exists('GAE_SERVICE',$_SERVER) );
-        }
-
-        function script()
-        {
-            return (isset($_SERVER['PWD']) && !isset($_SERVER['GAE_SERVICE']));
-        }
-
-        function dirReadable($dir)
-        {
-            if (strlen($dir)) return (is_dir($dir));
-        }
-
-        function terminal()
-        {
-            return !isset($_SERVER['SERVER_PORT']);
-        }
-
-        function dirWritable($dir)
-        {
-            if (strlen($dir)) {
-                if (!$this->dirReadble($dir)) return false;
-                try {
-                    if (@mkdir($dir . '/__tmp__')) {
-                        rmdir($dir . '/__tmp__');
-                        return (true);
-                    }
-                } catch (Exception $e) {
-                    return false;
-                }
-            }
-        }
-
-        function validEmail($email)
-        {
-            return (filter_var($email, FILTER_VALIDATE_EMAIL));
-        }
-
-        function validURL($url)
-        {
-            return (filter_var($url, FILTER_VALIDATE_URL));
-        }
-    }
-
-    /**
-     * Class to manage Cache
-     * https://cloud.google.com/appengine/docs/standard/php7/using-memorystore#setup_redis_db
-     * @package Core
-     */
-    class CoreCache
-    {
-        var $cache = null;
-        var $spacename = 'CloudFrameWork';
-        var $type = 'memory'; // memory, redis, datastore, directory,
-        var $dir = '';
-        var $error = false;
-        var $errorMsg = [];
-        var $debug = false;
-        var $lastHash = null;
-        var $lastExpireTime = null;
-        var $atom = null;
-        var $errorSecurity = false; // It will change to true when you try to get a value using a wrong $cache_secret_key,$cache_secret_iv
-        /** @var Core  */
-        var $core=null;
-
-        /**
-         * CoreCache constructor. If $type==CacheInDirectory a writable $path is required
-         * @param string $spacename
-         * @param string $path if != null the it assumes the cache will be store in files
-         */
-        function __construct(Core7 &$core, $spacename = '',  $path=null, $debug = null)
-        {
-            $this->core = $core;
-
-            // Initialize $this->spacename
-            if (!strlen(trim($spacename))) $spacename = (isset($_SERVER['HTTP_HOST'])) ? $_SERVER['HTTP_HOST'] : $_SERVER['PWD'];
-            $this->setSpaceName($spacename);
-
-            // Activate debug based on $debug or if I am in development (local environgmnet)
-            if(null !== $debug)
-                $this->debug = true === $debug;
-            // If we are in localhost then activate
-            else
-                if($this->core->is->development()) {
-                    if(!$path && $this->core->config->get('core.cache.cache_path')) $path = $this->core->config->get('core.cache.cache_path');
-                    $this->debug = true;
-                }
-
-            // Activate CacheInDirectory
-            if (null !== $path) {
-                $this->activateCacheFile($path);
-            }
-        }
-
-        /**
-         * Activate cache in memory
-         * @return bool
-         */
-        function activateMemory()
-        {
-            $this->cache = null;
-            $this->type = 'memory';
-            $this->init();
-            return true;
-        }
-
-        /**
-         * Activate cache in files.. It requires that the path will be writtable
-         * @param string $path dir path to keep files.
-         * @param string $spacename
-         * @return bool
-         */
-        function activateCacheFile($path, $spacename = '')
-        {
-            // Avoid to activate the same Cache Path
-            if($this->dir == $path && is_object($this->cache) ) return true;
-
-            if (isset($_SESSION['Core_CacheFile_' . $path]) || is_dir($path) || @mkdir($path)) {
-                $this->type = 'directory';
-                $this->dir = $path;
-                if (strlen($spacename)) $spacename = '_' . $spacename;
-                $this->setSpaceName(basename($path) . $spacename);
-                $this->cache = null;
-                $this->init();
-
-                // Save in session to improve the performance for buckets because is_dir has a high cost.
-                if(isset($_SESSION))
-                    $_SESSION['Core_CacheFile_' . $path] = true;
-                return true;
-            } else {
-                $this->addError($path . ' does not exist and can not be created');
-                return false;
-            }
-
-        }
-
-        /**
-         * Activate cache in Datastore.. It requires Core Class
-         * @param Core7 $core Core class to facilitate errors
-         * @param string $spacename spacename where to store objecs
-         * @return bool
-         */
-        function activateDataStore( $spacename = '')
-        {
-            $this->type = 'datastore';
-            if($spacename) $this->spacename = $spacename;
-            $this->cache = null;
-            $this->init();
-            if($this->error) return false;
-            else return true;
-        }
-
-        /**
-         * Initialiated Cache Memory object.. If previously it has been called it just returns true.. if there is an error it returns false..
-         * https://cloud.google.com/appengine/docs/standard/php7/php-differences
-         * App Engine Memcache support is not provided. Instead, use Memorystore for Redis.
-         * https://cloud.google.com/appengine/docs/standard/php7/using-memorystore
-         * @return bool
-         */
-        function init()
-        {
-            if(null !== $this->cache) return(is_object($this->cache));
-
-            if($this->debug)
-                $this->core->logs->add("init(). type: {$this->type}",'CoreCache');
-
-            if ($this->type == 'memory') {
-                if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
-                    if($this->debug)
-                        $this->core->logs->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
-                    $this->cache=-1;
-                    return;
-                } else {
-                    $host = getenv('REDIS_HOST');
-                    $port = getenv('REDIS_PORT');
-                    try {
-                        $this->cache = new Redis();
-                        $this->cache->connect($host, $port);
-                    } catch (Exception $e) {
-                        $this->core->logs->add("init(). REDIS connection failed because: ". $e->getMessage(),'CoreCache','warning');
-                        unset($this->cache);
-                        $this->cache=-1;
-                        return;
-                    }
-
-                }
-            } elseif($this->type=='datastore') {
-                $this->cache = new CoreCacheDataStore($this->core,$this->spacename);
-                if($this->cache->error) $this->addError(['CoreCacheDataStore'=>$this->cache->errorMsg]);
-            } elseif($this->type=='directory' && $this->dir) {
-                $this->cache = new CoreCacheFile($this->dir);
-            }
-
-            return(is_object($this->cache));
-        }
-
-
-        /**
-         * Set a $spacename to set/get $objects
-         * @param $name
-         */
-        function setSpaceName($name)
-        {
-            if (strlen($name)) {
-                $name = '_' . trim($name);
-                $this->spacename = preg_replace('/[^A-z_-]/', '_', 'CloudFrameWork_' . $this->type . $name);
-            }
-        }
-
-        /**
-         * Return an object from Cache.
-         * @param $key
-         * @param int $expireTime The default value es -1. If you want to expire, you can use a value in seconds.
-         * @param string $hash if != '' evaluate if the $hash match with hash stored in cache.. If not, delete the cache and return false;
-         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data in cache
-         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data in cache
-         * @return bool|mixed|null
-         */
-        function get($key, $expireTime = -1, $hash = '',$cache_secret_key='',$cache_secret_iv='')
-        {
-            if(!$this->init() || !strlen(trim($key))) return null;
-
-            // Performance microtime
-            $time = microtime(true);
-
-            //region SET __p performance paramater
-            if (!strlen($expireTime)) $expireTime = -1;
-            $encrypted = ($cache_secret_key && $cache_secret_iv)?'/encrypted':'/no-encrypted';
-            $encrypted.='/exp:'.$expireTime;
-            $encrypted.='/hash:'.(($hash)?'/with-hash':'/no-hash');
-            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", $key, 'note');
-            //endregion
-
-
-            $info = $this->cache->get($this->spacename . '-' . $key);
-            if (strlen($info) && $info !== null) {
-
-                $info = unserialize($info);
-                $this->lastExpireTime = microtime(true) - $info['_microtime_'];
-                $this->lastHash = $info['_hash_'];
-
-                // Expire Caché
-                if ($expireTime >= 0 && microtime(true) - $info['_microtime_'] >= $expireTime) {
-                    $this->delete( $key);
-                    if($this->debug)
-                        $this->core->logs->add("get('\$key=$key',$expireTime=\$expireTime) failed (because expiration)",'CoreCache');
-                    $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
-                    return null;
-                }
-                // Hash Cache
-                if ('' != $hash && $hash != $info['_hash_']) {
-                    $this->delete( $key);
-                    if($this->debug)
-                        $this->core->logs->add("get('$key',$expireTime,'\$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
-
-                    $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
-                    return null;
-                }
-                // Normal return
-
-                // decrypt data if $cache_secret_key and $cache_secret_iv are not empty
-                if($cache_secret_key && $cache_secret_iv) {
-                    $this->errorSecurity = false;
-                    $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
-                }
-
-                // unserialize vars
-                $ret = null;
-                try {
-                    if(isset($info['_data_']) && $info['_data_']) {
-                        $ret = @unserialize(@gzuncompress($info['_data_']));
-                        if($ret===false && $cache_secret_key && $cache_secret_iv) {
-                            $this->delete( $key);
-                            $this->errorSecurity = true;
-                            if($this->debug)
-                                $this->core->logs->add("get('$key',$expireTime,'$hash',\$cache_secret_key or \$cache_secret_iv). Wrong \$cache_secret_key or \$cache_secret_iv. Cache key has been deleted because security",'CoreCache');
-                            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
-                            return null;
-                        }
-                    }
-                } catch (Exception $e) {
-                    $ret = null;
-                }
-
-                if($this->debug)
-                    $this->core->logs->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned in namespace ".$this->spacename . ' [time='.(round(microtime(true)-$time,4)).' secs]','CoreCache');
-
-
-                $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
-                return $ret;
-
-            } else {
-                if($this->debug) $this->core->logs->add("get(\$key=$key) failed (because it does not exist)",'CoreCache');
-                $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", 'error', 'endnote');
-                return null;
-            }
-        }
-
-        /**
-         * Set an object on cache based on $key
-         * @param $key
-         * @param mixed $object
-         * @param string $hash Allow to set the info based in a hash to determine if it is valid when read it.
-         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
-         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache
-         * @return bool
-         */
-        function set($key, $object, $hash=null, $cache_secret_key='',$cache_secret_iv='')
-        {
-            $encrypt = ($cache_secret_key && $cache_secret_iv)?'/encrypt':'/no-encrypt';
-            if(!$this->init() || !strlen(trim($key))) return null;
-            $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", $key, 'note');
-
-            $info['_microtime_'] = microtime(true);
-            $info['_hash_'] = $hash;
-            $info['_data_'] = gzcompress(serialize($object));
-
-            // encrypt data if $cache_secret_key and $cache_secret_iv are not empty
-            if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->encrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
-
-            $this->cache->set($this->spacename . '-' . $key, serialize($info));
-            // If exists a property error in the class checkit
-            if(isset($this->cache->error) && $this->cache->error) {
-                $this->error = true;
-                $this->errorMsg = $this->cache->errorMsg;
-            }
-
-            if($this->debug)
-                $this->core->logs->add("set(\$key={$key},..)".(($hash)?' with $hash,':'').(($cache_secret_key && $cache_secret_iv)?' with $cache_secret_key and $cache_secret_iv':''),'CoreCache');
-
-            unset($info);
-            $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", '', 'endnote');
-            return ($this->error)?false:true;
-        }
-
-        /**
-         * delete a $key from cache
-         * @param $key
-         * @return true|null
-         */
-        function delete($key)
-        {
-            if(!$this->init() || !strlen(trim($key))) return null;
-
-            if (!strlen(trim($key))) return false;
-            if($this->type=='memory')
-                $this->cache->del($this->spacename . '-' . $key);
-            else
-                $this->cache->delete($this->spacename . '-' . $key);
-            if($this->debug)
-                $this->core->logs->add("delete(). token: ".$this->spacename . '-' . $key,'CoreCache');
-
-            return true;
-        }
-
-
-        /**
-         * Return a cache based in a hash previously assigned in set
-         * @param $str
-         * @param $hash
-         * @return bool|mixed|null
-         */
-        public function getByHash($str, $hash) { return $this->get($str,-1, $hash); }
-
-
-        /**
-         * Return a cache based in the Expiration time = TimeToSave + $seconds
-         * @param string $str
-         * @param int $seconds
-         * @return bool|mixed|null
-         */
-        public function getByExpireTime($str, $seconds) { return $this->get($str,$seconds); }
-
-        /**
-         * Set error in the class
-         * @param $value
-         */
-        function addError($value)
-        {
-            $this->error = true;
-            $this->errorMsg[] = $value;
-        }
-
-    }
-
-    /**
-     * Class to manate Cache in Files
-     * @package Core
-     */
-    class CoreCacheFile
-    {
-
-        var $dir = '';
-
-        function __construct($dir = '')
-        {
-            if (strlen($dir)) $this->dir = $dir . '/';
-        }
-
-        function set($path, $data)
-        {
-            $path = preg_replace('/[\/\.;]/','_',$path);
-            return @file_put_contents($this->dir . $path, gzcompress(serialize($data)));
-        }
-
-        function delete($path)
-        {
-            $path = preg_replace('/[\/\.;]/','_',$path);
-            if(is_file($this->dir . $path))
-                return @unlink($this->dir . $path);
-        }
-
-        function get($path)
-        {
-            $ret = false;
-            $path = preg_replace('/[\/\.;]/','_',$path);
-            if (is_file($this->dir . $path))
-                $ret = file_get_contents($this->dir . $path);
-            if (false === $ret) return null;
-            else return unserialize(gzuncompress($ret));
-        }
-    }
-
-    /**
-     * Class to manage Cache in DataStore
-     * @package Core
-     */
-    class CoreCacheDataStore
-    {
-
-        /** @var DataStore  */
-        var $ds = null;
-        /** @var Core7 */
-        var $core;
-        var $error = false;
-        var $errorMsg = [];
-        var $spacename = 'CloudFramework';
-
-        function __construct(Core7 &$core, $spacename)
-        {
-            $this->spacename = $spacename;
-            $this->core = $core;
-            $entity = 'CloudFrameworkCache';
-            $model = json_decode('{
-                                    "KeyName": ["keyname","index|minlength:4"],
-                                    "Fingerprint": ["json","internal"],
-                                    "DateUpdating": ["datetime","index|forcevalue:now"],
-                                    "Serialize": ["string"]
-                                  }',true);
-            $this->ds = $core->loadClass('DataStore',[$entity,$this->spacename,$model]);
-            if ($this->ds->error) return($this->addError($this->ds->errorMsg));
-
-        }
-
-        function set($path, $data)
-        {
-            $entity = ['KeyName'=>$path
-                ,'Fingerprint'=>$this->core->system->getRequestFingerPrint()
-                ,'DateUpdating'=>"now"
-                ,'Serialize'=>utf8_encode(gzcompress(serialize($data)))];
-
-            $ret = $this->ds->createEntities([$entity]);
-            if($this->ds->error) {
-                $this->errorMsg = ['DataStore'=>$this->ds->errorMsg];
-                $this->error = true;
-                return false;
-            }
-            return true;
-        }
-
-
-        function delete($path)
-        {
-            $this->ds->deleteByKeys([$path]);
-            if($this->ds->error) $this->addError($this->ds->errorMsg);
-            if($this->error) return false;
-            else return true;
-        }
-
-        function get($path)
-        {
-            $data = $this->ds->fetchOneByKey($path);
-            if($this->ds->error) return($this->addError($this->ds->errorMsg));
-            if(!$data) return null;
-            else return unserialize(gzuncompress(utf8_decode($data['Serialize'])));
-        }
-
-        function addError($value)
-        {
-            $this->error = true;
-            $this->errorMsg[] = $value;
-        }
-    }
-
-    /**
-     * Class to manage User information
-     * @package Core
-     */
-    class CoreUser
-    {
-        private $core;
-        var $isAuth = false;
-        var $token;
-        var $namespace;
-        var $id;
-        var $data = [];
-        /** @var bool $cached says if the user data has been retrieved from cache */
-        var $cached = false;
-        /** @var int $expirationTime Time to expire a token */
-        var $expirationTime = 3600;
-        /** @var int $maxTokens Max number of tokens in $expirationTime to handle */
-        var $maxTokens = 10;
-
-        var $error = false;
-        var $errorCode = null;
-        var $errorMsg = [];
-
-        // URL of the API service to verify token
-        const APIServices = 'https://api.cloudframework.io/core/signin';
-
-        function __construct(Core7 &$core)
-        {
-            $this->core = $core;
-        }
-
-        /**
-         * Verify that a token is valid and update the following properties: namespace, userId, userData
-         * It allows to work with several active tokens at the same time
-         * @param string $token Token to verify with CloudFramework ERP
-         * @param string $integration_key Integration Key to call CloudFramework API for signing
-         * @param bool $refresh indicates if we have to ignore cached data with $refresh=true. Default is false
-         * @return false|void
-         */
-        function checkERPToken(string $token, string $integration_key,bool $refresh=false)
-        {
-            //region SET $user,$namespace,$key from token structure or return errorCode: WRONG_TOKEN_FORMAT
-            $tokenParts = explode('__',$token);
-            if(count($tokenParts) != 3
-                || !($namespace=$tokenParts[0])
-                || !($user=$tokenParts[1])
-                || !($key=$tokenParts[2]) )
-                return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
-            //endregion
-
-            //region SET $userData trying to get the info from cache deleting expired tokens and checking $this->maxTokens
-            $updateCache = false;
-            $userData = $this->core->cache->get($namespace.'_'.$user);
-            if(!$userData) $userData = ['id'=>null,'tokens'=>[],'data'=>[]];
-            else {
-                $now = microtime(true);
-                foreach ($userData['tokens'] as $tokenId=>$tokenInfo) {
-                    if(($now - $tokenInfo['time']) > $this->expirationTime) {
-                        unset($userData['tokens'][$tokenId]);
-                        $updateCache = true;
-                    }
-                }
-
-                //update Cache with the deleted tokens
-                if($updateCache) $this->core->cache->set($namespace.'_'.$user,$userData);
-
-                // Verify $token is not a token with error
-                if(isset($userData['tokens'][$token]) && $userData['tokens'][$token]['error']) {
-                    return($this->addError('TOKEN_NOT_VALID',['The token already has been used but it is not valid',$userData['tokens'][$token]['error']]));
-                }
-
-                // Verify number of active tokens
-                if(!isset($userData['tokens'][$token]) && count($userData['tokens']) >=$this->maxTokens) {
-                    return($this->addError('MAX_TOKENS_REACHED','The max number of tokens has been reached: '.$this->maxTokens));
-                }
-
-                $this->cached = true;
-
-            }
-            //endregion
-
-            //region CALL CloudFramework API Service IF $token DOEST not exist in $userData OR $refresh
-            if(!isset($userData['tokens'][$token]) || $refresh) {
-
-                $this->cached = false;
-                $userData['tokens'][$token] = ['error'=>null,'time'=>microtime(true)];
-                $cfUserInfo = $this->core->request->post_json_decode(
-                    $this::APIServices.'/'.$namespace.'/check?_update&from_core7_user_object'
-                    ,['Fingerprint'=>$this->core->system->getRequestFingerPrint()]
-                    ,['X-WEB-KEY'=>'Core7UserObject'
-                    ,'X-DS-TOKEN'=>$token
-                    ,'X-EXTRA-INFO'=>$integration_key
-                ]);
-
-                if($this->core->request->error) {
-                    $userData['tokens'][$token]['error'] = $this->core->request->errorMsg;
-                    if($this->core->request->getLastResponseCode()==401) {
-                        $this->addError('SECURITY_ERROR','Token is not authorized');
-                    } else {
-                        $this->addError('TOKEN_ERROR_'.$this->core->request->getLastResponseCode(),$this->core->request->errorMsg);
-                    }
-                } else {
-                    $userData['data'] =  $cfUserInfo['data'];
-                    $userData['id'] = $cfUserInfo['data']['User']['KeyName'];
-                }
-                $this->core->request->reset();
-                $this->core->cache->set($namespace.'_'.$user,$userData);
-                if($this->error) return;
-            }
-            //endregion
-
-            //region SET $this->{isAuth, namespace, token, id, data}
-            $this->isAuth = true;
-            $this->token = $token;
-            $this->namespace = $namespace;
-            $this->id = $userData['id'];
-            $this->data = $userData['data'];
-            unset($userData);
-            //endregion
-
-            return true;
-
-        }
-
-        /**
-         * Return if the user is Authenticated
-         * @return bool
-         */
-        function isAuth()
-        {
-            return $this->isAuth;
-        }
-
-
-        /**
-         * Set a privilege for a user
-         * @param $privilege
-         * @param bool $active
-         */
-        function setPrivilege($privilege,$active=true)
-        {
-            if(!isset($this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'] = [];
-            if(!in_array($privilege,$this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'][] = $privilege;
-        }
-
-        /**
-         * Unset a privilege for a user
-         * @param $privilege
-         * @param bool $active
-         */
-        function unsetPrivilege($privilege)
-        {
-            if(!isset($this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'] = [];
-            if(($index = array_search($privilege,$this->data['User']['UserPrivileges']))!==false)
-                array_splice($this->data['User']['UserPrivileges'],$index,1);
-        }
-
-        /**
-         * Set a privilege for a user
-         * @param string $privilege
-         * @return bool
-         */
-        function hasPrivilege(string $privilege)
-        {
-            return (isset($this->data['User']['UserPrivileges']) && in_array($privilege,$this->data['User']['UserPrivileges']));
-        }
-
-        /**
-         * Set a privilege for a user
-         * @param string $privilege
-         * @return bool
-         */
-        function getPrivileges()
-        {
-            return $this->data['User']['UserPrivileges']??[];
-        }
-
-        /**
-         * Add an error Message
-         * @param $value
-         */
-        function addError($code,$message=null)
-        {
-            $this->error = true;
-            $this->errorCode = true;
-            $this->errorMsg[] = $value??$code;
-        }
-
-
-    }
-
-    /**
-     * Class to manage CloudFramework configuration.
-     * @package Core
+     * $this->core->config Class to manage CloudFramework configuration.
+     * @package Core.config
      */
     class CoreConfig
     {
@@ -2640,8 +1910,137 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manage the security access and dynamic getenv variables
-     * @package Core
+     * $this->core->session Class to manage session
+     * @package Core.session
+     */
+    class CoreSession
+    {
+        /** @var bool $start says if the session has been started */
+        var $start = false;
+        /** @var string $id Id of the session */
+        var $id = '';
+        /** @var bool $debug if true the class will send to $core->logs the use of the methods*/
+        var $debug = false;
+        /** @var Core7 $core */
+        var $core;
+
+        /**
+         * CoreSession constructor
+         * @param Core7 $core Core7 class passed by reference
+         * @param null $debug if true it will send to $core->logs the use of the methods
+         */
+        function __construct(Core7 &$core,$debug=null)
+        {
+            $this->core = $core;
+            //region SET $this->>debug. Activate debug based on $debug or if I am in development (local environgmnet)
+            if(null !== $debug) $this->debug = true === $debug;
+            else if($this->core->is->development()) $this->debug = true;
+            //endregion
+
+            //region VERIFY the session is currently active
+            if(session_status() == PHP_SESSION_ACTIVE) {
+                $this->id = session_id();
+                $this->start = true;
+                if($this->core->is->development() && $this->core->is->terminal()) {
+                    $this->core->logs->add("__construct. id [{$this->id}]",'CoreSession');
+                }
+            }
+            //endregion
+
+        }
+
+        /**
+         * init the session
+         * @param string $id optional paramater to assign a session_id
+         */
+        function init($id = '')
+        {
+            // If they pass a session id I will use it.
+            if (!empty($id)) {
+                $this->id = '';
+                $this->start = false;
+
+                if(session_status() == PHP_SESSION_ACTIVE) {
+                    if(session_id() != $id )  {
+                        session_abort();
+                        session_id($id);
+                    }
+                } else {
+                    session_id($id);
+                }
+            }
+
+            // Session start
+            if(session_status() != PHP_SESSION_ACTIVE) {
+                session_start();
+            }
+
+            // Let's keep the session id
+            $this->id = session_id();
+
+            // Initiated.
+            $this->start = true;
+
+            if($this->debug)
+                $this->core->logs->add("init(). id [{$this->id}]",'CoreSession');
+
+        }
+
+        /**
+         * get a variable from session
+         * @param $var
+         * @return mixed|null
+         */
+        function get($var)
+        {
+            if (!$this->start) $this->init();
+            if (key_exists('CloudSessionVar_' . $var, $_SESSION)) {
+                try {
+                    $ret = unserialize(gzuncompress($_SESSION['CloudSessionVar_' . $var]));
+                } catch (Exception $e) {
+                    if($this->debug)
+                        $this->core->logs->add("get('\$var=$var') Exception: ".$e->getMessage(),'CoreSession');
+                    return null;
+                }
+                if($this->debug)
+                    $this->core->logs->add("get('\$var=$var') found",'CoreSession');
+                return $ret;
+            }
+            if($this->debug)
+                $this->core->logs->add("get('\$var=$var') not-found",'CoreSession');
+
+            return null;
+        }
+
+        /**
+         * set a variable from session
+         * @param $var
+         * @param $value
+         */
+        function set($var, $value)
+        {
+            if (!$this->start) $this->init();
+            $_SESSION['CloudSessionVar_' . $var] = gzcompress(serialize($value));
+            if($this->debug)
+                $this->core->logs->add("set('\$var=$var') ok",'CoreSession');
+        }
+
+        /**
+         * delete a variable from session
+         * @param $var
+         */
+        function delete($var)
+        {
+            if (!$this->start) $this->init();
+            unset($_SESSION['CloudSessionVar_' . $var]);
+            if($this->debug)
+                $this->core->logs->add("delete('\$var=$var') ok",'CoreSession');
+        }
+    }
+
+    /**
+     * $this->core->security Class to manage the security access and dynamic getenv variables
+     * @package Core.security
      */
     class CoreSecurity
     {
@@ -3050,10 +2449,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $user this should be passed when you are working in a script or development environment
          * @return array|voud
          * {
-            "access_token": "ya29.****",
-            "expires_in": 1799,
-            "token_type": "Bearer"
-            }
+        "access_token": "ya29.****",
+        "expires_in": 1799,
+        "token_type": "Bearer"
+        }
          */
         function getGoogleAccessToken(string $user='') {
             if($this->core->is->development()) {
@@ -3139,37 +2538,37 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $token
          * @return mixed|string
          * appengine output {
-            "issued_to": "anonymous",
-            "audience": "anonymous",
-            "scope": "https://www.googleapis.com/auth/trace.append https://www.googleapis.com/auth/monitoring.write https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/logging.write https://www.googleapis.com/auth/cloud_debugger https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/appengine.apis",
-            "expires_in": 1408,
-            "email": "cloudframework-io@appspot.gserviceaccount.com",
-            "verified_email": true,
-            "access_type": "online"
-            },
+        "issued_to": "anonymous",
+        "audience": "anonymous",
+        "scope": "https://www.googleapis.com/auth/trace.append https://www.googleapis.com/auth/monitoring.write https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/logging.write https://www.googleapis.com/auth/cloud_debugger https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/appengine.apis",
+        "expires_in": 1408,
+        "email": "cloudframework-io@appspot.gserviceaccount.com",
+        "verified_email": true,
+        "access_type": "online"
+        },
          * compute engine script {
-            "aud": "32555940559.apps.googleusercontent.com",
-            "azp": "107073846750350635781",
-            "email": "173191905033-compute@developer.gserviceaccount.com",
-            "email_verified": true,
-            "exp": 1638615700,
-            "google": {
-                "compute_engine": {
-                    "instance_creation_timestamp": 1608593543,
-                    "instance_id": "5265569244953019153",
-                    "instance_name": "bnext-spain-etl-machine",
-                    "license_id": [
-                    "5926592092274602096"
-                    ],
-                    "project_id": "bnext-cloud",
-                    "project_number": 173191905033,
-                    "zone": "europe-west1-b"
-                }
-            },
-            "iat": 1638612100,
-            "iss": "https://accounts.google.com",
-            "sub": "107073846750350635781"
-            }
+        "aud": "32555940559.apps.googleusercontent.com",
+        "azp": "107073846750350635781",
+        "email": "173191905033-compute@developer.gserviceaccount.com",
+        "email_verified": true,
+        "exp": 1638615700,
+        "google": {
+        "compute_engine": {
+        "instance_creation_timestamp": 1608593543,
+        "instance_id": "5265569244953019153",
+        "instance_name": "bnext-spain-etl-machine",
+        "license_id": [
+        "5926592092274602096"
+        ],
+        "project_id": "bnext-cloud",
+        "project_number": 173191905033,
+        "zone": "europe-west1-b"
+        }
+        },
+        "iat": 1638612100,
+        "iss": "https://accounts.google.com",
+        "sub": "107073846750350635781"
+        }
          */
         function getGoogleAccessTokenInfo($token)
         {
@@ -3194,35 +2593,35 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param $token
          * @return array|boolean|null if the token is valid returns an array otherwise false. If there is a service error it returns null and addError in the class
          * appengine output example{
-            "aud": "https://api7.cloudframework.io",
-            "azp": "105263613482625024225",
-            "email": "cloudframework-io@appspot.gserviceaccount.com",
-            "email_verified": true,
-            "exp": 1638601791,
-            "iat": 1638598191,
-            "iss": "https://accounts.google.com",
-            "sub": "105263613482625024225"
-            },
+        "aud": "https://api7.cloudframework.io",
+        "azp": "105263613482625024225",
+        "email": "cloudframework-io@appspot.gserviceaccount.com",
+        "email_verified": true,
+        "exp": 1638601791,
+        "iat": 1638598191,
+        "iss": "https://accounts.google.com",
+        "sub": "105263613482625024225"
+        },
          * computeengine script example{
-            "aud": "32555940559.apps.googleusercontent.com",
-            "azp": "107073846750350635781",
-            "exp": 1638609030,
-            "iat": 1638605430,
-            "iss": "https://accounts.google.com",
-            "sub": "107073846750350635781"
-            },
+        "aud": "32555940559.apps.googleusercontent.com",
+        "azp": "107073846750350635781",
+        "exp": 1638609030,
+        "iat": 1638605430,
+        "iss": "https://accounts.google.com",
+        "sub": "107073846750350635781"
+        },
          * user localhost example{
-            "iss": "https://accounts.google.com",
-            "azp": "32555940559.apps.googleusercontent.com",
-            "aud": "32555940559.apps.googleusercontent.com",
-            "sub": "116008531197812823243",
-            "hd": "adrianmm.com",
-            "email": "info@adrianmm.com",
-            "email_verified": true,
-            "at_hash": "LgKsYP8U6NcmstQR1LgO7w",
-            "iat": 1638611898,
-            "exp": 1638615498
-            }
+        "iss": "https://accounts.google.com",
+        "azp": "32555940559.apps.googleusercontent.com",
+        "aud": "32555940559.apps.googleusercontent.com",
+        "sub": "116008531197812823243",
+        "hd": "adrianmm.com",
+        "email": "info@adrianmm.com",
+        "email_verified": true,
+        "at_hash": "LgKsYP8U6NcmstQR1LgO7w",
+        "iat": 1638611898,
+        "exp": 1638615498
+        }
          */
         function getGoogleIdentityTokenInfo($token)
         {
@@ -3940,301 +3339,447 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
     }
 
-
     /**
-     * Class to manage localizations
-     * @package Core
+     * $this->core->cache Class to manage Cache in your solutions.
+     * https://cloud.google.com/appengine/docs/standard/php7/using-memorystore#setup_redis_db
+     * @package Core.cache
      */
-    class CoreLocalization
+    class CoreCache
     {
-        protected $core;
-        var $data = [];
-        var $wapploca = [];
-        var $files_readed = [];
-        private $init = false;
+        var $cache = null;
+        var $spacename = 'CloudFrameWork';
+        var $type = 'memory'; // memory, redis, datastore, directory,
+        var $dir = '';
         var $error = false;
         var $errorMsg = [];
-        var $cache = true;
+        var $debug = false;
+        var $lastHash = null;
+        var $lastExpireTime = null;
+        var $atom = null;
+        var $errorSecurity = false; // It will change to true when you try to get a value using a wrong $cache_secret_key,$cache_secret_iv
+        /** @var Core  */
+        var $core=null;
 
-        function __construct(Core7 &$core)
+        /**
+         * CoreCache constructor. If $type==CacheInDirectory a writable $path is required
+         * @param string $spacename
+         * @param string $path if != null the it assumes the cache will be store in files
+         */
+        function __construct(Core7 &$core, $spacename = '',  $path=null, $debug = null)
         {
             $this->core = $core;
 
-        }
+            // Initialize $this->spacename
+            if (!strlen(trim($spacename))) $spacename = (isset($_SERVER['HTTP_HOST'])) ? $_SERVER['HTTP_HOST'] : $_SERVER['PWD'];
+            $this->setSpaceName($spacename);
 
-        function init() {
-
-            // Maintain compatibilty with old variable
-            if (!strlen($this->core->config->get('core.localization.cache_path')) && strlen($this->core->config->get('LocalizePath')))
-                $this->core->config->set('core.localization.cache_path', $this->core->config->get('LocalizePath'));
-
-            // Maintain compatibilty with old variable
-            if (!strlen($this->core->config->get('core.localization.cache_path')) && strlen($this->core->config->get('localizeCachePath')))
-                $this->core->config->set('core.localization.cache_path', $this->core->config->get('localizeCachePath'));
-
-
-            // Read from Cache last Dics
-            if($this->cache) {
-                if (!isset($_GET['_reloadDics']) && !isset($_GET['_nocacheDics'])) {
-                    $this->data = $this->core->cache->get('Core:Localization:Data');
-                    if (!is_array($this->data)) $this->data = [];
+            // Activate debug based on $debug or if I am in development (local environgmnet)
+            if(null !== $debug)
+                $this->debug = true === $debug;
+            // If we are in localhost then activate
+            else
+                if($this->core->is->development()) {
+                    if(!$path && $this->core->config->get('core.cache.cache_path')) $path = $this->core->config->get('core.cache.cache_path');
+                    $this->debug = true;
                 }
 
-
-                if ($this->core->config->get('WAPPLOCA') && !isset($_GET['_nocacheDics'])) {
-                    $this->wapploca = $this->core->cache->get('Core:Localization:WAPPLOCA', $this->core->config->get('wapploca_cache_expiration_time'));
-                    if (!is_array($this->wapploca)) $this->wapploca = [];
-                }
+            // Activate CacheInDirectory
+            if (null !== $path) {
+                $this->activateCacheFile($path);
             }
-
-            $this->init = true;
         }
 
         /**
-         * Get a Localization code from a localization file
-         * @param $locFile
-         * @param $code
-         * @param array $config
-         * @return mixed|string
+         * Activate cache in memory
+         * @return bool
          */
-        function get($locFile, $code, $config = [])
+        function activateMemory()
         {
-            if(!$this->init) $this->init();
-            $ret = null;
+            $this->cache = null;
+            $this->type = 'memory';
+            $this->init();
+            return true;
+        }
 
-            // Check syntax of $locFile & $code
-            if (!$this->checkLocFileAndCode($locFile, $code)) return 'Err in: [' . $locFile . "{{$code}}" . ']';
-            $lang = $this->core->config->getLang();
-            if (isset($config['lang']) && strlen($config['lang']) == 2) $lang = $config['lang'];
-            // The $locFile does not exist
-            if (!isset($_GET['_debugDics'])) {
+        /**
+         * Activate cache in files.. It requires that the path will be writtable
+         * @param string $path dir path to keep files.
+         * @param string $spacename
+         * @return bool
+         */
+        function activateCacheFile($path, $spacename = '')
+        {
+            // Avoid to activate the same Cache Path
+            if($this->dir == $path && is_object($this->cache) ) return true;
 
+            if (isset($_SESSION['Core_CacheFile_' . $path]) || is_dir($path) || @mkdir($path)) {
+                $this->type = 'directory';
+                $this->dir = $path;
+                if (strlen($spacename)) $spacename = '_' . $spacename;
+                $this->setSpaceName(basename($path) . $spacename);
+                $this->cache = null;
+                $this->init();
 
-
-                // Trying read from file
-                if (!isset($this->data[$locFile][$lang]) && !isset($this->files_readed[$locFile][$lang])  ) {
-                    $this->readFromFile($locFile, $lang);
-                }
-
-                // Trying read from WAPPLOCA
-                $wapploca_readed = false;
-                if ($this->core->config->get('WAPPLOCA') && !isset($this->data[$locFile][$lang])) {
-                    if ($this->readFromWAPPLOCA($locFile, $code, $lang) && isset($this->data[$locFile][$lang][$code])) {
-                        // Writting Local file.
-                        $this->writeLocalization($locFile, $lang);
-                        $this->files_readed[$locFile][$lang] = true;
-
-                    }
-                }
-
-                // If this localization file exists but the $code does not exist because the cache
-                if (isset($this->data[$locFile][$lang]) && !isset($this->data[$locFile][$lang][$code]) && !isset($this->files_readed[$locFile][$lang]) ) {
-                    // $this->readFromFile($locFile, $lang);
-                }
-            }
-
-
-            if (isset($_GET['_debugDics'])) {
-                $ret = $lang . '_' . $locFile . ":({$code})";
-            } else if (isset($this->data[$locFile][$lang][$code])) {
-                $ret = $this->data[$locFile][$lang][$code];
+                // Save in session to improve the performance for buckets because is_dir has a high cost.
+                if(isset($_SESSION))
+                    $_SESSION['Core_CacheFile_' . $path] = true;
+                return true;
             } else {
-                $this->core->logs->add("Missing configuration for Localizations: {$locFile}-{$lang}-{$code}");
-                $this->core->logs->add('WAPPLOCA: ' . ((empty($this->core->config->get('WAPPLOCA'))) ? 'empty' : '***'));
-                $this->core->logs->add('core.localization.cache_path: ' . ((empty($this->core->config->get('core.localization.cache_path'))) ? 'empty' : '***'));
-            }
-
-            // Evaluate data conversion
-            if(array_key_exists('data',$config) && $config['data']) {
-                $ret = vsprintf($ret,$config['data']);
-            }
-
-            // Return
-            return $ret;
-        }
-
-        /**
-         * Set a Localization code
-         * @param $locFile
-         * @param $code
-         * @param $content
-         * @param array $config
-         * @return mixed|string
-         */
-        function set($locFile, $code, $content,$config = [])
-        {
-            if(!$this->init) $this->init();
-
-            // Check syntax of $locFile & $code
-            if (!$this->checkLocFileAndCode($locFile, $code)) return 'Err in: [' . $locFile . "{{$code}}" . ']';
-            if (isset($config['lang']) && strlen($config['lang']) == 2) $lang = $config['lang'];
-
-            if (!isset($this->data[$locFile][$lang]) || !isset($this->data[$locFile][$lang][$code]) || $this->data[$locFile][$lang][$code]!=$content) {
-                $this->data[$locFile][$lang][$code]=$content;
-            }
-        }
-
-
-        /**
-         * Read from a file the localizations and store the content into: $this->data[$locFile][$lang]
-         * @param $locFile
-         * @return bool
-         */
-        private function readFromFile($locFile, $lang = '')
-        {
-            if(!$this->init) $this->init();
-
-
-            if (!strlen($this->core->config->get('core.localization.cache_path'))) {
-                $this->core->config->set('core.localization.cache_path',$this->core->system->app_path.'/localize');
-            }
-            if (!strlen($lang)) $lang = $this->core->config->getLang();
-            $ok = true;
-            $this->core->__p->add('Localization->readFromFile: ', strtoupper($lang)."-{$locFile}", 'note');
-            // First read from local directory if {{core.localization.cache_path}} is defined.
-            $this->files_readed[$locFile][$lang] = true;
-            if (strlen($this->core->config->get('core.localization.cache_path'))) {
-                $filename = $this->core->config->get('core.localization.cache_path') . '/' . strtoupper($lang) . '_Core_' . $locFile . '.json';
-                try {
-                    $ret = @file_get_contents($filename);
-                    if ($ret !== false) {
-                        $this->data[$locFile][$lang] = json_decode($ret, true);
-
-                        // Cache result
-                        if($this->cache)
-                            $this->core->cache->set('Core:Localization:Data', $this->data);
-
-                        $this->core->__p->add('Success reading ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
-
-                    } else {
-                        $this->core->__p->add('Error reading ' .  strtoupper($lang) . '_Core_' . $locFile . '.json');
-                        $this->addError('CoreLoalization.readFromFile error. No file: '.$filename);
-                        $this->addError(error_get_last());
-                        $ok = false;
-                    }
-                } catch (Exception $e) {
-                    $ok = false;
-                    $this->core->logs->add('Error reading ' . $filename . ': ');
-                    $this->core->logs->add($e->getMessage() . ' ' . error_get_last());
-                }
-            }
-            $this->core->__p->add('Localization->readFromFile: ', '', 'endnote');
-            return $ok;
-        }
-
-        public function writeLocalization($locFile, $lang = '')
-        {
-            if(!$this->init) $this->init();
-
-
-            if (!strlen($this->core->config->get('core.localization.cache_path'))) return false;
-            if (!isset($this->data[$locFile])) return false;
-            if (!strlen($lang)) $lang = $this->core->config->getLang();
-            $ok = true;
-            $this->core->__p->add('Localization->writeLocalization: ', strtoupper($lang) . '_Core_' . $locFile . '.json', 'note');
-
-            $filename = $this->core->config->get('core.localization.cache_path') . '/' . strtoupper($lang) . '_Core_' . $locFile . '.json';
-            try {
-                $ret = @file_put_contents($filename, json_encode($this->data[$locFile][$lang], JSON_PRETTY_PRINT));
-                if ($ret === false) {
-                    $ok = false;
-                    $this->core->__p->add('Error writting ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
-                    $this->core->logs->add('Error writting ' . $filename);
-                    $this->core->logs->add(error_get_last());
-                } else {
-                    $this->core->__p->add('Success Writting ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
-
-                    // Cache the result
-                    if($this->cache)
-                        $this->core->cache->set('Core:Localization:Data', $this->data);
-                }
-            } catch (Exception $e) {
-                $ok = false;
-                $this->core->logs->add('Error reading ' . $filename . ': ');
-                $this->core->logs->add($e->getMessage() . ' ' . error_get_last());
-            }
-            $this->core->__p->add('Localization->writeLocalization: ', '', 'endnote');
-            return $ok;
-        }
-
-
-        /**
-         * Read from a file the localizations
-         * @param $locFile
-         * @param $code
-         * @return bool
-         */
-        private function readFromWAPPLOCA($locFile, $code, $lang = '')
-        {
-            if(!$this->init) $this->init();
-
-            if (empty($this->core->config->get('WAPPLOCA'))) return false;
-            if (!strlen($lang)) $lang = $this->core->config->getLang();
-
-            list($org, $app, $cat, $loc_code) = explode(';', $code, 4);
-            if (!strlen($loc_code) || preg_match('/[^a-z0-9_-]/', $loc_code)) {
-                $this->core->logs->add('Localization->readFromWAPPLOCA: has a wrong value for $code: ' . $code);
+                $this->addError($path . ' does not exist and can not be created');
                 return false;
             }
-            $ok = true;
-            $lang = strtoupper($lang);
-            $key = "$org/$app/$cat?lang=" . $lang;
-            // Read From CloudService the info and put the cats into $this->wapploca
-            $url = $this->core->config->get('wapploca_api_url');
-            if (!isset($this->wapploca[$key][$lang])) {
-                $ret = $this->core->request->get($url . '/dics/' . $key);
-                if (!$this->core->request->error) {
-                    $ret = json_decode($ret, true);
-                    if (!$ret['success']) {
-                        $this->core->logs->add($ret);
-                        $ok = false;
-                    } else {
-                        if (is_array($ret['data'])) {
-                            $this->wapploca[$key] = $ret['data'];
 
-                            // Cache the result
-                            if($this->cache)
-                                $this->core->cache->set('Core:Localization:WAPPLOCA', $this->wapploca);
+        }
 
-                        } else {
-                            $this->core->logs->add('WAPPLOCA return data is not an array');
-                            $this->core->logs->add($ret);
+        /**
+         * Activate cache in Datastore.. It requires Core Class
+         * @param Core7 $core Core class to facilitate errors
+         * @param string $spacename spacename where to store objecs
+         * @return bool
+         */
+        function activateDataStore( $spacename = '')
+        {
+            $this->type = 'datastore';
+            if($spacename) $this->spacename = $spacename;
+            $this->cache = null;
+            $this->init();
+            if($this->error) return false;
+            else return true;
+        }
+
+        /**
+         * Initialiated Cache Memory object.. If previously it has been called it just returns true.. if there is an error it returns false..
+         * https://cloud.google.com/appengine/docs/standard/php7/php-differences
+         * App Engine Memcache support is not provided. Instead, use Memorystore for Redis.
+         * https://cloud.google.com/appengine/docs/standard/php7/using-memorystore
+         * @return bool
+         */
+        function init()
+        {
+            if(null !== $this->cache) return(is_object($this->cache));
+
+            if($this->debug)
+                $this->core->logs->add("init(). type: {$this->type}",'CoreCache');
+
+            if ($this->type == 'memory') {
+                if (!getenv('REDIS_HOST') || !getenv('REDIS_PORT')) {
+                    if($this->debug)
+                        $this->core->logs->add("init(). Failed because REDIS_HOST and REDIS_PORT env_vars does not exist.",'CoreCache','warning');
+                    $this->cache=-1;
+                    return;
+                } else {
+                    $host = getenv('REDIS_HOST');
+                    $port = getenv('REDIS_PORT');
+                    try {
+                        $this->cache = new Redis();
+                        $this->cache->connect($host, $port);
+                    } catch (Exception $e) {
+                        $this->core->logs->add("init(). REDIS connection failed because: ". $e->getMessage(),'CoreCache','warning');
+                        unset($this->cache);
+                        $this->cache=-1;
+                        return;
+                    }
+
+                }
+            } elseif($this->type=='datastore') {
+                $this->cache = new CoreCacheDataStore($this->core,$this->spacename);
+                if($this->cache->error) $this->addError(['CoreCacheDataStore'=>$this->cache->errorMsg]);
+            } elseif($this->type=='directory' && $this->dir) {
+                $this->cache = new CoreCacheFile($this->dir);
+            }
+
+            return(is_object($this->cache));
+        }
+
+
+        /**
+         * Set a $spacename to set/get $objects
+         * @param $name
+         */
+        function setSpaceName($name)
+        {
+            if (strlen($name)) {
+                $name = '_' . trim($name);
+                $this->spacename = preg_replace('/[^A-z_-]/', '_', 'CloudFrameWork_' . $this->type . $name);
+            }
+        }
+
+        /**
+         * Return an object from Cache.
+         * @param $key
+         * @param int $expireTime The default value es -1. If you want to expire, you can use a value in seconds.
+         * @param string $hash if != '' evaluate if the $hash match with hash stored in cache.. If not, delete the cache and return false;
+         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data in cache
+         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data in cache
+         * @return bool|mixed|null
+         */
+        function get($key, $expireTime = -1, $hash = '',$cache_secret_key='',$cache_secret_iv='')
+        {
+            if(!$this->init() || !strlen(trim($key))) return null;
+
+            // Performance microtime
+            $time = microtime(true);
+
+            //region SET __p performance paramater
+            if (!strlen($expireTime)) $expireTime = -1;
+            $encrypted = ($cache_secret_key && $cache_secret_iv)?'/encrypted':'/no-encrypted';
+            $encrypted.='/exp:'.$expireTime;
+            $encrypted.='/hash:'.(($hash)?'/with-hash':'/no-hash');
+            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", $key, 'note');
+            //endregion
+
+
+            $info = $this->cache->get($this->spacename . '-' . $key);
+            if (strlen($info) && $info !== null) {
+
+                $info = unserialize($info);
+                $this->lastExpireTime = microtime(true) - $info['_microtime_'];
+                $this->lastHash = $info['_hash_'];
+
+                // Expire Caché
+                if ($expireTime >= 0 && microtime(true) - $info['_microtime_'] >= $expireTime) {
+                    $this->delete( $key);
+                    if($this->debug)
+                        $this->core->logs->add("get('\$key=$key',$expireTime=\$expireTime) failed (because expiration)",'CoreCache');
+                    $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
+                    return null;
+                }
+                // Hash Cache
+                if ('' != $hash && $hash != $info['_hash_']) {
+                    $this->delete( $key);
+                    if($this->debug)
+                        $this->core->logs->add("get('$key',$expireTime,'\$hash') failed (because hash does not match) token: ".$this->spacename . '-' . $key.' [hash='.$this->lastHash.',since='.round($this->lastExpireTime,2).' ms.]','CoreCache');
+
+                    $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
+                    return null;
+                }
+                // Normal return
+
+                // decrypt data if $cache_secret_key and $cache_secret_iv are not empty
+                if($cache_secret_key && $cache_secret_iv) {
+                    $this->errorSecurity = false;
+                    $info['_data_'] = $this->core->security->decrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
+                }
+
+                // unserialize vars
+                $ret = null;
+                try {
+                    if(isset($info['_data_']) && $info['_data_']) {
+                        $ret = @unserialize(@gzuncompress($info['_data_']));
+                        if($ret===false && $cache_secret_key && $cache_secret_iv) {
+                            $this->delete( $key);
+                            $this->errorSecurity = true;
+                            if($this->debug)
+                                $this->core->logs->add("get('$key',$expireTime,'$hash',\$cache_secret_key or \$cache_secret_iv). Wrong \$cache_secret_key or \$cache_secret_iv. Cache key has been deleted because security",'CoreCache');
+                            $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
+                            return null;
                         }
                     }
-                } else $ok = false;
+                } catch (Exception $e) {
+                    $ret = null;
+                }
+
+                if($this->debug)
+                    $this->core->logs->add("get(\$key=$key,\$expireTime=$expireTime,\$hash,\$cache_secret_key, \$cache_secret_iv). successful returned in namespace ".$this->spacename . ' [time='.(round(microtime(true)-$time,4)).' secs]','CoreCache');
+
+
+                $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", '', 'endnote');
+                return $ret;
+
+            } else {
+                if($this->debug) $this->core->logs->add("get(\$key=$key) failed (because it does not exist)",'CoreCache');
+                $this->core->__p->add("CoreCache.get [{$this->type}{$encrypted}]", 'error', 'endnote');
+                return null;
+            }
+        }
+
+        /**
+         * Set an object on cache based on $key
+         * @param $key
+         * @param mixed $object
+         * @param string $hash Allow to set the info based in a hash to determine if it is valid when read it.
+         * @param string $cache_secret_key  optional secret key. If not empty it will encrypt the data en cache
+         * @param string $cache_secret_iv  optional secret key. If not empty it will encrypt the data en cache
+         * @return bool
+         */
+        function set($key, $object, $hash=null, $cache_secret_key='',$cache_secret_iv='')
+        {
+            $encrypt = ($cache_secret_key && $cache_secret_iv)?'/encrypt':'/no-encrypt';
+            if(!$this->init() || !strlen(trim($key))) return null;
+            $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", $key, 'note');
+
+            $info['_microtime_'] = microtime(true);
+            $info['_hash_'] = $hash;
+            $info['_data_'] = gzcompress(serialize($object));
+
+            // encrypt data if $cache_secret_key and $cache_secret_iv are not empty
+            if($cache_secret_key && $cache_secret_iv) $info['_data_'] = $this->core->security->encrypt($info['_data_'],$cache_secret_key,$cache_secret_iv);
+
+            $this->cache->set($this->spacename . '-' . $key, serialize($info));
+            // If exists a property error in the class checkit
+            if(isset($this->cache->error) && $this->cache->error) {
+                $this->error = true;
+                $this->errorMsg = $this->cache->errorMsg;
             }
 
+            if($this->debug)
+                $this->core->logs->add("set(\$key={$key},..)".(($hash)?' with $hash,':'').(($cache_secret_key && $cache_secret_iv)?' with $cache_secret_key and $cache_secret_iv':''),'CoreCache');
 
-            // Return the code required
-            if (isset($this->wapploca[$key][$lang][$code]))
-                $this->data[$locFile][$lang][$code] = $this->wapploca[$key][$lang][$code];
+            unset($info);
+            $this->core->__p->add("CoreCache.set [{$this->type}{$encrypt}]", '', 'endnote');
+            return ($this->error)?false:true;
+        }
+
+        /**
+         * delete a $key from cache
+         * @param $key
+         * @return true|null
+         */
+        function delete($key)
+        {
+            if(!$this->init() || !strlen(trim($key))) return null;
+
+            if (!strlen(trim($key))) return false;
+            if($this->type=='memory')
+                $this->cache->del($this->spacename . '-' . $key);
             else
-                $this->data[$locFile][$lang][$code] = $code;
-            return $ok;
+                $this->cache->delete($this->spacename . '-' . $key);
+            if($this->debug)
+                $this->core->logs->add("delete(). token: ".$this->spacename . '-' . $key,'CoreCache');
+
+            return true;
         }
 
 
         /**
-         * Check the formats for locaLizationFile and codes
-         * @param $locFile
-         * @param $code
-         * @return bool
+         * Return a cache based in a hash previously assigned in set
+         * @param $str
+         * @param $hash
+         * @return bool|mixed|null
          */
-        private function checkLocFileAndCode(&$locFile, &$code)
-        {
-            if(!$this->init) $this->init();
+        public function getByHash($str, $hash) { return $this->get($str,-1, $hash); }
 
-            $locFile = preg_replace('/[^A-z0-9_\-]/', '', $locFile);
-            if (!strlen($locFile)) {
-                $this->core->errors->set('Localization has received a wrong spacename: ');
-                return false;
-            }
-            $code = preg_replace('/[^a-z0-9_\-;\.]/', '', strtolower($code));
-            if (!strlen($code)) {
-                $this->core->errors->set('Localization has received a wrong code: ');
+
+        /**
+         * Return a cache based in the Expiration time = TimeToSave + $seconds
+         * @param string $str
+         * @param int $seconds
+         * @return bool|mixed|null
+         */
+        public function getByExpireTime($str, $seconds) { return $this->get($str,$seconds); }
+
+        /**
+         * Set error in the class
+         * @param $value
+         */
+        function addError($value)
+        {
+            $this->error = true;
+            $this->errorMsg[] = $value;
+        }
+
+    }
+
+    /**
+     * Class to manate Cache in Files
+     * @package Core.cache
+     */
+    class CoreCacheFile
+    {
+
+        var $dir = '';
+
+        function __construct($dir = '')
+        {
+            if (strlen($dir)) $this->dir = $dir . '/';
+        }
+
+        function set($path, $data)
+        {
+            $path = preg_replace('/[\/\.;]/','_',$path);
+            return @file_put_contents($this->dir . $path, gzcompress(serialize($data)));
+        }
+
+        function delete($path)
+        {
+            $path = preg_replace('/[\/\.;]/','_',$path);
+            if(is_file($this->dir . $path))
+                return @unlink($this->dir . $path);
+        }
+
+        function get($path)
+        {
+            $ret = false;
+            $path = preg_replace('/[\/\.;]/','_',$path);
+            if (is_file($this->dir . $path))
+                $ret = file_get_contents($this->dir . $path);
+            if (false === $ret) return null;
+            else return unserialize(gzuncompress($ret));
+        }
+    }
+
+    /**
+     * Class to manage Cache in DataStore
+     * @package Core.cache
+     */
+    class CoreCacheDataStore
+    {
+
+        /** @var DataStore  */
+        var $ds = null;
+        /** @var Core7 */
+        var $core;
+        var $error = false;
+        var $errorMsg = [];
+        var $spacename = 'CloudFramework';
+
+        function __construct(Core7 &$core, $spacename)
+        {
+            $this->spacename = $spacename;
+            $this->core = $core;
+            $entity = 'CloudFrameworkCache';
+            $model = json_decode('{
+                                    "KeyName": ["keyname","index|minlength:4"],
+                                    "Fingerprint": ["json","internal"],
+                                    "DateUpdating": ["datetime","index|forcevalue:now"],
+                                    "Serialize": ["string"]
+                                  }',true);
+            $this->ds = $core->loadClass('DataStore',[$entity,$this->spacename,$model]);
+            if ($this->ds->error) return($this->addError($this->ds->errorMsg));
+
+        }
+
+        function set($path, $data)
+        {
+            $entity = ['KeyName'=>$path
+                ,'Fingerprint'=>$this->core->system->getRequestFingerPrint()
+                ,'DateUpdating'=>"now"
+                ,'Serialize'=>utf8_encode(gzcompress(serialize($data)))];
+
+            $ret = $this->ds->createEntities([$entity]);
+            if($this->ds->error) {
+                $this->errorMsg = ['DataStore'=>$this->ds->errorMsg];
+                $this->error = true;
                 return false;
             }
             return true;
+        }
+
+
+        function delete($path)
+        {
+            $this->ds->deleteByKeys([$path]);
+            if($this->ds->error) $this->addError($this->ds->errorMsg);
+            if($this->error) return false;
+            else return true;
+        }
+
+        function get($path)
+        {
+            $data = $this->ds->fetchOneByKey($path);
+            if($this->ds->error) return($this->addError($this->ds->errorMsg));
+            if(!$data) return null;
+            else return unserialize(gzuncompress(utf8_decode($data['Serialize'])));
         }
 
         function addError($value)
@@ -4245,8 +3790,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manage HTTP requests
-     * @package Core
+     * $this->core->request Class to handle HTTP requests
+     * @package Core.request
      */
     class CoreRequest
     {
@@ -5026,10 +4571,503 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
     }
 
+    /**
+     * $this->core->user Class to manage User information
+     * @package Core.user
+     */
+    class CoreUser
+    {
+        private $core;
+        var $isAuth = false;
+        var $token;
+        var $namespace;
+        var $id;
+        var $data = [];
+        /** @var bool $cached says if the user data has been retrieved from cache */
+        var $cached = false;
+        /** @var int $expirationTime Time to expire a token */
+        var $expirationTime = 3600;
+        /** @var int $maxTokens Max number of tokens in $expirationTime to handle */
+        var $maxTokens = 10;
+
+        var $error = false;
+        var $errorCode = null;
+        var $errorMsg = [];
+
+        // URL of the API service to verify token
+        const APIServices = 'https://api.cloudframework.io/core/signin';
+
+        function __construct(Core7 &$core)
+        {
+            $this->core = $core;
+        }
+
+        /**
+         * Verify that a token is valid and update the following properties: namespace, userId, userData
+         * It allows to work with several active tokens at the same time
+         * @param string $token Token to verify with CloudFramework ERP
+         * @param string $integration_key Integration Key to call CloudFramework API for signing
+         * @param bool $refresh indicates if we have to ignore cached data with $refresh=true. Default is false
+         * @return false|void
+         */
+        function checkERPToken(string $token, string $integration_key,bool $refresh=false)
+        {
+            //region SET $user,$namespace,$key from token structure or return errorCode: WRONG_TOKEN_FORMAT
+            $tokenParts = explode('__',$token);
+            if(count($tokenParts) != 3
+                || !($namespace=$tokenParts[0])
+                || !($user=$tokenParts[1])
+                || !($key=$tokenParts[2]) )
+                return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
+            //endregion
+
+            //region SET $userData trying to get the info from cache deleting expired tokens and checking $this->maxTokens
+            $updateCache = false;
+            $userData = $this->core->cache->get($namespace.'_'.$user);
+            if(!$userData) $userData = ['id'=>null,'tokens'=>[],'data'=>[]];
+            else {
+                $now = microtime(true);
+                foreach ($userData['tokens'] as $tokenId=>$tokenInfo) {
+                    if(($now - $tokenInfo['time']) > $this->expirationTime) {
+                        unset($userData['tokens'][$tokenId]);
+                        $updateCache = true;
+                    }
+                }
+
+                //update Cache with the deleted tokens
+                if($updateCache) $this->core->cache->set($namespace.'_'.$user,$userData);
+
+                // Verify $token is not a token with error
+                if(isset($userData['tokens'][$token]) && $userData['tokens'][$token]['error']) {
+                    return($this->addError('TOKEN_NOT_VALID',['The token already has been used but it is not valid',$userData['tokens'][$token]['error']]));
+                }
+
+                // Verify number of active tokens
+                if(!isset($userData['tokens'][$token]) && count($userData['tokens']) >=$this->maxTokens) {
+                    return($this->addError('MAX_TOKENS_REACHED','The max number of tokens has been reached: '.$this->maxTokens));
+                }
+
+                $this->cached = true;
+
+            }
+            //endregion
+
+            //region CALL CloudFramework API Service IF $token DOEST not exist in $userData OR $refresh
+            if(!isset($userData['tokens'][$token]) || $refresh) {
+
+                $this->cached = false;
+                $userData['tokens'][$token] = ['error'=>null,'time'=>microtime(true)];
+                $cfUserInfo = $this->core->request->post_json_decode(
+                    $this::APIServices.'/'.$namespace.'/check?_update&from_core7_user_object'
+                    ,['Fingerprint'=>$this->core->system->getRequestFingerPrint()]
+                    ,['X-WEB-KEY'=>'Core7UserObject'
+                    ,'X-DS-TOKEN'=>$token
+                    ,'X-EXTRA-INFO'=>$integration_key
+                ]);
+
+                if($this->core->request->error) {
+                    $userData['tokens'][$token]['error'] = $this->core->request->errorMsg;
+                    if($this->core->request->getLastResponseCode()==401) {
+                        $this->addError('SECURITY_ERROR','Token is not authorized');
+                    } else {
+                        $this->addError('TOKEN_ERROR_'.$this->core->request->getLastResponseCode(),$this->core->request->errorMsg);
+                    }
+                } else {
+                    $userData['data'] =  $cfUserInfo['data'];
+                    $userData['id'] = $cfUserInfo['data']['User']['KeyName'];
+                }
+                $this->core->request->reset();
+                $this->core->cache->set($namespace.'_'.$user,$userData);
+                if($this->error) return;
+            }
+            //endregion
+
+            //region SET $this->{isAuth, namespace, token, id, data}
+            $this->isAuth = true;
+            $this->token = $token;
+            $this->namespace = $namespace;
+            $this->id = $userData['id'];
+            $this->data = $userData['data'];
+            unset($userData);
+            //endregion
+
+            return true;
+
+        }
+
+        /**
+         * Return if the user is Authenticated
+         * @return bool
+         */
+        function isAuth()
+        {
+            return $this->isAuth;
+        }
+
+
+        /**
+         * Set a privilege for a user
+         * @param $privilege
+         * @param bool $active
+         */
+        function setPrivilege($privilege,$active=true)
+        {
+            if(!isset($this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'] = [];
+            if(!in_array($privilege,$this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'][] = $privilege;
+        }
+
+        /**
+         * Unset a privilege for a user
+         * @param $privilege
+         * @param bool $active
+         */
+        function unsetPrivilege($privilege)
+        {
+            if(!isset($this->data['User']['UserPrivileges'])) $this->data['User']['UserPrivileges'] = [];
+            if(($index = array_search($privilege,$this->data['User']['UserPrivileges']))!==false)
+                array_splice($this->data['User']['UserPrivileges'],$index,1);
+        }
+
+        /**
+         * Set a privilege for a user
+         * @param string $privilege
+         * @return bool
+         */
+        function hasPrivilege(string $privilege)
+        {
+            return (isset($this->data['User']['UserPrivileges']) && in_array($privilege,$this->data['User']['UserPrivileges']));
+        }
+
+        /**
+         * Set a privilege for a user
+         * @param string $privilege
+         * @return bool
+         */
+        function getPrivileges()
+        {
+            return $this->data['User']['UserPrivileges']??[];
+        }
+
+        /**
+         * Add an error Message
+         * @param $value
+         */
+        function addError($code,$message=null)
+        {
+            $this->error = true;
+            $this->errorCode = true;
+            $this->errorMsg[] = $value??$code;
+        }
+
+
+    }
 
     /**
-     * Class to manage Data Models
-     * @package Core
+     * $this->core->localization Class to manage localizations
+     * @package Core.localization
+     */
+    class CoreLocalization
+    {
+        protected $core;
+        var $data = [];
+        var $wapploca = [];
+        var $files_readed = [];
+        private $init = false;
+        var $error = false;
+        var $errorMsg = [];
+        var $cache = true;
+
+        function __construct(Core7 &$core)
+        {
+            $this->core = $core;
+
+        }
+
+        function init() {
+
+            // Maintain compatibilty with old variable
+            if (!strlen($this->core->config->get('core.localization.cache_path')) && strlen($this->core->config->get('LocalizePath')))
+                $this->core->config->set('core.localization.cache_path', $this->core->config->get('LocalizePath'));
+
+            // Maintain compatibilty with old variable
+            if (!strlen($this->core->config->get('core.localization.cache_path')) && strlen($this->core->config->get('localizeCachePath')))
+                $this->core->config->set('core.localization.cache_path', $this->core->config->get('localizeCachePath'));
+
+
+            // Read from Cache last Dics
+            if($this->cache) {
+                if (!isset($_GET['_reloadDics']) && !isset($_GET['_nocacheDics'])) {
+                    $this->data = $this->core->cache->get('Core:Localization:Data');
+                    if (!is_array($this->data)) $this->data = [];
+                }
+
+
+                if ($this->core->config->get('WAPPLOCA') && !isset($_GET['_nocacheDics'])) {
+                    $this->wapploca = $this->core->cache->get('Core:Localization:WAPPLOCA', $this->core->config->get('wapploca_cache_expiration_time'));
+                    if (!is_array($this->wapploca)) $this->wapploca = [];
+                }
+            }
+
+            $this->init = true;
+        }
+
+        /**
+         * Get a Localization code from a localization file
+         * @param $locFile
+         * @param $code
+         * @param array $config
+         * @return mixed|string
+         */
+        function get($locFile, $code, $config = [])
+        {
+            if(!$this->init) $this->init();
+            $ret = null;
+
+            // Check syntax of $locFile & $code
+            if (!$this->checkLocFileAndCode($locFile, $code)) return 'Err in: [' . $locFile . "{{$code}}" . ']';
+            $lang = $this->core->config->getLang();
+            if (isset($config['lang']) && strlen($config['lang']) == 2) $lang = $config['lang'];
+            // The $locFile does not exist
+            if (!isset($_GET['_debugDics'])) {
+
+
+
+                // Trying read from file
+                if (!isset($this->data[$locFile][$lang]) && !isset($this->files_readed[$locFile][$lang])  ) {
+                    $this->readFromFile($locFile, $lang);
+                }
+
+                // Trying read from WAPPLOCA
+                $wapploca_readed = false;
+                if ($this->core->config->get('WAPPLOCA') && !isset($this->data[$locFile][$lang])) {
+                    if ($this->readFromWAPPLOCA($locFile, $code, $lang) && isset($this->data[$locFile][$lang][$code])) {
+                        // Writting Local file.
+                        $this->writeLocalization($locFile, $lang);
+                        $this->files_readed[$locFile][$lang] = true;
+
+                    }
+                }
+
+                // If this localization file exists but the $code does not exist because the cache
+                if (isset($this->data[$locFile][$lang]) && !isset($this->data[$locFile][$lang][$code]) && !isset($this->files_readed[$locFile][$lang]) ) {
+                    // $this->readFromFile($locFile, $lang);
+                }
+            }
+
+
+            if (isset($_GET['_debugDics'])) {
+                $ret = $lang . '_' . $locFile . ":({$code})";
+            } else if (isset($this->data[$locFile][$lang][$code])) {
+                $ret = $this->data[$locFile][$lang][$code];
+            } else {
+                $this->core->logs->add("Missing configuration for Localizations: {$locFile}-{$lang}-{$code}");
+                $this->core->logs->add('WAPPLOCA: ' . ((empty($this->core->config->get('WAPPLOCA'))) ? 'empty' : '***'));
+                $this->core->logs->add('core.localization.cache_path: ' . ((empty($this->core->config->get('core.localization.cache_path'))) ? 'empty' : '***'));
+            }
+
+            // Evaluate data conversion
+            if(array_key_exists('data',$config) && $config['data']) {
+                $ret = vsprintf($ret,$config['data']);
+            }
+
+            // Return
+            return $ret;
+        }
+
+        /**
+         * Set a Localization code
+         * @param $locFile
+         * @param $code
+         * @param $content
+         * @param array $config
+         * @return mixed|string
+         */
+        function set($locFile, $code, $content,$config = [])
+        {
+            if(!$this->init) $this->init();
+
+            // Check syntax of $locFile & $code
+            if (!$this->checkLocFileAndCode($locFile, $code)) return 'Err in: [' . $locFile . "{{$code}}" . ']';
+            if (isset($config['lang']) && strlen($config['lang']) == 2) $lang = $config['lang'];
+
+            if (!isset($this->data[$locFile][$lang]) || !isset($this->data[$locFile][$lang][$code]) || $this->data[$locFile][$lang][$code]!=$content) {
+                $this->data[$locFile][$lang][$code]=$content;
+            }
+        }
+
+
+        /**
+         * Read from a file the localizations and store the content into: $this->data[$locFile][$lang]
+         * @param $locFile
+         * @return bool
+         */
+        private function readFromFile($locFile, $lang = '')
+        {
+            if(!$this->init) $this->init();
+
+
+            if (!strlen($this->core->config->get('core.localization.cache_path'))) {
+                $this->core->config->set('core.localization.cache_path',$this->core->system->app_path.'/localize');
+            }
+            if (!strlen($lang)) $lang = $this->core->config->getLang();
+            $ok = true;
+            $this->core->__p->add('Localization->readFromFile: ', strtoupper($lang)."-{$locFile}", 'note');
+            // First read from local directory if {{core.localization.cache_path}} is defined.
+            $this->files_readed[$locFile][$lang] = true;
+            if (strlen($this->core->config->get('core.localization.cache_path'))) {
+                $filename = $this->core->config->get('core.localization.cache_path') . '/' . strtoupper($lang) . '_Core_' . $locFile . '.json';
+                try {
+                    $ret = @file_get_contents($filename);
+                    if ($ret !== false) {
+                        $this->data[$locFile][$lang] = json_decode($ret, true);
+
+                        // Cache result
+                        if($this->cache)
+                            $this->core->cache->set('Core:Localization:Data', $this->data);
+
+                        $this->core->__p->add('Success reading ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
+
+                    } else {
+                        $this->core->__p->add('Error reading ' .  strtoupper($lang) . '_Core_' . $locFile . '.json');
+                        $this->addError('CoreLoalization.readFromFile error. No file: '.$filename);
+                        $this->addError(error_get_last());
+                        $ok = false;
+                    }
+                } catch (Exception $e) {
+                    $ok = false;
+                    $this->core->logs->add('Error reading ' . $filename . ': ');
+                    $this->core->logs->add($e->getMessage() . ' ' . error_get_last());
+                }
+            }
+            $this->core->__p->add('Localization->readFromFile: ', '', 'endnote');
+            return $ok;
+        }
+
+        public function writeLocalization($locFile, $lang = '')
+        {
+            if(!$this->init) $this->init();
+
+
+            if (!strlen($this->core->config->get('core.localization.cache_path'))) return false;
+            if (!isset($this->data[$locFile])) return false;
+            if (!strlen($lang)) $lang = $this->core->config->getLang();
+            $ok = true;
+            $this->core->__p->add('Localization->writeLocalization: ', strtoupper($lang) . '_Core_' . $locFile . '.json', 'note');
+
+            $filename = $this->core->config->get('core.localization.cache_path') . '/' . strtoupper($lang) . '_Core_' . $locFile . '.json';
+            try {
+                $ret = @file_put_contents($filename, json_encode($this->data[$locFile][$lang], JSON_PRETTY_PRINT));
+                if ($ret === false) {
+                    $ok = false;
+                    $this->core->__p->add('Error writting ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
+                    $this->core->logs->add('Error writting ' . $filename);
+                    $this->core->logs->add(error_get_last());
+                } else {
+                    $this->core->__p->add('Success Writting ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
+
+                    // Cache the result
+                    if($this->cache)
+                        $this->core->cache->set('Core:Localization:Data', $this->data);
+                }
+            } catch (Exception $e) {
+                $ok = false;
+                $this->core->logs->add('Error reading ' . $filename . ': ');
+                $this->core->logs->add($e->getMessage() . ' ' . error_get_last());
+            }
+            $this->core->__p->add('Localization->writeLocalization: ', '', 'endnote');
+            return $ok;
+        }
+
+
+        /**
+         * Read from a file the localizations
+         * @param $locFile
+         * @param $code
+         * @return bool
+         */
+        private function readFromWAPPLOCA($locFile, $code, $lang = '')
+        {
+            if(!$this->init) $this->init();
+
+            if (empty($this->core->config->get('WAPPLOCA'))) return false;
+            if (!strlen($lang)) $lang = $this->core->config->getLang();
+
+            list($org, $app, $cat, $loc_code) = explode(';', $code, 4);
+            if (!strlen($loc_code) || preg_match('/[^a-z0-9_-]/', $loc_code)) {
+                $this->core->logs->add('Localization->readFromWAPPLOCA: has a wrong value for $code: ' . $code);
+                return false;
+            }
+            $ok = true;
+            $lang = strtoupper($lang);
+            $key = "$org/$app/$cat?lang=" . $lang;
+            // Read From CloudService the info and put the cats into $this->wapploca
+            $url = $this->core->config->get('wapploca_api_url');
+            if (!isset($this->wapploca[$key][$lang])) {
+                $ret = $this->core->request->get($url . '/dics/' . $key);
+                if (!$this->core->request->error) {
+                    $ret = json_decode($ret, true);
+                    if (!$ret['success']) {
+                        $this->core->logs->add($ret);
+                        $ok = false;
+                    } else {
+                        if (is_array($ret['data'])) {
+                            $this->wapploca[$key] = $ret['data'];
+
+                            // Cache the result
+                            if($this->cache)
+                                $this->core->cache->set('Core:Localization:WAPPLOCA', $this->wapploca);
+
+                        } else {
+                            $this->core->logs->add('WAPPLOCA return data is not an array');
+                            $this->core->logs->add($ret);
+                        }
+                    }
+                } else $ok = false;
+            }
+
+
+            // Return the code required
+            if (isset($this->wapploca[$key][$lang][$code]))
+                $this->data[$locFile][$lang][$code] = $this->wapploca[$key][$lang][$code];
+            else
+                $this->data[$locFile][$lang][$code] = $code;
+            return $ok;
+        }
+
+
+        /**
+         * Check the formats for locaLizationFile and codes
+         * @param $locFile
+         * @param $code
+         * @return bool
+         */
+        private function checkLocFileAndCode(&$locFile, &$code)
+        {
+            if(!$this->init) $this->init();
+
+            $locFile = preg_replace('/[^A-z0-9_\-]/', '', $locFile);
+            if (!strlen($locFile)) {
+                $this->core->errors->set('Localization has received a wrong spacename: ');
+                return false;
+            }
+            $code = preg_replace('/[^a-z0-9_\-;\.]/', '', strtolower($code));
+            if (!strlen($code)) {
+                $this->core->errors->set('Localization has received a wrong code: ');
+                return false;
+            }
+            return true;
+        }
+
+        function addError($value)
+        {
+            $this->error = true;
+            $this->errorMsg[] = $value;
+        }
+    }
+
+    /**
+     * $this->core->model Class to manage Data Models
+     * @package Core.model
      */
     Class CoreModel
     {
@@ -5155,6 +5193,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 if(!$this->readModelsFromCloudFramework($object,$options['cf_models_api_key'])) return;
             }
             //endregion
+
 
             // If the model does not include the '(ds|db):' we add it.
             $source_object = $object;
@@ -5541,8 +5580,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to Manage Datastore Logs and Bitacora Entries
-     * @package Core
+     * $this->core->cfiLog Class to Manage Datastore Logs and Bitacora Entries
+     * @package Core.log
      */
     class CFILog
     {
@@ -5828,11 +5867,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     /**
      * Class to be extended for the creation of a logic application.
      *
-     * The sintax is: `Class Logic extends CoreLogic() {..}`
-     *
-     *
      * Normally your file has to be stored in the `logic/` directory and extend this class.
-     * @package Core
+     * @package Logic
      */
     Class CoreLogic2020
     {
@@ -5972,6 +6008,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
     }
 
+    /**
+     * Class to be extended for the creation of a scripts
+     *
+     * The sintax is: `Class Logic extends CoreLogic2020() {..}`
+     *
+     *
+     * Normally your file has to be stored in the `logic/` directory and extend this class.
+     * @package Scripts
+     */
     class Scripts2020 extends CoreLogic2020
     {
         /** @var array $argv Keep the arguments passed to the logic if it runs as a script  */

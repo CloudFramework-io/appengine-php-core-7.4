@@ -140,6 +140,9 @@ so if you get struck on a write operation, this is a good workaround,
 as you are probably just missing a required field
 or using an invalid element ID when referring
 to something such as a link to a contact.
+ *
+ * @deprecated
+ * @ignore
  */
 class Insightly {
     /**

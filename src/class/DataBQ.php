@@ -1,8 +1,5 @@
 <?php
-/**
- * Class to handle Bigquery datasets:tables
- * https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-php
- */
+
 
 use Google\Cloud\BigQuery\BigQueryClient;
 use Google\Cloud\BigQuery\Timestamp;
@@ -11,6 +8,12 @@ use Google\Cloud\Core\ExponentialBackoff;
 if (!defined ("_DATABQCLIENT_CLASS_") ) {
     define("_DATABQCLIENT_CLASS_", TRUE);
 
+    /**
+     * [$bq = $this->core->loadClass('DataBQ');]  Class to handle Bigquery datasets:tables with CloudFramework models
+     *
+     * https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-php
+     * @package CoreClasses
+     */
     class DataBQ
     {
         var $core = null;                   // Core7 reference

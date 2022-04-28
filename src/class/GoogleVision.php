@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * [$cfGoogle = $this->core->loadClass('CFGoogle');] Class to facilitate Google APIs integration like vision
+ * @package LabClasses
+ */
 class CFGoogle
 {
     var $core;

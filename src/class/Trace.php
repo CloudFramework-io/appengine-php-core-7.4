@@ -5,6 +5,11 @@
 if (!defined("_Trace_CLASS_")) {
     define("_Trace_CLASS_", TRUE);
 
+    /**
+     * Class to facilitate Traces for an application
+     * author: hl@cloudframework.io
+     * @package LabClasses
+     */
     class Trace
     {
         private $core;

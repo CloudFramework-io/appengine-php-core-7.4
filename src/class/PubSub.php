@@ -1,18 +1,22 @@
 <?php
-
 /**
  * PubSub CloudFramework Class
+
+ * last-update: 2021-03
+ */
+use Google\Cloud\PubSub\PubSubClient;
+use Google\Cloud\PubSub\Subscription;
+/**
+ * [$pubsub = $this->core->loadClass('PubSub');]  Class to handle Pub/Sub of GCP
+ *
  * https://cloud.google.com/pubsub/docs/quickstart-client-libraries
  * It requires to execute for testing:
  * gcloud pubsub topics create cloudframework-pubsub-test --project={your-project}
  * gcloud pubsub subscriptions create cloudframework-pubsub-test-sub --topic cloudframework-pubsub-test --project={your-project}
  * https://console.cloud.google.com/cloudpubsub/topic/list?folder=&organizationId=&project={your-project}
  * It requires: Pub/Sub Admin
- * last-update: 2021-03
+ * @package CoreClasses
  */
-use Google\Cloud\PubSub\PubSubClient;
-use Google\Cloud\PubSub\Subscription;
-
 class PubSub
 {
 

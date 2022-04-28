@@ -11,6 +11,11 @@
 if (!defined ("_Google_CLASS_GoogleDocuments") ) {
     define("_Google_CLASS_GoogleDocuments", TRUE);
 
+
+    /**
+     * [$gdocs = $this->core->loadClass('GoogleDocuments');] Class to facilitate GoogleDocuments integration
+     * @package LabClasses
+     */
     class GoogleDocuments
     {
 

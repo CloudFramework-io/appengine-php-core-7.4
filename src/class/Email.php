@@ -8,7 +8,7 @@
  * Paquete de clases de utilidad general
  * @version 1.0.0
  * @author Hector López <hlopez@adnbp.com>
- * @package com.adnbp.class.email
+ * @deprecated
  */
 
 if(!isset($_SERVER['PWD'])) {

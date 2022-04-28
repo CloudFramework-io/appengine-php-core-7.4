@@ -4,6 +4,11 @@
 if (!defined("_RESTfull_CLASS_")) {
     define("_RESTfull_CLASS_", TRUE);
 
+    /**
+     * [$api = $this->core->loadClass('RESTful');] Class CFI to handle APIs. It is been used in Core APIs
+     * last_update: 20200502
+     * @package CoreClasses
+     */
     class RESTful
     {
         var $apiName ='';

@@ -1,4 +1,5 @@
 <?php
+
 // https://developers.google.com/drive/v3/web/quickstart/php
 // php composer.phar require google/apiclient:^2.0
 
@@ -6,6 +7,10 @@
 if (!defined ("_Facebook_CLASS_") ) {
     define("_Facebook_CLASS_", TRUE);
 
+    /**
+     * [$facebook = $this->core->loadClass('Facebook');] Class to facilitate facbook integration
+     * @package LabClasses
+     */
     class Facebook
     {
         private $core;

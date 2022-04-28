@@ -1,8 +1,9 @@
 <?php
 /**
- * Class CFOs to handle CFO app for CloudFrameworkInterface
+ * [$cfos = $this->core->loadClass('CFOs');] Class CFOs to handle CFO app for CloudFrameworkInterface
  * https://www.notion.so/cloudframework/CFI-PHP-Class-c26b2a1dd2254ddd9e663f2f8febe038
  * last_update: 202201
+ * @package CoreClasses
  */
 class CFOs {
 
@@ -87,6 +88,21 @@ class CFOs {
     }
 
     /**
+     * Execute a Direct query inside a $connection
+     * @param $q
+     * @param null $params
+     * @param string $connection
+     * @return array|void
+     */
+    public function dbQuery ($q,$params=null,$connection='default')
+    {
+        $this->core->model->dbInit($connection);
+        $ret= $this->core->model->dbQuery('CFO Direct Query for connection  '.$connection,$q,$params);
+        if($this->core->model->error) $this->addError($this->core->model->errorMsg);
+        return($ret);
+    }
+
+    /**
      * @param string $object
      * @return CloudSQL
      */
@@ -112,7 +128,17 @@ class CFOs {
     }
 
     /**
+     * Assign DB Credentials to stablish connection
      * @param array $credentials Varaibles to establish a connection
+     * $credentials['dbServer']
+     * $credentials['dbUser']
+     * $credentials['dbPassword']??null);
+     * $credentials['dbName']??null);
+     * $credentials['dbSocket']??null);
+     * $credentials['dbProxy']??null);
+     * $credentials['dbProxyHeaders']??null);
+     * $credentials['dbCharset']??null);
+     * $credentials['dbPort']??'3306');
      * @param string $connection Optional name of the connection. If empty it will be default
      * @return boolean
      */
@@ -138,6 +164,7 @@ class CFOs {
 
     /**
      * Create a Foo Datastore Object to be returned in case someone tries to access a non created object
+     * @ignore
      */
     private function createFooDatastoreObject($object) {
         if(!isset($this->dsObjects[$object])) {
@@ -151,6 +178,7 @@ class CFOs {
 
     /**
      * Create a Foo BQ Object to be returned in case someone tries to access a non created object
+     * @ignore
      */
     private function createFooBQObject($object) {
         if(!isset($this->bqObjects[$object])) {
@@ -164,6 +192,7 @@ class CFOs {
 
     /**
      * Create a Foo DB Object to be returned in case someone tries to access a non created object
+     * @ignore
      */
     private function createFooDBObject($object) {
 

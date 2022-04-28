@@ -1,9 +1,10 @@
 <?php
 
 /**
- * Class CFA to handle WebApps for CloudFrameworkInterface
+ * [$cfa = $this->core->loadClass('CFA');] Class CFA to handle WebApps for CloudFrameworkInterface
  * notion: xxxx
  * last_update: 20220226
+ * @package CoreClasses
  */
 class CFA
 {

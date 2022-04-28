@@ -3,6 +3,11 @@
 if (!defined ("_RenderTwig_CLASS_") ) {
     define("_RenderTwig_CLASS_", TRUE);
 
+    /**
+     * Class to facilitate Markdown rendering
+     * author: hl@cloudframework.io
+     * @package LabClasses
+     */
     class RenderMarkDown
     {
         private $core;

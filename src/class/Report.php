@@ -3,6 +3,11 @@
 if (!defined ("_CloudServiceReporting_CLASS_") ) {
     define("_CloudServiceReporting_CLASS_", TRUE);
 
+    /**
+     * Class to facilitate reporting creating data cubes
+     * author: hl@cloudframework.io
+     * @package LabClasses
+     */
     class ReportCube
     {
         var $data;

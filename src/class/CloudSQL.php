@@ -1,10 +1,8 @@
 <?php
-/**
-*  CLOUDRAMEWORK Mysql Class
-*  Feel free to use a distribute it. 
-*  last-update 2021-11-17
-*/
 
+/**
+ * @ignore
+ */
 class CloudSQLError extends Exception {
     public function __construct() {
         list(
@@ -20,6 +18,9 @@ if (!defined ("_MYSQLI_CLASS_") ) {
     define ("_MYSQLI_CLASS_", TRUE);
 
 
+    /**
+     * @ignore
+     */
     class CloudSQLQueryObject {
 
         var $data = array();
@@ -34,6 +35,12 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         }
     }
 
+    /**
+     *  [$sql = $this->core->loadClass('CloudSQL')] Class to handle CloudSQL (mysql) interactions.
+     *  Feel free to use a distribute it.
+     *  last-update 2021-11-17
+     * @package CoreClasses
+     */
     class CloudSQL {
         // Base variables
         var $_error=[];                      // Holds the last error

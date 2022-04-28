@@ -7,6 +7,7 @@
  *     pecl install mongodb
  *     php -i | grep mongodb
  *     composer require mongodb/mongodb:^1.9
+ * @package InDevelopment
  */
 
 if (!defined ("_MONGODB_CLASS_") ) {
