@@ -559,7 +559,7 @@ class DataSQL
 
             if($where) $where.=' AND ';
 
-            switch (strval($value)) {
+            switch ((!is_array($value))?strval($value):'default') {
                 case "__null__":
                     $where.="{$this->entity_name}.{$key} IS NULL";
                     break;
