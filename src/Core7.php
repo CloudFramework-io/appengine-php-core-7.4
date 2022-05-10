@@ -153,7 +153,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.04281';
+        var $_version = 'v74.05101';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2243,10 +2243,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             //endregion
 
-            //region ADD $keys to  $this->cache_key and $this->cache_iv
+            //region ADD $keys to  $this->cache_key and $this->cache_iv avoiding to be added more that one time
             if(!isset($keys['data']['key']) || !isset($keys['data']['iv'])) return($this->addError('Error in CloudFramework Service to retrieve subkeys. key or iv is missing'));
-            $this->cache_key.=$keys['data']['key'];
-            $this->cache_iv.=$keys['data']['iv'];
+            if(strpos($this->cache_key,'__'.$keys['data']['key'])===false)
+                $this->cache_key.='__'.$keys['data']['key'];
+            if(strpos($this->cache_iv,'__'.$keys['data']['iv'])===false)
+                $this->cache_iv.='__'.$keys['data']['iv'];
             //endregion
 
             return true;
