@@ -167,10 +167,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                 if (strlen($value)) {
                                     // Fix the problem when value is returned as microtime
                                     try {
-                                        // Convert to $this->default_time_zone_to_write
-                                        $value_time = new DateTime($value);
-                                        if($tz) $value = $value_time->setTimezone($tz);
+                                        // Convert to DateTime Object for Datastore
+                                        $value_time = new DateTime($value, new DateTimeZone($this->default_time_zone_to_read));
+
+                                        // Evaluate to change TimeZone if  $this->default_time_zone_to_read!=$this->default_time_zone_to_write
+                                        if($this->default_time_zone_to_read!=$this->default_time_zone_to_write) $value = $value_time->setTimezone(new DateTimeZone($this->default_time_zone_to_write));
                                         else $value = $value_time;
+
                                     } catch (Exception $e) {
                                         $ret[] = ['error' => 'field {' . $this->schema['props'][$i][0] . '} has a wrong date format: ' . $value];
                                         $record = [];

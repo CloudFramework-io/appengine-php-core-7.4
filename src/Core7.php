@@ -153,7 +153,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.05102';
+        var $_version = 'v74.05201';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2046,7 +2046,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     {
         private $core;
         /* @var $dsToken DataStore */
-        private $dsToken = null;
+        var $dsToken = null;
 
         var $error = false;
         var $errorMsg = [];
@@ -2859,9 +2859,31 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
+
+
         /**
+         * Just Read a Token from Database
          * @param $token Id generated with setDSToken
-         * @param string $prefix Prefix to separate tokens Between apps
+         * @return array|mixed    The content contained in DS.JSONZIP
+         */
+        function getDSTokenInfo($token)
+        {
+
+            // Check if object has been created
+            if (null === $this->dsToken) if(!$this->createDSToken()) return;
+
+            $retToken = $this->dsToken->fetchByKeys($token);
+            if ($this->dsToken->error) {
+                $this->core->errors->add(['getDSTokenInfo' => $this->dsToken->errorMsg]);
+            }
+            return $retToken[0]??null;
+        }
+
+
+        /**
+         * Verify a Token with different rules and return the content from field JSONZIP unziping it.
+         * @param $token Id generated with setDSToken
+         * @param string $prefixStarts
          * @param int $time MAX TIME to expire the token
          * @param string $fingerprint_hash fingerprint_has to use.. if '' we will generate it using: $this->core->system->getRequestFingerPrint()['hash']
          * @param boolean $use_fingerprint_security Says it we are going to apply fingerprint security
@@ -2872,7 +2894,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->core->__p->add('getDSToken', $prefixStarts, 'note');
             $ret = null;
 
-
             // Check if token starts with $prefix
             if (strlen($prefixStarts) && strpos($token, $prefixStarts) !== 0) {
                 $this->core->errors->add(['getDSToken' => 'incorrect prefix token']);
@@ -2880,7 +2901,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
             // Check if object has been created
             if (null === $this->dsToken) if(!$this->createDSToken()) return;
-
 
             $retToken = $this->dsToken->fetchByKeys($token);
             // Allow to rewrite the fingerprint it it is passed
@@ -2930,6 +2950,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if (null === $this->dsToken) if(!$this->createDSToken()) return;
 
             $retToken = $this->dsToken->fetchByKeys($token);
+
             if(count($retToken)) {
                 $retToken[0]['JSONZIP'] = $this->compress(json_encode($data));
                 $ret = $this->dsToken->createEntities($retToken[0]);
