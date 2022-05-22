@@ -172,6 +172,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $security;
         /** @var CoreCache $cache */
         var $cache;
+        /** @var CoreAuth $auth */
+        var $auth;
         /** @var CoreRequest $request */
         var $request;
         /** @var CoreLocalization $localization */
@@ -225,6 +227,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->session->init('CloudFrameworkScripts');
             }
             //endregion
+
+            //region SET $this->security, $this->cache, $this->request, $this->localization, $this->model, $this->cfiLog
             $this->security = new CoreSecurity($this);
             $this->cache = new CoreCache($this);
             $this->request = new CoreRequest($this);
@@ -232,21 +236,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->localization = new CoreLocalization($this);
             $this->model = new CoreModel($this);
             $this->cfiLog = new CFILog($this);
-            //setup GCP basic vars
+            //endregion
+
+            //region SET GCP basic vars: $this->gc_project_id, $this->gc_project_service
             if($this->config->get('core.gcp.project_id')) putenv('PROJECT_ID='.$this->config->get('core.gcp.project_id'));
             $this->gc_project_id = getenv('PROJECT_ID');
             $this->gc_project_service = ($this->config->get('core.gcp.project_service'))?$this->config->get('core.gcp.project_service'):'default';
+            //endregion
 
-            // DATASTORE_DATASET
+            //region FIX env vars: DATASTORE_DATASET and DATASTORE_EMULATOR_HOST to handle Datastore development
             if($this->gc_project_id && !getenv('DATASTORE_DATASET'))  putenv('DATASTORE_DATASET='.$this->gc_project_id);
 
-            //evaluate development DATASTORE fix
             if($DATASTORE_EMULATOR_HOST = getenv('DATASTORE_EMULATOR_HOST')) {
                 if(strpos($DATASTORE_EMULATOR_HOST,'::1')===0) {
                     $DATASTORE_EMULATOR_HOST = str_replace('::1','localhost',$DATASTORE_EMULATOR_HOST);
                     putenv("DATASTORE_EMULATOR_HOST={$DATASTORE_EMULATOR_HOST}");
                 }
             }
+            //endregion
 
             // Local configuration
             $this->__p->add('Loaded $this->__p,$this->system,$this->logs,$this->errors,$this->is,$this->config,$this->session,$this->security,$this->cache,$this->request,$this->localization,$this->model,$this->cfiLog with __session[started=' . (($this->session->start) ? 'true' : 'false') . ']: ,', __METHOD__);
@@ -4606,16 +4613,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     {
         private $core;
         var $isAuth = false;
-        var $token;
-        var $namespace;
         var $id;
+        var $namespace='Default';
+        var $token;
+        var $tokenExpiration;
         var $data = [];
         /** @var bool $cached says if the user data has been retrieved from cache */
         var $cached = false;
         /** @var int $expirationTime Time to expire a token */
         var $expirationTime = 3600;
         /** @var int $maxTokens Max number of tokens in $expirationTime to handle */
-        var $maxTokens = 10;
+        var $maxTokens = 2;
 
         var $error = false;
         var $errorCode = null;
@@ -4627,6 +4635,153 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function __construct(Core7 &$core)
         {
             $this->core = $core;
+            $this->reset();
+        }
+
+        /**
+         * Resent user variables
+         */
+        public function reset() {
+            $this->isAuth=false;
+            $this->id=null;
+            $this->data=null;
+            $this->token=null;
+            $this->tokenExpiration=null;
+        }
+
+        /**
+         * Set Auth for a user in a namespace and store the result in cache for new queries
+         * @param bool $auth
+         * @param string $user
+         * @param string $namespace
+         * @param bool $auth
+         * @param array $data
+         * @param string $token
+         */
+        function setAuth(bool $auth,string $user='',string $namespace='', string $token='', $data=null) {
+
+            $this->reset();
+            $this->isAuth = $auth;
+
+            if($user && $namespace) {
+                $userData = $this->core->cache->get($namespace.'_'.$user);
+                if(!$userData) $userData = ['id'=>$user,'tokens'=>[],'data'=>[]];
+                if($this->isAuth) {
+                    $this->id = $userData['id'];
+                    $this->data = $userData['data'];
+                    if($token) {
+                        if(count($userData['tokens']) >= $this->maxTokens) do {
+                            array_shift($userData['tokens']);
+                        } while(count($userData['tokens']) >= $this->maxTokens);
+
+                        $this->token = $token;
+                        $userData['tokens'][$token] = ['error'=>null,'time'=>microtime(true)];
+                    }
+                    if($data!==null) $userData['data'] = $data;
+
+
+                    $this->core->cache->set($namespace.'_'.$user,$userData);
+                    $this->data = $userData['data'];
+
+
+                } else {
+                    if($token) {
+                        if(isset($userData['tokens'][$token])) unset($userData['tokens'][$token]);
+                        $this->core->cache->set($namespace.'_'.$user,$userData);
+                    } else {
+                        $this->core->cache->delete($namespace.'_'.$user);
+                    }
+                }
+
+            }
+        }
+
+        /**
+         * Check a token previously generated
+         * @param string $token
+         * @return bool|void
+         */
+        function checkUserToken(string $token) {
+
+            $this->reset();
+
+            $parts = explode('__',$token,4);
+            if(count($parts)!=4 || $parts[0]!='token' || !$parts[1] || !$parts[2]) return($this->addError('The token does not have a right format'));
+
+            $user = $parts[1];
+            $namespace = $parts[2];
+
+            $userData = $this->core->cache->get($namespace.'_'.$user);
+            if(!$userData || !isset($userData['tokens'][$token]) || !isset($userData['tokens'][$token]['time'])) return($this->addError('Token is not found'));
+
+            $now = microtime(true);
+            if(($now - $userData['tokens'][$token]['time']) > $this->expirationTime) {
+                return($this->addError('Token is expired'));
+            }
+
+            //region SET $this->{isAuth, namespace, token, id, data}
+            $this->isAuth = true;
+            $this->token = $token;
+            $this->tokenExpiration = $this->expirationTime - ($now - $userData['tokens'][$token]['time']);
+            $this->namespace = $namespace;
+            $this->id = $userData['id'];
+            $this->data = $userData['data'];
+            //endregion
+
+            return true;
+        }
+
+        /**
+         * Return a Token with a specific format token__{user}__{namespace}__hash()
+         * This method is to be used together with setAuth(..)
+         * @param $user
+         * @param $namespace
+         * @return string
+         */
+        function createUserToken($user,$namespace='default',$data=null) {
+
+            $this->reset();
+
+            //region CHECK $user, $namespace
+            if(!$user) return($this->addError('The user is empty'));
+            if(!$namespace) return($this->addError('The namespace is empty'));
+            if(strpos($user,'__')!==false) return($this->addError('The user has "__" chars in the content'));
+            if(strpos($namespace,'__')!==false) return($this->addError('The namespace has "__" chars in the content'));
+            //endregion
+
+            //region SET $token and $userData reading from cache
+            $token =  'token__'.$user.'__'.$namespace.'__'.hash('md5',microtime(true));
+
+            $userData = $this->core->cache->get($namespace.'_'.$user);
+            if(!$userData) $userData = ['id'=>$user,'tokens'=>[],'data'=>[]];
+            //endregion
+
+            //region SET $now and REDUCE $userData['tokens'] to $this->maxTokens
+            $now = microtime(true);
+            if(count($userData['tokens']) >= $this->maxTokens) do {
+                array_shift($userData['tokens']);
+            } while(count($userData['tokens']) >= $this->maxTokens);
+            $userData['tokens'][$token] = ['error'=>null,'time'=>$now];
+            //endregion
+
+            //region ASSIGN $data to $userData['data'] if not null
+            if($data!== null) $userData['data'] = $data;
+            //endregion
+
+            //region SET $this->isAuth, namespace, token, id, data}
+            $this->isAuth = true;
+            $this->token = $token;
+            $this->tokenExpiration = $this->expirationTime;
+            $this->namespace = $namespace;
+            $this->id = $userData['id'];
+            $this->data = $userData['data'];
+            //endregion
+
+            //region SAVE cache of $userData and return the token
+            $this->core->cache->set($namespace.'_'.$user,$userData);
+            return($token);
+            //endregion
+
         }
 
         /**
@@ -4639,6 +4794,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function checkERPToken(string $token, string $integration_key,bool $refresh=false)
         {
+            $this->reset();
+            
             //region SET $user,$namespace,$key from token structure or return errorCode: WRONG_TOKEN_FORMAT
             $tokenParts = explode('__',$token);
             if(count($tokenParts) != 3
@@ -4731,7 +4888,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             return $this->isAuth;
         }
 
-
         /**
          * Set a privilege for a user
          * @param $privilege
@@ -4777,13 +4933,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Add an error Message
-         * @param $value
+         * @param $code
+         * @param null $message
          */
-        function addError($code,$message=null)
+        function addError($message)
         {
             $this->error = true;
             $this->errorCode = true;
-            $this->errorMsg[] = $value??$code;
+            $this->errorMsg[] = $message;
         }
 
 

@@ -2,6 +2,7 @@
 class API extends RESTful
 {
     function main() {
+
         $this->sendCorsHeaders('GET');
 
         if($this->getFormParamater('time_zone')) {
