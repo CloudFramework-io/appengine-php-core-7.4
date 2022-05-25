@@ -261,7 +261,6 @@ class API extends RESTful
         //region VERIFY $token is right
         $this->core->user->maxTokens = $this->basic_max_tokens;            // Define the Max tokens to keep in memory. 10 by default. When it exceeds the number the first token is deleted
         $this->core->user->expirationTime = $this->basic_expiration_time;  // Define the when the tokens has to expire 3600 seconds by defaults
-
         if(!$this->core->user->checkERPToken($token,$integration_key,$refresh))  return $this->setErrorFromCodelib('security-error',$this->core->user->errorMsg);
         //endregion
 
