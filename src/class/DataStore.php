@@ -39,6 +39,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $cache_data = null;
         var $project_id = '';
         var $namespace = 'default';
+        var $service_account = null;
         var $debug = false;
         var $transformReadedEntities = true; // Transform readed entities
 
@@ -69,6 +70,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 try {
                     $this->datastore = new DatastoreClient($options);
                     $this->project_id = $options['projectId'];
+                    if(isset($options['keyFile'])) $this->service_account = $options['keyFile']['client_email']??null;
                 } catch (Exception $e) {
                     return($this->addError($e->getMessage()));
                 }

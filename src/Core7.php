@@ -153,7 +153,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.06081';
+        var $_version = 'v74.06082';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2333,12 +2333,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //region CHECK $erp_user value
             if(!$erp_user || !is_string($erp_user)) {
                 $erp_user = $this->core->config->get('core.erp.user_id.'.$erp_platform_id);
-                if(!$this->core->config->get('core.erp.platform_id') || $this->core->config->get('core.erp.platform_id')!=$erp_platform_id) {
-                    $erp_user = $this->core->security->getGoogleEmailAccount();
+                if(!$erp_user) {
+                    $key_erp_user = 'getGoogleEmailAccount_'.$this->core->gc_project_id.'_'.$erp_platform_id;
+                    $erp_user = $this->getCache($key_erp_user,'ERP.users');
+                    if(!$erp_user) {
+                        $erp_user = $this->core->security->getGoogleEmailAccount();
+                        $this->updateCache($key_erp_user,$erp_user,'ERP.users');
+                    }
                 }
                 if(!$erp_user) return($this->addError('readERPSecretVars(..) missing function readERPSecretVars(..,$erp_user) or config-var(core.erp.user_id.{platform_id})'));
             }
             //endregion
+
 
             if(!$this->readERPDeveloperEncryptedSubKeys($erp_platform_id,$erp_user))
                 return($this->addError('Called from readERPSecretVars(..)'));

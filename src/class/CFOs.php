@@ -15,6 +15,8 @@ class CFOs {
     var $errorMsg = [];                 // When error array of messages
     var $namespace = 'default';
     var $project_id = null;
+    var $service_account = null;
+    var $keyId = null;
     var $dsObjects = [];
     var $bqObjects = [];
     var $dbObjects = [];
@@ -37,8 +39,9 @@ class CFOs {
      * @param $object
      * @param string $namespace
      * @param string $project_id
+     * @param array $service_account
      */
-    public function dsInit ($object,$namespace='',$project_id='')
+    public function dsInit ($object,$namespace='',$project_id='',$service_account=[])
     {
 
         //region SET $options['cf_models_api_key'], $options['namespace'], $options['projectId']
@@ -46,6 +49,10 @@ class CFOs {
         if($namespace) $options['namespace'] = $namespace;
         if($project_id) $options['projectId'] = $project_id;
         elseif($this->project_id) $options['projectId'] = $this->project_id;
+
+        if($service_account) $options['keyFile'] = $service_account;
+        elseif($this->service_account) $options['keyFile'] = $this->service_account;
+
         //endregion
 
         $this->dsObjects[$object] = $this->core->model->getModelObject('ds:'.$object,$options);
@@ -73,12 +80,15 @@ class CFOs {
      * Initialize a bq $object
      * @param $object
      * @param string $project_id
+     * @param array $service_account
      */
-    public function bqInit ($object,$project_id='')
+    public function bqInit ($object,$project_id='',$service_account=[])
     {
         $options = ['cf_models_api_key'=>$this->integrationKey];
         if($project_id) $options['projectId'] = $project_id;
         elseif($this->project_id) $options['projectId'] = $this->project_id;
+        if($service_account) $options['keyFile'] = $service_account;
+        elseif($this->service_account) $options['keyFile'] = $this->service_account;
 
         $this->bqObjects[$object] = $this->core->model->getModelObject('bq:'.$object,$options);
         if($this->core->model->error) {
@@ -257,6 +267,14 @@ class CFOs {
      */
     function setProjectId($project_id) {
         $this->project_id = $project_id;
+    }
+
+    /**
+     * Set a default service account for Datastore and BigQuery Objects. It has to be an array
+     * @param array $service_account
+     */
+    function setServiceAccount(array $service_account) {
+        $this->service_account = $service_account;
     }
 
     /**
