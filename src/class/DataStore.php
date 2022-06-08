@@ -68,6 +68,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             if($this->project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
                 try {
                     $this->datastore = new DatastoreClient($options);
+                    $this->project_id = $options['projectId'];
                 } catch (Exception $e) {
                     return($this->addError($e->getMessage()));
                 }

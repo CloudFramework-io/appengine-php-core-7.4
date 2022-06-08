@@ -153,7 +153,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.05201';
+        var $_version = 'v74.06081';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5583,17 +5583,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $object  We expect a '(db|ds):model_name' or just 'model_name'
          * @param array $options  optional options
          *    string $namespace says what namespace to use for datastore objects
+         *    string $projectId says what project_id to use for datastore/bq objects
          *    string $cf_models_api_key is the API-KEY to use for CloudFrameworkDataModels and read the structure remotelly
          * @return DataStore|DataSQL|void
          */
         public function getModelObject(string $object,$options=[]) {
-
-
-            //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
-            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] && !isset($this->models['db:'.$object]) && !isset($this->models['ds:'.$object]) && !isset($this->models[$object])) {
-                if(!$this->readModelsFromCloudFramework($object,$options['cf_models_api_key'])) return;
-            }
-            //endregion
 
 
             // If the model does not include the '(ds|db):' we add it.
@@ -5604,6 +5598,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 elseif(isset($this->models['bq:'.$object])) $object = 'bq:'.$object;
                 else $object = 'api:'.$object;
             }
+
+            //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
+            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] &&  !isset($this->models[$object])) {
+                if(!$this->readModelsFromCloudFramework(preg_replace('/.*:/','',$object),$options['cf_models_api_key'])) return;
+            }
+            //endregion
 
             // Let's find it and return
             if(!isset($this->models[$object])) {
@@ -5671,12 +5671,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if(isset($this->models[$object]['data']['entity'])) $entity = $this->models[$object]['data']['entity'];
                     //endregion
 
-                    $project_id = $this->core->config->get('core.gcp.datastore.project_id') ?? $this->core->gc_project_id;
-                    $project_id = $this->models[$object]['data']['interface']['project_id'] ?? $project_id;
-                    $options = ['projectId'=>$project_id];
+                    if(!isset($options['projectId'])) {
+                        $project_id = $this->core->config->get('core.gcp.datastore.project_id') ?? $this->core->gc_project_id;
+                        $project_id = $this->models[$object]['data']['interface']['project_id'] ?? $project_id;
+                        $options['projectId']=$project_id;
+                    }
 
-                    if(isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
-                    if(isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $options['namespace'] = $this->models[$object]['data']['interface']['namespace'];
+                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(!isset($options['namespace']) && isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $options['namespace'] = $this->models[$object]['data']['interface']['namespace'];
                     if(!is_object($object_ds = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$object]['data'],$options]))) return;
 
                     return($object_ds);
@@ -5689,8 +5691,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     if(isset($this->models[$object]['data']['interface']['object'])) $dataset = $this->models[$object]['data']['interface']['object'];
 
                     // $options
-                    $options = ['projectId'=>(isset($this->models[$object]['data']['interface']['project_id']) && $this->models[$object]['data']['interface']['project_id'])?$this->models[$object]['data']['interface']['project_id']: $this->core->gc_project_id];
-                    if(isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(!isset($options['projectId'])) {
+                        $project_id = $this->core->config->get('core.gcp.bigquery.project_id') ?? $this->core->gc_project_id;
+                        $project_id = $this->models[$object]['data']['interface']['project_id'] ?? $project_id;
+                        $options['projectId']=$project_id;
+                    }
+
+                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
                     // Object creation
                     if(!is_object($object_bq = $this->core->loadClass('DataBQ',[$dataset,$this->models[$object]['data'],$options]))) return;
                     return($object_bq);

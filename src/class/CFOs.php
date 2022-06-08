@@ -14,6 +14,7 @@ class CFOs {
     var $error = false;                 // When error true
     var $errorMsg = [];                 // When error array of messages
     var $namespace = 'default';
+    var $project_id = null;
     var $dsObjects = [];
     var $bqObjects = [];
     var $dbObjects = [];
@@ -28,7 +29,33 @@ class CFOs {
     {
         $this->core = $core;
         $this->integrationKey = $integrationKey;
+        $this->project_id = $this->core->gc_project_id;
         //region Create a
+    }
+
+    /**
+     * @param $object
+     * @param string $namespace
+     * @param string $project_id
+     */
+    public function dsInit ($object,$namespace='',$project_id='')
+    {
+
+        //region SET $options['cf_models_api_key'], $options['namespace'], $options['projectId']
+        $options = ['cf_models_api_key'=>$this->integrationKey];
+        if($namespace) $options['namespace'] = $namespace;
+        if($project_id) $options['projectId'] = $project_id;
+        elseif($this->project_id) $options['projectId'] = $this->project_id;
+        //endregion
+
+        $this->dsObjects[$object] = $this->core->model->getModelObject('ds:'.$object,$options);
+        if($this->core->model->error) {
+            //$this->addError($this->core->model->errorMsg);
+            //Return a Foo object instead to avoid exceptions in the execution
+            $this->createFooDatastoreObject($object);
+            $this->dsObjects[$object]->error = true;
+            $this->dsObjects[$object]->errorMsg = $this->core->model->errorMsg;
+        }
     }
 
     /**
@@ -37,34 +64,41 @@ class CFOs {
      */
     public function ds ($object): DataStore
     {
-        if(!isset($this->dsObjects[$object])) {
-            $this->dsObjects[$object] = $this->core->model->getModelObject($object,['cf_models_api_key'=>$this->integrationKey]);
-            if($this->core->model->error) {
-                //$this->addError($this->core->model->errorMsg);
-                //Return a Foo object instead to avoid exceptions in the execution
-                    $this->createFooDatastoreObject($object);
-                $this->dsObjects[$object]->error = true;
-                $this->dsObjects[$object]->errorMsg = $this->core->model->errorMsg;
-            }
-        }
+        if(!isset($this->dsObjects[$object]))
+            $this->dsInit($object);
         return $this->dsObjects[$object];
     }
 
     /**
+     * Initialize a bq $object
+     * @param $object
+     * @param string $project_id
+     */
+    public function bqInit ($object,$project_id='')
+    {
+        $options = ['cf_models_api_key'=>$this->integrationKey];
+        if($project_id) $options['projectId'] = $project_id;
+        elseif($this->project_id) $options['projectId'] = $this->project_id;
+
+        $this->bqObjects[$object] = $this->core->model->getModelObject('bq:'.$object,$options);
+        if($this->core->model->error) {
+            if(!is_object($this->bqObjects[$object]))
+                $this->createFooBQObject($object);
+            $this->bqObjects[$object]->error = true;
+            $this->bqObjects[$object]->errorMsg = $this->core->model->errorMsg;
+        }
+    }
+
+    /**
+     * Return a bq $object
      * @param $object
      * @return DataStore
      */
     public function bq ($object): DataBQ
     {
-        if(!isset($this->bqObjects[$object])) {
-            $this->bqObjects[$object] = $this->core->model->getModelObject($object,['cf_models_api_key'=>$this->integrationKey]);
-            if($this->core->model->error) {
-                if(!is_object($this->bqObjects[$object]))
-                    $this->createFooBQObject($object);
-                $this->bqObjects[$object]->error = true;
-                $this->bqObjects[$object]->errorMsg = $this->core->model->errorMsg;
-            }
-        }
+        if(!isset($this->bqObjects[$object]))
+            $this->bqInit($object);
+
         return $this->bqObjects[$object];
     }
 
@@ -75,7 +109,7 @@ class CFOs {
     public function db ($object,$connection='default'): DataSQL
     {
         if(!isset($this->dbObjects[$object])) {
-            $this->dbObjects[$object] = $this->core->model->getModelObject($object,['cf_models_api_key'=>$this->integrationKey]);
+            $this->dbObjects[$object] = $this->core->model->getModelObject('db:'.$object,['cf_models_api_key'=>$this->integrationKey]);
             if($this->core->model->error) {
                 if(!is_object($this->dbObjects[$object]))
                     $this->createFooDBObject($object);
@@ -171,7 +205,7 @@ class CFOs {
             $model = json_decode('{
                                     "KeyName": ["keyname","index|minlength:4"]
                                   }',true);
-            $this->dsObjects[$object] = $this->core->loadClass('DataBQ',['Foo','default',$model]);
+            $this->dsObjects[$object] = $this->core->loadClass('Datastore',['Foo','default',$model]);
             if ($this->dsObjects[$object]->error) return($this->addError($this->dsObjects[$object]->errorMsg));
         }
     }
@@ -215,6 +249,14 @@ class CFOs {
         foreach (array_keys($this->dsObjects) as $object) {
             $this->ds($object)->namespace=$namespace;
         }
+    }
+
+    /**
+     * Set a default project_id overwritting the default project_id
+     * @param $project_id
+     */
+    function setProjectId($project_id) {
+        $this->project_id = $project_id;
     }
 
     /**
