@@ -3162,9 +3162,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * It decode a JSON WEB TOKEN based on a public key
          * based on https://github.com/firebase/php-jwt
          * to generate publicKey ../scripts/jwtRS256.sh
+         * @param $jwt
+         * @param null $publicKey optionally you can verify the signature of the token
+         * @param null $keyId optionally you can verify header.kid of the token
+         * @param string $algorithm optionally you can verify the header.alg of the token: SHA256,RS256..
          * @return string with a length of 32 chars
          */
-        public function jwt_decode($jwt,$publicKey=null,$keyId=null,$algorithm='SHA256')
+        public function jwt_decode($jwt,$publicKey=null,$keyId=null,$algorithm=null)
         {
 
             $tks = explode('.', $jwt);
@@ -3183,16 +3187,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if (false === ($sig = $this->urlsafeB64Decode($cryptob64))) {
                 return($this->addError('Invalid signature encoding'));
             }
-            if (!array_key_exists('alg',$header) || $header['alg']!='SHA256') {
+            if ($algorithm && (!array_key_exists('alg',$header) || $header['alg']!='SHA256')) {
                 return($this->addError('Empty algorithm in header or value != SHA256'));
             }
-            if (array_key_exists('kid',$header) && $header['kid']!=$keyId) {
+            if (array_key_exists('kid',$header) && $keyId && $header['kid']!=$keyId) {
                 return($this->addError('KeyId present in header and does not match with $keyId'));
             }
 
             //region create $signature signing with the privateKey
             if($publicKey) {
                 if(!is_string($publicKey) || strlen($publicKey)< 10) return($this->addError('Wrong public key'));
+                if(!$algorithm) $algorithm='SHA256';
                 $success = @openssl_verify("$headb64.$bodyb64",$sig, $publicKey, $algorithm);
                 if($success!==1) {
                     $this->addError(['error'=>true,'errorMsg'=>'OpenSSL verification failed. '.openssl_error_string()]);
