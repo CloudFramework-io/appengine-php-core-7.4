@@ -29,6 +29,7 @@ class CFI
     function __construct (Core7 &$core, $bucket='')
     {
         $this->core = $core;
+        $this->initApp('Set a title for the CFO');
     }
 
     /**
@@ -36,11 +37,13 @@ class CFI
      * @param $title
      */
     public function initApp($title) {
-        $this->json_object=['title'=>$title
-            ,'allow_copy'=>false
-            ,'allow_delete'=>false
-            ,'allow_display'=>false
-            ,'allow_update'=>false,
+        $this->json_object=[
+            'title'=>$title,
+            'allow_copy'=>false,
+            'allow_delete'=>false,
+            'allow_display'=>false,
+            'allow_update'=>false,
+            'tabs'=>[],
             'fields'=>[],
             'buttons'=>[],
             'close'=>'Cancel'
@@ -60,6 +63,15 @@ class CFI
      * @param $title
      */
     public function setTile($title) {$this->json_object['title']=$title;}
+
+    /**
+     * Change title of the App
+     * @param $title
+     */
+    public function addTab($title,$icon='home') {
+        $index = count($this->json_object['tabs']);
+        $this->json_object['tabs'][]=['title'=>$title,'ico'=>$icon,'active'=>($index==0?true:false),'index'=>$index];
+    }
 
     /**
      * @param $field
@@ -95,10 +107,10 @@ class CFI
 
     /**
      * Return a CFIButton $button
-     * @param $button
+     * @param $button_title
      * @return CFIButton
      */
-    public function button($button) { return $this->getButton($button);}
+    public function button($button_title='Button') { return $this->getButton($button_title);}
 
     /**
      * set the title for close button
@@ -143,11 +155,37 @@ class CFIField {
     public function title($title) { $this->cfi->json_object['fields'][$this->field]['name'] = $title; return $this;}
 
     /**
+     * Set a title for the field
+     * @param int $n_tab Number of tab the field has to be shown 0..n
+     * @return CFIField $this
+     */
+    public function tab(int $n_tab) {
+        $n_tab = intval($n_tab);
+        if(isset($this->cfi->json_object['tabs'][$n_tab]))
+            $this->cfi->json_object['fields'][$this->field]['tab'] = $n_tab;
+        return $this;
+    }
+
+    /**
      * Set if the field to readonly
      * @param boolean $read_only optional params. By default true
      * @return CFIField $this
      */
     public function readOnly($read_only=true) { $this->cfi->json_object['fields'][$this->field]['read_only'] = $read_only; return $this;}
+
+    /**
+     * Set if we will create a new row after he field
+     * @param boolean $new_row optional params. By default true
+     * @return CFIField $this
+     */
+    public function newRow($new_row=true) { $this->cfi->json_object['fields'][$this->field]['new_row'] = $new_row; return $this;}
+
+    /**
+     * Set if we will create a new row after he field
+     * @param boolean $allow_empty optional params. By default true
+     * @return CFIField $this
+     */
+    public function allowEmpty($allow_empty=true) { $this->cfi->json_object['fields'][$this->field]['allow_empty'] = $allow_empty; return $this;}
 
     /**
      * Set if the field to disabled and it will not be sent in the form submit
@@ -157,24 +195,54 @@ class CFIField {
     public function disabled($disabled=true) { $this->cfi->json_object['fields'][$this->field]['disabled'] = $disabled; return $this;}
 
     /**
-     * Set if the field to type json
+     * Set if the field has to be represented as an image
+     * @param bool $image
+     * @param int $image_with_pixels
+     * @param int $image_height_pixels
      * @return CFIField $this
      */
-    public function json() { $this->cfi->json_object['fields'][$this->field]['type'] = 'json'; return $this;}
+    public function image($image=true,int $image_with_pixels=0,int $image_height_pixels=0) {
+        $this->cfi->json_object['fields'][$this->field]['image'] = $image;
+        if($image_with_pixels) $this->cfi->json_object['fields'][$this->field]['image_width'] = $image_with_pixels;
+        if($image_height_pixels) $this->cfi->json_object['fields'][$this->field]['image_height'] = $image_height_pixels;
+
+        return $this;
+    }
 
     /**
-     * Set if the field to type texarea
+     * Set if the field to type json
+     * @param string $title optional title
      * @return CFIField $this
      */
-    public function textarea() { $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea'; return $this;}
+    public function json($title='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'json';
+        if($title) $this->cfi->json_object['fields'][$this->field]['name'] = $title;
+        return $this;
+    }
+
+    /**
+     * Set if the field to type textarea
+     * @param string $title optional title
+     * @return CFIField $this
+     */
+    public function textarea($title='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea';
+        if($title) $this->cfi->json_object['fields'][$this->field]['name'] = $title;
+        return $this;}
     // Deprecated by error
     public function texarea() { $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea'; return $this;}
 
     /**
-     * Set if the field to type texarea
+     * Set if the field to type select
      * @return CFIField $this
      */
-    public function select() { $this->cfi->json_object['fields'][$this->field]['type'] = 'select'; return $this;}
+    public function select(array $values,$defaultvalue='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'select';
+        $this->cfi->json_object['fields'][$this->field]['values'] = $values;
+        if($defaultvalue)
+            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
+        return $this;
+    }
 
     /**
      * Set if the field to type iframe
