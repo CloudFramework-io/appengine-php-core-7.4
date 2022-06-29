@@ -5600,6 +5600,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         public function getModelObject(string $object,$options=[]) {
 
+            //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
+            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] &&  !isset($this->models[$object])) {
+                if(!$this->readModelsFromCloudFramework(preg_replace('/.*:/','',$object),$options['cf_models_api_key'])) return;
+            }
+            //endregion
 
             // If the model does not include the '(ds|db):' we add it.
             $source_object = $object;
@@ -5609,12 +5614,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 elseif(isset($this->models['bq:'.$object])) $object = 'bq:'.$object;
                 else $object = 'api:'.$object;
             }
-
-            //region $this->readModelsFromCloudFramework if $options['cf_models_api_key']
-            if(isset($options['cf_models_api_key']) && $options['cf_models_api_key'] &&  !isset($this->models[$object])) {
-                if(!$this->readModelsFromCloudFramework(preg_replace('/.*:/','',$object),$options['cf_models_api_key'])) return;
-            }
-            //endregion
 
             // Let's find it and return
             if(!isset($this->models[$object])) {
