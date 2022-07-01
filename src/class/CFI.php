@@ -305,15 +305,29 @@ class CFIButton {
     /**
      * Set a value for the field
      * @param $value
-     * @return CFIField $this
+     * @return CFIButton $this
      */
     public function title($title) { $this->button['title'] = $title; return $this;}
+
+    /**
+     * Set button color
+     * @param $value
+     * @return CFIButton $this
+     */
+    public function color($color) { $this->button['color'] = $color; return $this;}
+
+    /**
+     * Set button align
+     * @param $align
+     * @return CFIButton $this
+     */
+    public function align($align) { $this->button['align'] = $align; return $this;}
 
     /**
      * Assign url and method for an API call
      * @param $url
      * @param string $method optinal var to assign the type of call: GET, POST, PUT, DELETE
-     * @return CFIField $this
+     * @return CFIButton $this
      */
     public function url($url,$method='GET') { $this->button['method'] = strtoupper($method);$this->button['url'] = $url; return $this;}
 
