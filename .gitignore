@@ -9,3 +9,4 @@ vendor/*
 **/tmp/*
 **/composer.lock
 **/vendor/*
+.idea/*
