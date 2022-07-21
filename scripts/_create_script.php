@@ -17,7 +17,7 @@ class Script extends Scripts2020
         if(is_file($this->core->system->script_path.'/'.$script.'.php')) return($this->addError("script already exist:{$show_script_path}/{$script}.php"));
         if(preg_match('/[^a-z0-9_\-]/',$script)) return($this->addError("{$script} name is incorrect. Only is allowed the following chars: [a-z0-9_\-]"));
         $this->sendTerminal("  - Copying template to {$show_script_path}/{$script}.php");
-        copy(__DIR__ . '/../scripts-dist/template.php',$this->core->system->script_path."/{$script}.php");
+        copy(__DIR__ . '/../install/scripts-dist/template.php',$this->core->system->script_path."/{$script}.php");
         $this->sendTerminal("  - Everything is ok :)");
         $this->sendTerminal("  - Execute: cfscript {$script}/hello\?var1=value1\&var2=value2");
     }

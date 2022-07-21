@@ -17,7 +17,7 @@ class Script extends Scripts2020
         if(is_file($this->core->system->api_path.'/'.$api.'.php')) return($this->addError("script already exist:{$show_api_path}/{$api}.php"));
         if(preg_match('/[^a-z0-9_\-]/',$api)) return($this->addError("{$api} name is incorrect. Only is allowed the following chars: [a-z0-9_\-]"));
         $this->sendTerminal("  - Copying template to {$show_api_path}/{$api}.php");
-        copy(__DIR__ . '/../api-dist/template.php',$this->core->system->api_path."/{$api}.php");
+        copy(__DIR__ . '/../install/api-dist/template.php',$this->core->system->api_path."/{$api}.php");
         $this->sendTerminal("  - Everything is ok :)");
         $this->sendTerminal("  - execute: [composer serve]");
         $this->sendTerminal("  - Go to: http://localhost:8080/{$api}/default?var1=value1");
