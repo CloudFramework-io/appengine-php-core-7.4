@@ -243,6 +243,29 @@ class CFIField {
             $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
         return $this;
     }
+    /**
+     * Set if the field to type select
+     * @return CFIField $this
+     */
+    public function multiselect(array $values,$defaultvalue='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'multiselect';
+        $this->cfi->json_object['fields'][$this->field]['values'] = $values;
+        if($defaultvalue)
+            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
+        return $this;
+    }
+
+    /**
+     * Set if the field will be connected with external SQL table/view
+     * @return CFIField $this
+     */
+    public function connectWithBigQuery($table,$fields,$linked_field) {
+        $this->cfi->json_object['fields'][$this->field]['external_values'] = 'bq';
+        $this->cfi->json_object['fields'][$this->field]['entity'] = $table;
+        $this->cfi->json_object['fields'][$this->field]['fields'] = $fields;
+        $this->cfi->json_object['fields'][$this->field]['linked_field'] = $linked_field;
+        return $this;
+    }
 
     /**
      * Set if the field to type iframe
