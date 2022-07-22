@@ -247,6 +247,16 @@ class CFIField {
      * Set if the field to type select
      * @return CFIField $this
      */
+    public function html($defaultvalue='') {
+        if($defaultvalue)
+            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'html';
+        return $this;
+    }
+    /**
+     * Set if the field to type select
+     * @return CFIField $this
+     */
     public function multiselect(array $values,$defaultvalue='') {
         $this->cfi->json_object['fields'][$this->field]['type'] = 'multiselect';
         $this->cfi->json_object['fields'][$this->field]['values'] = $values;
