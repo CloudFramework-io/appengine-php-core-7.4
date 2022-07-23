@@ -1272,8 +1272,12 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             ];
 
             //get the $table['model']['fields'] from the $table
+            $table_name = $table;
             $table = $this->getModelFromTable($table);
-
+            if(!$table['table_exists']) {
+                $this->setError("{$table_name} does not exist");
+                return;
+            }
             //region assign $fields['model'] taking MYSQL field types from $table
             if(isset($table['model']['fields'])) foreach ($table['model']['fields'] as $field=>$values) {
 
