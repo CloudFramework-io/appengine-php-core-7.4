@@ -806,10 +806,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     elseif ($this->schema['props'][$key][1] == 'txt')
                         $row[$key] = $value;
                     elseif ($value instanceof DateTimeImmutable) {
-
                         // Change timezone of the object
                         if($tz) $value = $value->setTimezone($tz)??$value;
-
                         if ($this->schema['props'][$key][1] == 'date') {
                             $row[$key] = $value->format('Y-m-d');
                         } elseif ($this->schema['props'][$key][1] == 'datetime')
@@ -821,6 +819,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         $row[$key] = intval($value);
                     elseif ($this->schema['props'][$key][1] == 'float')
                         $row[$key] = floatval($value);
+                    elseif ($this->schema['props'][$key][1] == 'datetime' && is_numeric($value) && $value) {
+                        $row[$key] = date('Y-m-d H:i:s',$value/1000000);
+                    }
 //                    elseif ($this->schema['props'][$key][1] == 'boolean')
 //                        $row[$key] = ($value)?true:false;
                 }
