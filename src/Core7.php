@@ -105,8 +105,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if($core)
                 $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
 
-            if(!$core || ($core->is->development() && !$core->is->terminal()))
-                _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
+//
+//            if(!$core || ($core->is->development() && !$core->is->terminal()))
+//                _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
         }
     }
 
