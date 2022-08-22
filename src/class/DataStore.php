@@ -617,6 +617,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         //endregion
                         //region ELSE set normal to search
                         else {
+                            if (is_array($value)) $comp = 'IN';
                             $key = $key . $idkey;
                             if ($i == 0) $_q .= " WHERE $fieldname {$comp} @{$key}";
                             else $_q .= " AND $fieldname {$comp} @{$key}";
