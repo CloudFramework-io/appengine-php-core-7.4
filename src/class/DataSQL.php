@@ -23,6 +23,8 @@ class DataSQL
     var $debug = false;
     var $dbConnections = [];
     var $dbCredentials = [];
+    var $default_time_zone_to_read = 'UTC';
+    var $default_time_zone_to_write = 'UTC';
     private $joins = [];
     private $queryFields = '';
     private $queryWhere = [];
@@ -386,6 +388,8 @@ class DataSQL
     public function update(&$data) {
         if(!is_array($data) ) return($this->addError('update($data) $data has to be an array with key->value'));
 
+        $this->checkDateNowValues($data);
+
         // Let's convert from Mapping into SQL fields
         if($this->use_mapping) {
             $mapdata = $data;
@@ -410,6 +414,8 @@ class DataSQL
     public function upsert($data) {
         if(!is_array($data) ) return($this->addError('upsert($data) $data has to be an array with key->value'));
 
+        $this->checkDateNowValues($data);
+
         // Let's convert from Mapping into SQL fields
         if($this->use_mapping) {
             $mapdata = $data;
@@ -433,6 +439,8 @@ class DataSQL
      */
     public function insert($data) {
         if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
+
+        $this->checkDateNowValues($data);
 
         // Let's convert from Mapping into SQL fields
         if($this->use_mapping) {
@@ -472,6 +480,20 @@ class DataSQL
         if($this->core->model->error) $this->addError($this->core->model->errorMsg);
         return($ret);
 
+    }
+
+    /**
+     * Check if in Data there is a now value
+     * @param $data
+     */
+    private function checkDateNowValues(&$data) {
+        $dt = new DateTime("now", new DateTimeZone($this->default_time_zone_to_write));
+        foreach ($data as $key=>$datum) if(in_array(($this->entity_schema['model'][$key][0]??null),['date','datetime','timestamp']) && $datum=='now'){
+            if($this->entity_schema['model'][$key][0]=='date')
+                $data[$key] = $dt->format('Y-m-d');
+            else
+                $data[$key] = $dt->format('Y-m-d H:i:s');
+        }
     }
 
 
