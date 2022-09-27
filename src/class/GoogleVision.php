@@ -286,7 +286,7 @@ class GoogleVision extends CFGoogle
                     $ret['textAnnotations'][] = ['description'=>$item->getFullTextAnnotation()->getText()];
             }
         }
-        return $ret;
+        return $ret ?? null;
 
     }
 
