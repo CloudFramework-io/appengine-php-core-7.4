@@ -3,11 +3,12 @@
 /**
  * [$cfi = $this->core->loadClass('CFI');] Class CFI to handle CFO app for CloudFrameworkInterface
  * https://www.notion.so/cloudframework/CFI-PHP-Class-c26b2a1dd2254ddd9e663f2f8febe038
- * last_update: 20200502
+ * last_update: 20221003
  * @package CoreClasses
  */
 class CFI
 {
+    private $version = '20221003';
     private $core;
     private $fields = [];
     private $buttons = [];
@@ -195,6 +196,13 @@ class CFIField {
     public function disabled($disabled=true) { $this->cfi->json_object['fields'][$this->field]['disabled'] = $disabled; return $this;}
 
     /**
+     * Set if the field is virtual
+     * @param boolean $virtual optional params. By default true
+     * @return CFIField $this
+     */
+    public function virtual($virtual=true) { $this->cfi->json_object['fields'][$this->field]['virtual'] = $virtual; return $this;}
+
+    /**
      * Set if the field has to be represented as an image
      * @param bool $image
      * @param int $image_with_pixels
@@ -205,6 +213,25 @@ class CFIField {
         $this->cfi->json_object['fields'][$this->field]['image'] = $image;
         if($image_with_pixels) $this->cfi->json_object['fields'][$this->field]['image_width'] = $image_with_pixels;
         if($image_height_pixels) $this->cfi->json_object['fields'][$this->field]['image_height'] = $image_height_pixels;
+
+        return $this;
+    }
+    /**
+     * Set if the field has to be represented as an image
+     * @param bool $image
+     * @param int $image_with_pixels
+     * @param int $image_height_pixels
+     * @return CFIField $this
+     */
+    public function addExternalAPI($title,$url,$method='POST',$js_condition=null) {
+
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'virtual';
+        $this->cfi->json_object['fields'][$this->field]['name'] = 'action';
+
+        if(!isset($this->cfi->json_object['fields'][$this->field]['external_apis']) || !is_array($this->cfi->json_object['fields'][$this->field]['external_apis'])) $this->cfi->json_object['fields'][$this->field]['external_apis'] = [];
+        $external = ['title'=>$title,'url'=>$url,'method'=>$method];
+        if($js_condition) $external['js_condition'] = $js_condition;
+        $this->cfi->json_object['fields'][$this->field]['external_apis'][] = $external;
 
         return $this;
     }
@@ -229,8 +256,6 @@ class CFIField {
         $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea';
         if($title) $this->cfi->json_object['fields'][$this->field]['name'] = $title;
         return $this;}
-    // Deprecated by error
-    public function texarea() { $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea'; return $this;}
 
     /**
      * Set if the field to type select
@@ -247,33 +272,15 @@ class CFIField {
      * Set if the field to type select
      * @return CFIField $this
      */
-    public function html($defaultvalue='') {
-        if($defaultvalue)
-            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
-        $this->cfi->json_object['fields'][$this->field]['type'] = 'html';
-        return $this;
-    }
-    /**
-     * Set if the field to type select
-     * @return CFIField $this
-     */
-    public function multiselect(array $values,$defaultvalue='') {
-        $this->cfi->json_object['fields'][$this->field]['type'] = 'multiselect';
-        $this->cfi->json_object['fields'][$this->field]['values'] = $values;
-        if($defaultvalue)
-            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
-        return $this;
-    }
-
-    /**
-     * Set if the field will be connected with external SQL table/view
-     * @return CFIField $this
-     */
-    public function connectWithBigQuery($table,$fields,$linked_field) {
-        $this->cfi->json_object['fields'][$this->field]['external_values'] = 'bq';
-        $this->cfi->json_object['fields'][$this->field]['entity'] = $table;
-        $this->cfi->json_object['fields'][$this->field]['fields'] = $fields;
-        $this->cfi->json_object['fields'][$this->field]['linked_field'] = $linked_field;
+    public function link(string $url='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'virtual';
+        $this->cfi->json_object['fields'][$this->field]['link'] = true;
+        if($url) {
+            if(!($this->cfi->json_object['fields'][$this->field]['value']??null))
+                $this->cfi->json_object['fields'][$this->field]['value'] = $url;
+            else
+                $this->cfi->json_object['fields'][$this->field]['link_content'] = $url;
+        }
         return $this;
     }
 
@@ -282,9 +289,10 @@ class CFIField {
      * @param $height integer optinal iframe height: default 400
      * @return CFIField $this
      */
-    public function iframe($height=400) {
+    public function iframe($height=400,$url='') {
         $this->cfi->json_object['fields'][$this->field]['type'] = 'iframe';
         $this->cfi->json_object['fields'][$this->field]['iframe_height'] = $height;
+        if($url) $this->cfi->json_object['fields'][$this->field]['iframe_url'] =$url;
         return $this;}
 
     /**
