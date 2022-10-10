@@ -990,7 +990,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(isset($_SERVER['HTTP_X_APPENGINE_CITYLATLONG'])) $ret['getData']['latlong'] = $_SERVER['HTTP_X_APPENGINE_CITYLATLONG'];
 
             $ret['http_referer'] = (array_key_exists('HTTP_REFERER',$_SERVER))?$_SERVER['HTTP_REFERER']:'unknown';
-            $ret['time'] = date('Ymdhis');
+            $ret['time'] = date('Ymdhise');
             $ret['uri'] = (isset($_SERVER['REQUEST_URI']))?$_SERVER['REQUEST_URI']:null;
 
 
@@ -3205,7 +3205,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
             }
             //endregion
-            return(['header'=>$header,'body'=>$payload]);
+            return(['header'=>$header,'body'=>$payload,'signature'=>$cryptob64]);
         }
 
         /**
