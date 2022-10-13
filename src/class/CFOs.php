@@ -43,16 +43,21 @@ class CFOs {
      */
     public function dsInit ($object,$namespace='',$project_id='',$service_account=[])
     {
-
         //region SET $options['cf_models_api_key'], $options['namespace'], $options['projectId']
         $options = ['cf_models_api_key'=>$this->integrationKey];
         if($namespace) $options['namespace'] = $namespace;
         if($project_id) $options['projectId'] = $project_id;
         elseif($this->project_id) $options['projectId'] = $this->project_id;
-
-        if($service_account) $options['keyFile'] = $service_account;
-        elseif($this->service_account) $options['keyFile'] = $this->service_account;
-
+        if($service_account){
+            if (!($service_account['private_key']??null) || !($service_account['project_id']??null)) {
+                $this->createFooDatastoreObject($object);
+                $this->dsObjects[$object]->error = true;
+                $this->dsObjects[$object]->errorMsg = 'The service account you have passed does not have private_key or project_id';
+                return false;
+            }
+            $options['keyFile'] = $service_account;
+            $options['projectId'] = $service_account['project_id'];
+        }
         //endregion
 
         $this->dsObjects[$object] = $this->core->model->getModelObject('ds:'.$object,$options);
@@ -62,8 +67,22 @@ class CFOs {
             $this->createFooDatastoreObject($object);
             $this->dsObjects[$object]->error = true;
             $this->dsObjects[$object]->errorMsg = $this->core->model->errorMsg;
+            return false;
         }
+        return true;
     }
+
+    /**
+     * @param $cfos
+     */
+    public function readCFOs ($cfos) {
+        $models = $this->core->model->readModelsFromCloudFramework($cfos,$this->integrationKey);
+        if($this->core->model->error) {
+            return $this->addError($this->core->model->errorMsg);
+        }
+        return $models;
+    }
+
 
     /**
      * @param $object
