@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.10131';
+        var $_version = 'v74.10161';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2062,6 +2062,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache_key = null;
         var $cache_iv = null;
         var $secret_vars = null;
+        var $last_key_cache = null;     // To control double read of: readERPDeveloperEncryptedSubKeys
 
 
         function __construct(Core7 &$core)
@@ -2199,6 +2200,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public function readERPDeveloperEncryptedSubKeys($erp_platform_id='',$erp_user='')
         {
 
+            //avoid to call the method more than once
+            if($this->last_key_cache) {
+                $this->core->logs->add('readERPDeveloperEncryptedSubKeys() has been call more than once. The first one was: '.$this->last_key_cache,'CoreSecurity');
+            }
+
             //region CHECK $erp_platform_id value
             if(!$erp_platform_id || !is_string($erp_platform_id)) {
                 $erp_platform_id = $this->core->config->get('core.erp.platform_id');
@@ -2219,7 +2225,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region SET $url, $key_cache, $keys=[];
             $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
-            $key_cache = $erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
+            $key_cache = '/my-daily-encryption-subkeys/'.$erp_user;
             $keys = [];
             //endregion
 
@@ -2233,6 +2239,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $keys = $this->core->session->get($key_cache);
             }
             //endregion
+
 
             //region CALL $url and SET $keys if empty $keys
             if(!$keys) {
@@ -2259,6 +2266,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->cache_iv.='__'.$keys['data']['iv'];
             //endregion
 
+            //avoid to call the method more than once
+            $this->last_key_cache = $this->cache_key;
             return true;
         }
 

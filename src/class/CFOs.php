@@ -20,6 +20,7 @@ class CFOs {
     var $dsObjects = [];
     var $bqObjects = [];
     var $dbObjects = [];
+    private $secrets = [];
 
 
     /**
@@ -35,6 +36,27 @@ class CFOs {
         //region Create a
     }
 
+
+    /**
+     * @param $cfos
+     */
+    public function readCFOs ($cfos) {
+        $models = $this->core->model->readModelsFromCloudFramework($cfos,$this->integrationKey);
+        if($this->core->model->error) {
+            return $this->addError($this->core->model->errorMsg);
+        }
+        return $models;
+    }
+
+    /**
+     * Set secrets to be used by Datastore, Bigquery, Database
+     * @param $key
+     * @param array $value
+     */
+    public function setSecret ($key,array $value) {
+        $this->secrets[$key] = $value;
+    }
+
     /**
      * @param $object
      * @param string $namespace
@@ -43,7 +65,26 @@ class CFOs {
      */
     public function dsInit ($object,$namespace='',$project_id='',$service_account=[])
     {
-        //region SET $options['cf_models_api_key'], $options['namespace'], $options['projectId']
+
+        //region EVALUATE DS Model looking for secrets (service accounts)
+        $model = ($this->core->model->models['ds:'.$object]??null);
+        if(!$model) {
+            $this->readCFOs($object);
+            $model = ($this->core->model->models['ds:'.$object]??null);
+        }
+        if(!$service_account && ($service_account = ($model['data']['secret']??null))) {
+            if(is_string($service_account) ){
+                if(!$service_account = ($this->secrets[$service_account]??null)){
+                    $this->createFooDatastoreObject($object);
+                    $this->dsObjects[$object]->error = true;
+                    $this->dsObjects[$object]->errorMsg = 'The object ['.$object.'] hash a secret ['.$service_account.'] and it does not exist in CFOs->secrets. Programmer has to CFOs->setSecret(\''.$service_account.'\', array secret)';
+                    return false;
+                }
+            }
+        }
+        //endregion
+
+        //region SET $options[cf_models_api_key,namespace,projectId,projectId]
         $options = ['cf_models_api_key'=>$this->integrationKey];
         if($namespace) $options['namespace'] = $namespace;
         if($project_id) $options['projectId'] = $project_id;
@@ -60,6 +101,7 @@ class CFOs {
         }
         //endregion
 
+        //region SET $this->dsObjects[$object] = $this->core->model->getModelObject('ds:'.$object,$options);
         $this->dsObjects[$object] = $this->core->model->getModelObject('ds:'.$object,$options);
         if($this->core->model->error) {
             //$this->addError($this->core->model->errorMsg);
@@ -69,19 +111,11 @@ class CFOs {
             $this->dsObjects[$object]->errorMsg = $this->core->model->errorMsg;
             return false;
         }
+        //endregion
+
         return true;
     }
 
-    /**
-     * @param $cfos
-     */
-    public function readCFOs ($cfos) {
-        $models = $this->core->model->readModelsFromCloudFramework($cfos,$this->integrationKey);
-        if($this->core->model->error) {
-            return $this->addError($this->core->model->errorMsg);
-        }
-        return $models;
-    }
 
 
     /**
@@ -108,6 +142,7 @@ class CFOs {
         elseif($this->project_id) $options['projectId'] = $this->project_id;
         if($service_account) $options['keyFile'] = $service_account;
         elseif($this->service_account) $options['keyFile'] = $this->service_account;
+
 
         $this->bqObjects[$object] = $this->core->model->getModelObject('bq:'.$object,$options);
         if($this->core->model->error) {
