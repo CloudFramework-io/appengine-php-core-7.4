@@ -49,6 +49,17 @@ class CFOs {
     }
 
     /**
+     * @param $object
+     * @return DataStore
+     */
+    public function ds ($object): DataStore
+    {
+        if(!isset($this->dsObjects[$object]))
+            $this->dsInit($object);
+        return $this->dsObjects[$object];
+    }
+
+    /**
      * Set secrets to be used by Datastore, Bigquery, Database
      * @param $key
      * @param array $value
@@ -72,14 +83,16 @@ class CFOs {
             $this->readCFOs($object);
             $model = ($this->core->model->models['ds:'.$object]??null);
         }
-        if(!$service_account && ($service_account = ($model['data']['secret']??null))) {
-            if(is_string($service_account) ){
-                if(!$service_account = ($this->secrets[$service_account]??null)){
+        if(!$service_account && ($service_account_secret = ($model['data']['secret']??null))) {
+            if(is_string($service_account_secret) ){
+                if(!$service_account = ($this->secrets[$service_account_secret]??null)){
                     $this->createFooDatastoreObject($object);
                     $this->dsObjects[$object]->error = true;
-                    $this->dsObjects[$object]->errorMsg = 'The object ['.$object.'] hash a secret ['.$service_account.'] and it does not exist in CFOs->secrets. Programmer has to CFOs->setSecret(\''.$service_account.'\', array secret)';
+                    $this->dsObjects[$object]->errorMsg = 'The object ['.$object.'] hash a secret ['.$service_account_secret.'] and it does not exist in CFOs->secrets. Programmer has to CFOs->setSecret(\''.$service_account_secret.'\', array secret)';
                     return false;
                 }
+            } else {
+                $service_account = $service_account_secret;
             }
         }
         //endregion
@@ -118,16 +131,7 @@ class CFOs {
 
 
 
-    /**
-     * @param $object
-     * @return DataStore
-     */
-    public function ds ($object): DataStore
-    {
-        if(!isset($this->dsObjects[$object]))
-            $this->dsInit($object);
-        return $this->dsObjects[$object];
-    }
+
 
     /**
      * Initialize a bq $object
@@ -265,7 +269,7 @@ class CFOs {
      * @ignore
      */
     private function createFooDatastoreObject($object) {
-        if(!isset($this->dsObjects[$object])) {
+        if(!isset($this->dsObjects[$object]) || !is_object($this->dsObjects[$object])) {
             $model = json_decode('{
                                     "KeyName": ["keyname","index|minlength:4"]
                                   }',true);
