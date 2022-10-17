@@ -129,10 +129,6 @@ class CFOs {
         return true;
     }
 
-
-
-
-
     /**
      * Initialize a bq $object
      * @param $object
@@ -268,7 +264,7 @@ class CFOs {
      * Create a Foo Datastore Object to be returned in case someone tries to access a non created object
      * @ignore
      */
-    private function createFooDatastoreObject($object) {
+    public function createFooDatastoreObject($object) {
         if(!isset($this->dsObjects[$object]) || !is_object($this->dsObjects[$object])) {
             $model = json_decode('{
                                     "KeyName": ["keyname","index|minlength:4"]
@@ -282,7 +278,7 @@ class CFOs {
      * Create a Foo BQ Object to be returned in case someone tries to access a non created object
      * @ignore
      */
-    private function createFooBQObject($object) {
+    public function createFooBQObject($object) {
         if(!isset($this->bqObjects[$object])) {
             $model = json_decode('{
                                     "KeyName": ["string","index|minlength:4"]
@@ -296,7 +292,7 @@ class CFOs {
      * Create a Foo DB Object to be returned in case someone tries to access a non created object
      * @ignore
      */
-    private function createFooDBObject($object) {
+    public function createFooDBObject($object) {
 
         if(!isset($this->dbObjects[$object])) {
             $model = json_decode('{
