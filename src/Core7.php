@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.10191';
+        var $_version = 'v74.10192';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -497,7 +497,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             elseif (is_file($this->system->app_path . "/class/" . $class . ".php"))
                 include_once($this->system->app_path . "/class/" . $class . ".php");
             else {
-                $this->errors->add("Class $class not found");
+                $this->errors->add("Class $class not found in the following paths: [".__DIR__ . "/class/{$class}.php,".$this->system->app_path . "/class/" . $class . ".php]");
                 return null;
             }
             $this->loadedClasses[$hash] = new $class($this, $params);
