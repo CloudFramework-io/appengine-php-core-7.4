@@ -5696,7 +5696,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $options['projectId']=$project_id;
                     }
 
-                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) {
+                        $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                        if($options['keyFile']['project_id']??null) $options['projectId'] = $options['keyFile']['project_id'];
+                    }
                     if(!isset($options['namespace']) && isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $options['namespace'] = $this->models[$object]['data']['interface']['namespace'];
                     if(!is_object($object_ds = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$object]['data'],$options]))) return;
 
@@ -5716,7 +5719,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $options['projectId']=$project_id;
                     }
 
-                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) {
+                        $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                        if($options['keyFile']['project_id']??null) $options['projectId'] = $options['keyFile']['project_id'];
+                    }
                     // Object creation
                     if(!is_object($object_bq = $this->core->loadClass('DataBQ',[$dataset,$this->models[$object]['data'],$options]))) return;
                     return($object_bq);
