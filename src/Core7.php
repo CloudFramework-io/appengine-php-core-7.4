@@ -5651,6 +5651,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                     }
                     // rewrite name of the table
+                    $table = $this->models[$object]['data']['entity'];
                     if(isset($this->models[$object]['data']['interface']['object'])) $table = $this->models[$object]['data']['interface']['object'];
 
                     // Object creation
