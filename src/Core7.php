@@ -1,6 +1,6 @@
 <?php
 /**
- * Core classes developend in PHP7.x to be used to develop APIs, Scripts, Web Pages
+ * Core classes developed in ^PHP7.4 to be used to develop APIs, Scripts, Web Pages
  *
  * Core7 class is included in your APIs as $this->core and it includes objects
  * of other classes to facilitate your developments.
@@ -114,7 +114,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     register_shutdown_function( "__fatal_handler" );
 
     /**
-     * Print a group of mixed vars passed as arguments
+     * Print a group of mixed vars passed as arguments. Example _print($object,$array,$class,...)
      */
     function _print()
     {
@@ -3845,22 +3845,39 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * $this->core->request Class to handle HTTP requests
+     * $this->core->request Object is used to handle http requests
      * @package Core.request
      */
     class CoreRequest
     {
+        /** @ignore */
         protected $core;
+        /** @ignore */
         protected $http;
+        /** @ignore */
         public $responseHeaders;
+        /** @var bool $error it allow to know if the last call has returned an error. $this->core->request->error */
         public $error = false;
+        /** @var array $errorMsg It contains the last errors. $this->core->request->errorMsg */
         public $errorMsg = [];
+        /** @ignore */
         public $options = null;
+        /** @ignore */
         var $rawResult = '';
+        /** @ignore */
         var $automaticHeaders = true; // Add automatically the following headers if exist on config: X-CLOUDFRAMEWORK-SECURITY, X-SERVER-KEY, X-SERVER-KEY, X-DS-TOKEN,X-EXTRA-INFO
+        /** @ignore */
         var $sendSysLogs = true;
+        /** @ignore */
         var $default_options = array('ssl' => array('verify_peer' => false),'http'=>['protocol_version'=>'1.1','ignore_errors'=>'1','follow_location'=>true]);
+        /** @ignore */
         var $cookies = [];
+
+        /**
+         * Class constructor
+         * @ignore
+         * @param Core7 $core
+         */
         function __construct(Core7 &$core)
         {
             $this->core = $core;
