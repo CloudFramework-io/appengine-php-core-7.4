@@ -99,6 +99,7 @@ class CFI
     /**
      * Internal method to return a button
      * @param $button
+     * @param string $align where to show the button in the bottom: right or left
      * @return CFIButton
      */
     private function getButton($button) {
@@ -109,9 +110,10 @@ class CFI
     /**
      * Return a CFIButton $button
      * @param $button_title
+     * @param string $align where to show the button in the bottom: right or left
      * @return CFIButton
      */
-    public function button($button_title='Button') { return $this->getButton($button_title);}
+    public function button($button_title='Button',string $align='right') { return $this->getButton($button_title);}
 
     /**
      * set the title for close button
@@ -318,6 +320,21 @@ class CFIField {
         if($this->cfi->json_object['fields'][$this->field]['type'] = 'iframe') {
             $this->cfi->json_object['fields'][$this->field]['iframe_content'] =$value;
         }
+        return $this;
+    }
+
+    /**
+     * Set how-many cols will be set for the field
+     * @param float $n_cols number of columns to feed: 1,1.5.,2,3
+     * @return CFIField $this
+     */
+    public function cols(float $n_cols) {
+        $n_cols = (!in_array(floatval($n_cols),[1,2,3,1.5]))?1:floatval($n_cols);
+        $class = "";
+        if($n_cols==1.5) $class = "col col-6 ";
+        elseif($n_cols==2) $class = "col col-9 ";
+        elseif($n_cols==3) $class = "col col-12 ";
+        $this->cfi->json_object['fields'][$this->field]['section_class'] = $class;
         return $this;
     }
 }
