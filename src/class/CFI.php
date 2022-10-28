@@ -17,9 +17,10 @@ class CFI
         ,'allow_delete'=>false
         ,'allow_display'=>false
         ,'allow_update'=>false
-        ,'fields'=>[],
-        'buttons'=>[],
-        'close'=>'Cancel'
+        ,'tabs'=>[]
+        ,'fields'=>[]
+        ,'buttons'=>[]
+        ,'close'=>'Cancel'
     ];
 
     /**
@@ -380,6 +381,13 @@ class CFIButton {
      * @return CFIButton $this
      */
     public function align($align) { $this->button['align'] = $align; return $this;}
+
+    /**
+     * Set button align
+     * @param $align
+     * @return CFIButton $this
+     */
+    public function onclick($js) { $this->button['onclick'] = $js; return $this;}
 
     /**
      * Assign url and method for an API call
