@@ -382,12 +382,15 @@ class CFIButton {
      */
     public function align($align) { $this->button['align'] = $align; return $this;}
 
-    /**
-     * Set button align
-     * @param $align
+        /**
+     * Type of Button
+     * @param string $type Type of button: form, api
      * @return CFIButton $this
      */
-    public function onclick($js) { $this->button['onclick'] = $js; return $this;}
+    public function type(string $type) {
+        if(in_array($type,['form','api'])) $this->button['type'] = $type;
+        return $this;
+    }
 
     /**
      * Assign url and method for an API call
@@ -396,5 +399,38 @@ class CFIButton {
      * @return CFIButton $this
      */
     public function url($url,$method='GET') { $this->button['method'] = strtoupper($method);$this->button['url'] = $url; return $this;}
+
+
+    /**
+     * Set button align
+     * @param $align
+     * @return CFIButton $this
+     */
+    public function onclick($js) { $this->button['js'] = $js; $this->button['type'] = 'onclick'; return $this;}
+
+
+    /**
+     * Assign url to call an external API without avoiding the form sending
+     * @param $url
+     * @param string $method optinal var to assign the type of call: GET, POST, PUT, DELETE
+     * @return CFIButton $this
+     */
+    public function apiUrl($url,$method='GET') {
+        $this->button['method'] = strtoupper($method);$this->button['url'] = $url;
+        $this->button['type'] = 'api';
+        return $this;
+    }
+
+    /**
+     * Assign url to call an external API without avoiding the form sending
+     * @param $url
+     * @param string $method optinal var to assign the type of call: GET, POST, PUT, DELETE
+     * @return CFIButton $this
+     */
+    public function formUrl($url,$method='GET') {
+        $this->button['method'] = strtoupper($method);$this->button['url'] = $url;
+        $this->button['type'] = 'form';
+        return $this;
+    }
 
 }
