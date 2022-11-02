@@ -3,11 +3,12 @@
 /**
  * [$cfi = $this->core->loadClass('CFI');] Class CFI to handle CFO app for CloudFrameworkInterface
  * https://www.notion.so/cloudframework/CFI-PHP-Class-c26b2a1dd2254ddd9e663f2f8febe038
- * last_update: 20200502
+ * last_update: 20221003
  * @package CoreClasses
  */
 class CFI
 {
+    private $version = '20221003';
     private $core;
     private $fields = [];
     private $buttons = [];
@@ -16,9 +17,10 @@ class CFI
         ,'allow_delete'=>false
         ,'allow_display'=>false
         ,'allow_update'=>false
-        ,'fields'=>[],
-        'buttons'=>[],
-        'close'=>'Cancel'
+        ,'tabs'=>[]
+        ,'fields'=>[]
+        ,'buttons'=>[]
+        ,'close'=>'Cancel'
     ];
 
     /**
@@ -98,6 +100,7 @@ class CFI
     /**
      * Internal method to return a button
      * @param $button
+     * @param string $align where to show the button in the bottom: right or left
      * @return CFIButton
      */
     private function getButton($button) {
@@ -108,9 +111,10 @@ class CFI
     /**
      * Return a CFIButton $button
      * @param $button_title
+     * @param string $align where to show the button in the bottom: right or left
      * @return CFIButton
      */
-    public function button($button_title='Button') { return $this->getButton($button_title);}
+    public function button($button_title='Button',string $align='right') { return $this->getButton($button_title);}
 
     /**
      * set the title for close button
@@ -195,6 +199,13 @@ class CFIField {
     public function disabled($disabled=true) { $this->cfi->json_object['fields'][$this->field]['disabled'] = $disabled; return $this;}
 
     /**
+     * Set if the field is virtual
+     * @param boolean $virtual optional params. By default true
+     * @return CFIField $this
+     */
+    public function virtual($virtual=true) { $this->cfi->json_object['fields'][$this->field]['virtual'] = $virtual; return $this;}
+
+    /**
      * Set if the field has to be represented as an image
      * @param bool $image
      * @param int $image_with_pixels
@@ -205,6 +216,25 @@ class CFIField {
         $this->cfi->json_object['fields'][$this->field]['image'] = $image;
         if($image_with_pixels) $this->cfi->json_object['fields'][$this->field]['image_width'] = $image_with_pixels;
         if($image_height_pixels) $this->cfi->json_object['fields'][$this->field]['image_height'] = $image_height_pixels;
+
+        return $this;
+    }
+    /**
+     * Set if the field has to be represented as an image
+     * @param bool $image
+     * @param int $image_with_pixels
+     * @param int $image_height_pixels
+     * @return CFIField $this
+     */
+    public function addExternalAPI($title,$url,$method='POST',$js_condition=null) {
+
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'virtual';
+        $this->cfi->json_object['fields'][$this->field]['name'] = 'action';
+
+        if(!isset($this->cfi->json_object['fields'][$this->field]['external_apis']) || !is_array($this->cfi->json_object['fields'][$this->field]['external_apis'])) $this->cfi->json_object['fields'][$this->field]['external_apis'] = [];
+        $external = ['title'=>$title,'url'=>$url,'method'=>$method];
+        if($js_condition) $external['js_condition'] = $js_condition;
+        $this->cfi->json_object['fields'][$this->field]['external_apis'][] = $external;
 
         return $this;
     }
@@ -229,8 +259,6 @@ class CFIField {
         $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea';
         if($title) $this->cfi->json_object['fields'][$this->field]['name'] = $title;
         return $this;}
-    // Deprecated by error
-    public function texarea() { $this->cfi->json_object['fields'][$this->field]['type'] = 'textarea'; return $this;}
 
     /**
      * Set if the field to type select
@@ -247,33 +275,15 @@ class CFIField {
      * Set if the field to type select
      * @return CFIField $this
      */
-    public function html($defaultvalue='') {
-        if($defaultvalue)
-            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
-        $this->cfi->json_object['fields'][$this->field]['type'] = 'html';
-        return $this;
-    }
-    /**
-     * Set if the field to type select
-     * @return CFIField $this
-     */
-    public function multiselect(array $values,$defaultvalue='') {
-        $this->cfi->json_object['fields'][$this->field]['type'] = 'multiselect';
-        $this->cfi->json_object['fields'][$this->field]['values'] = $values;
-        if($defaultvalue)
-            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
-        return $this;
-    }
-
-    /**
-     * Set if the field will be connected with external SQL table/view
-     * @return CFIField $this
-     */
-    public function connectWithBigQuery($table,$fields,$linked_field) {
-        $this->cfi->json_object['fields'][$this->field]['external_values'] = 'bq';
-        $this->cfi->json_object['fields'][$this->field]['entity'] = $table;
-        $this->cfi->json_object['fields'][$this->field]['fields'] = $fields;
-        $this->cfi->json_object['fields'][$this->field]['linked_field'] = $linked_field;
+    public function link(string $url='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'virtual';
+        $this->cfi->json_object['fields'][$this->field]['link'] = true;
+        if($url) {
+            if(!($this->cfi->json_object['fields'][$this->field]['value']??null))
+                $this->cfi->json_object['fields'][$this->field]['value'] = $url;
+            else
+                $this->cfi->json_object['fields'][$this->field]['link_content'] = $url;
+        }
         return $this;
     }
 
@@ -282,9 +292,10 @@ class CFIField {
      * @param $height integer optinal iframe height: default 400
      * @return CFIField $this
      */
-    public function iframe($height=400) {
+    public function iframe($height=400,$url='') {
         $this->cfi->json_object['fields'][$this->field]['type'] = 'iframe';
         $this->cfi->json_object['fields'][$this->field]['iframe_height'] = $height;
+        if($url) $this->cfi->json_object['fields'][$this->field]['iframe_url'] =$url;
         return $this;}
 
     /**
@@ -310,6 +321,21 @@ class CFIField {
         if($this->cfi->json_object['fields'][$this->field]['type'] = 'iframe') {
             $this->cfi->json_object['fields'][$this->field]['iframe_content'] =$value;
         }
+        return $this;
+    }
+
+    /**
+     * Set how-many cols will be set for the field
+     * @param float $n_cols number of columns to feed: 1,1.5.,2,3
+     * @return CFIField $this
+     */
+    public function cols(float $n_cols) {
+        $n_cols = (!in_array(floatval($n_cols),[1,2,3,1.5]))?1:floatval($n_cols);
+        $class = "";
+        if($n_cols==1.5) $class = "col col-6 ";
+        elseif($n_cols==2) $class = "col col-9 ";
+        elseif($n_cols==3) $class = "col col-12 ";
+        $this->cfi->json_object['fields'][$this->field]['section_class'] = $class;
         return $this;
     }
 }
@@ -356,6 +382,16 @@ class CFIButton {
      */
     public function align($align) { $this->button['align'] = $align; return $this;}
 
+        /**
+     * Type of Button
+     * @param string $type Type of button: form, api
+     * @return CFIButton $this
+     */
+    public function type(string $type) {
+        if(in_array($type,['form','api'])) $this->button['type'] = $type;
+        return $this;
+    }
+
     /**
      * Assign url and method for an API call
      * @param $url
@@ -363,5 +399,38 @@ class CFIButton {
      * @return CFIButton $this
      */
     public function url($url,$method='GET') { $this->button['method'] = strtoupper($method);$this->button['url'] = $url; return $this;}
+
+
+    /**
+     * Set button align
+     * @param $align
+     * @return CFIButton $this
+     */
+    public function onclick($js) { $this->button['js'] = $js; $this->button['type'] = 'onclick'; return $this;}
+
+
+    /**
+     * Assign url to call an external API without avoiding the form sending
+     * @param $url
+     * @param string $method optinal var to assign the type of call: GET, POST, PUT, DELETE
+     * @return CFIButton $this
+     */
+    public function apiUrl($url,$method='GET') {
+        $this->button['method'] = strtoupper($method);$this->button['url'] = $url;
+        $this->button['type'] = 'api';
+        return $this;
+    }
+
+    /**
+     * Assign url to call an external API without avoiding the form sending
+     * @param $url
+     * @param string $method optinal var to assign the type of call: GET, POST, PUT, DELETE
+     * @return CFIButton $this
+     */
+    public function formUrl($url,$method='GET') {
+        $this->button['method'] = strtoupper($method);$this->button['url'] = $url;
+        $this->button['type'] = 'form';
+        return $this;
+    }
 
 }

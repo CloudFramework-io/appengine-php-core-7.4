@@ -1,6 +1,6 @@
 <?php
 /**
- * Core classes developend in PHP7.x to be used to develop APIs, Scripts, Web Pages
+ * Core classes developed in ^PHP7.4 to be used to develop APIs, Scripts, Web Pages
  *
  * Core7 class is included in your APIs as $this->core and it includes objects
  * of other classes to facilitate your developments.
@@ -114,7 +114,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     register_shutdown_function( "__fatal_handler" );
 
     /**
-     * Print a group of mixed vars passed as arguments
+     * Print a group of mixed vars passed as arguments. Example _print($object,$array,$class,...)
      */
     function _print()
     {
@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.07011';
+        var $_version = 'v74.10281';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -497,7 +497,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             elseif (is_file($this->system->app_path . "/class/" . $class . ".php"))
                 include_once($this->system->app_path . "/class/" . $class . ".php");
             else {
-                $this->errors->add("Class $class not found");
+                $this->errors->add("Class $class not found in the following paths: [".__DIR__ . "/class/{$class}.php,".$this->system->app_path . "/class/" . $class . ".php]");
                 return null;
             }
             $this->loadedClasses[$hash] = new $class($this, $params);
@@ -990,7 +990,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(isset($_SERVER['HTTP_X_APPENGINE_CITYLATLONG'])) $ret['getData']['latlong'] = $_SERVER['HTTP_X_APPENGINE_CITYLATLONG'];
 
             $ret['http_referer'] = (array_key_exists('HTTP_REFERER',$_SERVER))?$_SERVER['HTTP_REFERER']:'unknown';
-            $ret['time'] = date('Ymdhis');
+            $ret['time'] = date('Ymdhise');
             $ret['uri'] = (isset($_SERVER['REQUEST_URI']))?$_SERVER['REQUEST_URI']:null;
 
 
@@ -2062,6 +2062,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cache_key = null;
         var $cache_iv = null;
         var $secret_vars = null;
+        var $last_key_cache = null;     // To control double read of: readERPDeveloperEncryptedSubKeys
 
 
         function __construct(Core7 &$core)
@@ -2199,6 +2200,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         public function readERPDeveloperEncryptedSubKeys($erp_platform_id='',$erp_user='')
         {
 
+            //avoid to call the method more than once
+            if($this->last_key_cache) {
+                $this->core->logs->add('readERPDeveloperEncryptedSubKeys() has been call more than once. The first one was: '.$this->last_key_cache,'CoreSecurity');
+            }
+
             //region CHECK $erp_platform_id value
             if(!$erp_platform_id || !is_string($erp_platform_id)) {
                 $erp_platform_id = $this->core->config->get('core.erp.platform_id');
@@ -2219,7 +2225,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             //region SET $url, $key_cache, $keys=[];
             $url = 'https://api.cloudframework.io/core/secrets/'.$erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
-            $key_cache = $erp_platform_id.'/my-daily-encryption-subkeys/'.$erp_user;
+            $key_cache = '/my-daily-encryption-subkeys/'.$erp_user;
             $keys = [];
             //endregion
 
@@ -2233,6 +2239,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $keys = $this->core->session->get($key_cache);
             }
             //endregion
+
 
             //region CALL $url and SET $keys if empty $keys
             if(!$keys) {
@@ -2259,6 +2266,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->cache_iv.='__'.$keys['data']['iv'];
             //endregion
 
+            //avoid to call the method more than once
+            $this->last_key_cache = $this->cache_key;
             return true;
         }
 
@@ -3205,7 +3214,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 }
             }
             //endregion
-            return(['header'=>$header,'body'=>$payload]);
+            return(['header'=>$header,'body'=>$payload,'signature'=>$cryptob64]);
         }
 
         /**
@@ -3836,22 +3845,39 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * $this->core->request Class to handle HTTP requests
+     * $this->core->request Object is used to handle http requests
      * @package Core.request
      */
     class CoreRequest
     {
+        /** @ignore */
         protected $core;
+        /** @ignore */
         protected $http;
+        /** @ignore */
         public $responseHeaders;
+        /** @var bool $error it allow to know if the last call has returned an error. $this->core->request->error */
         public $error = false;
+        /** @var array $errorMsg It contains the last errors. $this->core->request->errorMsg */
         public $errorMsg = [];
+        /** @ignore */
         public $options = null;
+        /** @ignore */
         var $rawResult = '';
+        /** @ignore */
         var $automaticHeaders = true; // Add automatically the following headers if exist on config: X-CLOUDFRAMEWORK-SECURITY, X-SERVER-KEY, X-SERVER-KEY, X-DS-TOKEN,X-EXTRA-INFO
+        /** @ignore */
         var $sendSysLogs = true;
+        /** @ignore */
         var $default_options = array('ssl' => array('verify_peer' => false),'http'=>['protocol_version'=>'1.1','ignore_errors'=>'1','follow_location'=>true]);
+        /** @ignore */
         var $cookies = [];
+
+        /**
+         * Class constructor
+         * @ignore
+         * @param Core7 $core
+         */
         function __construct(Core7 &$core)
         {
             $this->core = $core;
@@ -5542,7 +5568,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // To reset cache they have to call $this->resetCache();
             $ret_models = $this->getCache($models);
-
             if(!$ret_models || isset($ret_models['Unknown'])) {
                 $ret_models =  $this->core->request->get_json_decode('https://api.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));
@@ -5643,6 +5668,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                     }
                     // rewrite name of the table
+                    $table = $this->models[$object]['data']['entity'];
                     if(isset($this->models[$object]['data']['interface']['object'])) $table = $this->models[$object]['data']['interface']['object'];
 
                     // Object creation
@@ -5688,7 +5714,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $options['projectId']=$project_id;
                     }
 
-                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) {
+                        $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                        if($options['keyFile']['project_id']??null) $options['projectId'] = $options['keyFile']['project_id'];
+                    }
                     if(!isset($options['namespace']) && isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $options['namespace'] = $this->models[$object]['data']['interface']['namespace'];
                     if(!is_object($object_ds = $this->core->loadClass('DataStore',[$entity,$namespace,$this->models[$object]['data'],$options]))) return;
 
@@ -5708,7 +5737,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                         $options['projectId']=$project_id;
                     }
 
-                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                    if(!isset($options['keyFile']) && isset($this->models[$object]['data']['interface']['secret']) && $this->models[$object]['data']['interface']['secret']) {
+                        $options['keyFile'] = $this->models[$object]['data']['interface']['secret'];
+                        if($options['keyFile']['project_id']??null) $options['projectId'] = $options['keyFile']['project_id'];
+                    }
                     // Object creation
                     if(!is_object($object_bq = $this->core->loadClass('DataBQ',[$dataset,$this->models[$object]['data'],$options]))) return;
                     return($object_bq);

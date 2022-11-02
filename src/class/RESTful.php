@@ -109,6 +109,7 @@ if (!defined("_RESTfull_CLASS_")) {
             }
 
 
+
             // URL splits
             $this->url = (isset($_SERVER['REQUEST_URI']))?str_replace('/_eval/','/',$_SERVER['REQUEST_URI']):'';
             $this->urlParams = '';
@@ -121,6 +122,10 @@ if (!defined("_RESTfull_CLASS_")) {
             $this->service = $url;
             $this->serviceParam = '';
             $this->params = [];
+
+            if($this->core->is->development()) {
+                $this->core->logs->add("Url: [{$this->method}] ". $this->core->system->url['host_url_uri'],'RESTful');
+            }
 
             if (strpos($url, '/') !== false) {
                 list($this->service, $this->serviceParam) = explode('/', $url, 2);
@@ -412,13 +417,20 @@ if (!defined("_RESTfull_CLASS_")) {
             return ($this->error?false:$this->params[$pos]);
         }
 
-        function setError($error, $returnStatus = 400, $returnCode=null, $message='')
+        /**
+         * Set and error to be return in JSON format with status $returnStatus
+         * @param mixed $error Error to show. It can be a string or and array
+         * @param int $returnStatus integer >=200. 400 by default
+         * @param mixed $returnCode optional returnCode
+         * @param string $message
+         */
+        function setError($error, int $returnStatus = 400, $returnCode=null, $message='')
         {
-            $this->error = $returnStatus;
+            $this->error = (intval($returnStatus)<=100)?400:intval($returnStatus);
             $this->errorMsg = $error;
             $this->core->errors->add($error);
             $this->code = (null !== $returnCode)? $returnCode:$returnStatus;
-            $this->message = ($message)?$message:$this->code;
+            $this->message = ($message)?:(is_string($error)?$error:$this->code);
         }
 
         function addHeader($key, $value)

@@ -23,6 +23,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $datastore = null;              // DatastoreClient
         var $error = false;                 // When error true
         var $errorMsg = [];                 // When error array of messages
+        var $options = [];
         var $entity_name = null;
         var $schema = [];
         var $lastQuery = '';
@@ -63,14 +64,16 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             if(!isset($options['transport']) || !$options['transport'])
                 $options['transport'] = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
 
+            $this->options = $options;
             global $datastore;
             $this->project_id = ($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID');
             // Evaluate to use global $datastore for performance or to create a new one object
-            if($this->project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
+            if($this->project_id!=$this->options['projectId'] || (isset($this->options['keyFile']) && $this->options['keyFile']) || !is_object($datastore)) {
                 try {
-                    $this->datastore = new DatastoreClient($options);
-                    $this->project_id = $options['projectId'];
-                    if(isset($options['keyFile'])) $this->service_account = $options['keyFile']['client_email']??null;
+                    if($this->options['keyFile']['project_id']??null) $this->options['projectId'] = $this->options['keyFile']['project_id'];
+                    $this->datastore = new DatastoreClient($this->options);
+                    $this->project_id = $this->options['projectId'];
+                    if(isset($options['keyFile'])) $this->service_account = $this->options['keyFile']['client_email']??null;
                 } catch (Exception $e) {
                     return($this->addError($e->getMessage()));
                 }
