@@ -126,6 +126,7 @@ if (!defined ("_DATAVALIDATION_CLASS_") ) {
          */
         public function transformValue($data, $options) {
 
+            if(!is_string($data)) return $data;
             if(strpos($options,'forcevalue:')!==false) {
                 $data = $this->extractOptionValue('forcevalue:',$options);
                 //if deault is "null"
@@ -199,7 +200,8 @@ if (!defined ("_DATAVALIDATION_CLASS_") ) {
                 case "phone": return is_string($data);
                 case "zip": return is_string($data);
                 case "keyname": return is_string($data);
-                case "key": return is_string($data);
+                case "keyid":
+                case "key": return strval(intval($data)) == $data;
                 case "date": return $this->validateDate($data);
                 case "datetime": return $this->validateDateTime($data);
                 case "datetimeiso": return $this->validateDateTimeISO($data);

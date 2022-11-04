@@ -210,10 +210,11 @@ class CFOs {
     /**
      * Return a bq $object
      * @param $object
-     * @return DataStore
+     * @return DataBQ
      */
     public function bq ($object): DataBQ
     {
+
         if(!isset($this->bqObjects[$object]))
             $this->bqInit($object);
 

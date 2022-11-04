@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.10281';
+        var $_version = 'v74.11041';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -3223,18 +3223,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          *
          * @param string $token  token of the entity of CloudFrameWorkAPIKeys
          * @param string $key   key of the APIKey to evaluate if it exists
-         * @param string $spacename spacename of the data. Default cloudframework.
+         * @param string $namespace spacename of the data. Default cloudframework.
          * @param string $org organization of the entity inside of the spacename. Default common
          * @return bool[]|false[]|mixed|string[]|void
          */
-        public function checkAPIKey($token,$key,$spacename='cloudframework',$org='common') {
+        public function checkAPIKey($token, $key, $namespace='cloudframework', $org='common') {
 
             //Generate hash and evaluate return cached data
-            $hash = md5($token.$key.$spacename.$org);
+            $hash = md5($token.$key.$namespace.$org);
             if($data = $this->getCache($hash)) return $data;
 
             // Call CloudFrameWorkAPIKeys Service
-            $url = 'https://api.cloudframework.io/core/api-keys/'.$spacename.'/'.$org;
+            $url = 'https://api.cloudframework.io/core/api-keys/'.$namespace.'/'.$org;
             $ret = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$key,'X-DS-TOKEN'=>$token]);
             if($this->core->request->error) {
                 $this->addError(['checkAPIKey'=>$this->core->request->errorMsg]);
@@ -5569,7 +5569,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // To reset cache they have to call $this->resetCache();
             $ret_models = $this->getCache($models);
             if(!$ret_models || isset($ret_models['Unknown'])) {
-                $ret_models =  $this->core->request->get_json_decode('https://api.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
+                $ret_models =  $this->core->request->get_json_decode('https://api.cloudframework.io/erp/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));
                 $ret_models = $ret_models['data'];
                 if(!isset($ret_models['Unknown']))
