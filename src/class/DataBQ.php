@@ -41,7 +41,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         var $order = '';
         var $_last_query=null;
         var $_last_query_time=0;
+        var $_lastExecutionMicrotime = 0;
         var $_only_create_query = false;
+        var $debug = false;
         private $joins = [];
         private $queryFields = '';
         private $queryWhere = [];
@@ -61,6 +63,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         {
             $this->core = $core;
             $this->core->__p->add('DataBQ new instance ', $params[0]??'', 'note');
+            if($this->core->is->development()) $this->debug = true;
 
             //region INIT $this->dataset_name,$this->table_name if isset($params[0]) and strpos($params[0],'.')
             if(isset($params[0])){
@@ -333,6 +336,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @return array|void
          */
         private function _query($q,$params=[]) {
+            $start_global_time = microtime(true);
             $this->core->__p->add('DataBQ._query '. substr($q,0,10).'..', '','note');
 
             $n_percentsS = substr_count($q,'%s');
@@ -347,7 +351,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             $this->_last_query = $q;
             if($this->_only_create_query) return [];
-            $start_global_time = microtime(true);
 
             try {
 
@@ -388,6 +391,8 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                             }
                             else {
                                 $this->_last_query_time = round(microtime(true)-$start_global_time,4);
+                                if($this->debug)
+                                    $this->core->logs->add("DataBQ.fetch({$this->_last_query}) [".$this->_last_query_time." secs]",'DataBQ');
                                 return($this->addError($key.' field is of unknown class: '.get_class($value)));
                             }
                         } elseif(is_array($value)) {
@@ -399,6 +404,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 }
                 $this->core->__p->add('DataBQ._query '. substr($q,0,10).'..', '', 'endnote');
                 $this->_last_query_time = round(microtime(true)-$start_global_time,4);
+                if($this->debug)
+                    $this->core->logs->add("DataBQ.fetch({$this->_last_query}) [".$this->_last_query_time." secs]",'DataBQ');
+
                 return $ret;
             } catch (Exception $e) {
                 return($this->addError($e->getMessage()));
@@ -456,17 +464,13 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $ret='';
             foreach ($fields as $i=>$field) {
                 if($ret) $ret.=',';
-                if(strpos($field,'(')!==false) {
-                    $ret.=str_replace('(','(`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.',$field);
-                } else {
-                   if(isset($this->entity_schema['model'][$field][0])) {
+                if(strpos($field,'(')===false && isset($this->entity_schema['model'][$field][0])) {
                         $ret.='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.'.$field;
-                    } else{
-                        $ret.=$field;
-                    }
+                } else{
+                    $ret.=$field;
                 }
-
             }
+
             return $ret;
             //$this->dataset_name.'.'.implode(','.$this->dataset_name.'.',$fields);
 
@@ -1177,7 +1181,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if($fields && is_string($fields)) $fields = explode(',',$fields);
 
             $ret =  $this->getSQLSelectFields($fields);
-            if($ret=='*') $ret='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.*';
 
             foreach ($this->joins as $i=>$join) {
 
