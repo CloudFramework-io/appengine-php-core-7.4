@@ -126,34 +126,35 @@ if (!defined ("_DATAVALIDATION_CLASS_") ) {
          */
         public function transformValue($data, $options) {
 
-            if(!is_string($data)) return $data;
             if(strpos($options,'forcevalue:')!==false) {
                 $data = $this->extractOptionValue('forcevalue:',$options);
                 //if deault is "null"
                 if($data=="null") $data=null;
-            } elseif(strpos($options,'defaultvalue:')!==false && !strlen($data) && !is_bool($data) ) {
+            } elseif(strpos($options,'defaultvalue:')!==false && !$data && !is_bool($data) && (!is_string($data) || !strlen($data)) ) {
                 $data = $this->extractOptionValue('defaultvalue:',$options);
                 //if deault is "null"
                 if($data=="null") $data=null;
             }
 
-            if( strpos($options,'tolowercase')!==false && strlen($data)) (is_array($data))?$data = array_map('strtolower',$data):$data = strtolower($data);
-            if( strpos($options,'touppercase')!==false && strlen($data)) (is_array($data))?$data = array_map('strtoupper',$data):$data = strtoupper($data);
-            if( strpos($options,'trim')!==false && strlen($data)) (is_array($data))?$data = array_map('trim',$data):$data = trim($data);
-            if( strpos($options,'regex_delete:')!==false) {
-                $regex = $this->extractOptionValue("regex_delete:",$options);
-                if(strlen($regex)) {
-                    if(is_array($data)) foreach ($data as &$item) $item = preg_replace("/$regex/",'',$item);
-                    else $data = preg_replace("/$regex/",'',$data);
+            if(is_string($data)) {
+                if( strpos($options,'tolowercase')!==false && strlen($data)) (is_array($data))?$data = array_map('strtolower',$data):$data = strtolower($data);
+                if( strpos($options,'touppercase')!==false && strlen($data)) (is_array($data))?$data = array_map('strtoupper',$data):$data = strtoupper($data);
+                if( strpos($options,'trim')!==false && strlen($data)) (is_array($data))?$data = array_map('trim',$data):$data = trim($data);
+                if( strpos($options,'regex_delete:')!==false) {
+                    $regex = $this->extractOptionValue("regex_delete:",$options);
+                    if(strlen($regex)) {
+                        if(is_array($data)) foreach ($data as &$item) $item = preg_replace("/$regex/",'',$item);
+                        else $data = preg_replace("/$regex/",'',$data);
+                    }
                 }
-            }
 
-            //Convert a string into an array
-            if( strpos($options,'toarray:')!==false && !is_array($data) && is_string($data)) {
-                $sep = $this->extractOptionValue('toarray:',$options);
-                if(strlen($data))
-                    $data = explode($sep,$data);
-                else $data = [];
+                //Convert a string into an array
+                if( strpos($options,'toarray:')!==false && !is_array($data) && is_string($data)) {
+                    $sep = $this->extractOptionValue('toarray:',$options);
+                    if(strlen($data))
+                        $data = explode($sep,$data);
+                    else $data = [];
+                }
             }
 
             //Convert an array into string

@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.11042';
+        var $_version = 'v74.11071';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -6257,7 +6257,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param null|string $app_id string Id of the app to which receive and action
          * @param null|string $title
          * @param null|mixed $data  values to add in bitacora if it is necessary
-         * @return bool|void
+         * @return integer|void It returns the KeyId of the Datastore
          */
         public function bitacora(string $user, string $action, string $solution, string $app, string $app_id=null, string $title=null, $data=null)
         {
@@ -6294,13 +6294,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region $this->dsBitacora->createEntities($entity)
-            $this->dsBitacora->createEntities($entity);
+            $entity = $this->dsBitacora->createEntities($entity)[0]??null;
             if ($this->dsBitacora->error) {
                 $this->addError($this->dsBitacora->errorMsg);
                 return($this->core->logs->add(['data'=>$entity,'error'=>$this->dsLogs->errorMsg],'CFILog_bitacora_error'));
             } else {
                 $this->core->logs->add('CFILog_bitacora_ok');
-                return true;
+                return $entity['KeyId'];
             }
             //endregion
         }

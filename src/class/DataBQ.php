@@ -83,6 +83,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             //region SET $this->client and ($this->dataset, $this->table if $this->dataset_name and $this->table_name exist)
             try {
+                if($this->options['keyFile']['project_id']??null) $this->options['projectId'] = $this->options['keyFile']['project_id'];
                 $this->client = new BigQueryClient($options);
                 if($this->dataset_name) {
                     $this->dataset = $this->client->dataset($this->dataset_name);
@@ -193,7 +194,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 $tables = $dataset->tables();
                 $ret = [];
                 if($tables) foreach ($tables as $table) {
-                    $ret[] = ['table'=>$table->id(),'id'=>$this->project_id.':'.$dataset_name.':'.$table->id(),'query'=>'SELECT * FROM `'.$this->project_id.'.'.$dataset_name.'.'.$table->id().'` limit 10'];
+                    $ret[] = $table->id();
                 }
                 return $ret;
             } catch (Exception $e) {
@@ -1408,6 +1409,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             $datasetInfo = $this->getDataSetInfo();
             if($this->error) {
+                $ret['field_analysis'] ="{$this->dataset_name} DATASET DOES NOT EXIST. Send [fix=1] to repair";
                 $ret['dataset'] = ["name"=>$this->dataset_name,'error'=>$this->errorMsg];
             } else {
                 $ret['dataset'] = $datasetInfo;
@@ -1423,6 +1425,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                             $ret['table']['info'] = $create_table['info'];
                         }
                     } else {
+                        $ret['field_analysis'] ="{$this->dataset_name}.{$this->table_name} TABLE DOES NOT EXIST. Send [fix=1] to repair";
                         $ret['table'] = ["name"=>$this->table_name,'error'=>$this->errorMsg];
                     }
                 } else {
@@ -1449,6 +1452,110 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             }
 
             return $ret;
+        }
+
+
+        /**
+         * Return a structure with bigquery squema based on CF model
+         * @return array
+         */
+        public function getInterfaceModelFromDatasetTable()
+        {
+            $cfo = [
+                'KeyName'=>"{$this->dataset_name}.{$this->table_name}"
+                ,'type'=>'bq'
+                ,'entity'=>"{$this->dataset_name}.{$this->table_name}"
+                ,'extends'=>null
+                ,'GroupName'=>'CFOs'
+                ,'model'=>[
+                    'model'=>[]
+                    ,'bq'=>[]
+                    ,'dependencies'=>[]
+                ]
+                ,'securityAndFields'=>[
+                    'security'=>[
+                        'cfo_locked'=>false,
+                        'user_privileges'=>[],
+                        'user_groups'=>[],
+                        'user_organizations'=>[],
+                        'user_namespaces'=>[],
+                        'allow_update'=>[
+                            'user_privileges'=>[],
+                            'user_groups'=>[],
+                            'user_organizations'=>[],
+                            'user_namespaces'=>[],
+                            'field_values'=>[]],
+                        'allow_display'=>[],
+                        'allow_delete'=>[],
+                        'allow_copy'=>[],
+                        'logs'=>['list'=>false,'display'=>false,'update'=>false,'delete'=>false],
+                        'backups'=>['update'=>false,'delete'=>false]
+                ],
+                    'fields'=>[]]
+                ,'interface'=>[
+                    'object'=>"{$this->dataset_name}.{$this->table_name}"
+                    ,'name'=>$this->table_name.' Report'
+                    ,'plural'=>$this->table_name.' Reports'
+                    ,'ico'=>'building'
+                    ,'modal_size'=>'xl'
+                    ,'secret'=>$this->options['keyFile']??null
+                    ,'filters'=>[]
+                    ,'buttons'=>[]
+                    ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'server_fields'=>null,'server_order'=>null,'server_where'=>null,'server_limit'=>200,'fields'=>[]]]
+                    ,'display_fields'=>null
+                    ,'update_fields'=>null
+                    ,'insert_fields'=>null
+                    ,'copy_fields'=>null
+                    ,'delete_fields'=>null
+                    ,'hooks'=>['on.insert'=>[],'on.update'=>[],'on.delete'=>[]]
+                ]
+            ];
+
+            $is_key = null;
+            if($bq_structure = $this->getDataSetTableInfo()['info']['schema']['fields']??null) {
+                foreach ($bq_structure as $item) {
+                    $cfo['model']['bq'][$item['name']] = $item;
+
+                    $attributues = "index|";
+                    if(in_array($item['name'],['id','KeyName','KeyId'])) {
+                        $attributues.='isKey|';
+                        $is_key=$item['name'];
+                    }
+                    if($item['mode']=='NULLABLE') $attributues.="allowNull|";
+                    $attributues.="description:".str_replace('|',',',$item['description']).'|';
+                    $cfo['model']['model'][$item['name']] = [strtolower($item['type']),$attributues];
+
+                    $cfo['securityAndFields']['fields'][$item['name']] = ['name'=>$item['name']];
+                    if(in_array($item['type'],['DATE','DATETIME','JSON'])) $cfo['securityAndFields']['fields'][$item['name']]['type'] = strtolower($item['type']);
+                    $cfo['securityAndFields']['fields'][$item['name']] = ['name'=>$item['name']];
+
+                    if($item['type']=='RECORD') {
+                        $cfo['model']['model'][$item['name']][0] = 'json';
+                        $cfo['model']['model'][$item['name']][1].= 'record:'.json_encode($item['fields']);
+                        $cfo['securityAndFields']['fields'][$item['name']]['type'] = 'json';
+                        $cfo['securityAndFields']['fields'][$item['name']]['record'] = json_encode($item['fields']);
+                    } else {
+                        $cfo['interface']['views']['default']['fields'][$item['name']] = ['field'=>$item['name']];
+                    }
+                    if($item['mode']=='NULLABLE') $cfo['securityAndFields']['fields'][$item['name']]['allow_empty'] = true;
+                }
+            }
+
+            if($is_key) {
+                $cfo['interface']['buttons'] = [['title'=>"Insert {$this->table_name} Report row",'type'=>'api-insert'],['title'=>"Bulk {$this->table_name} Report rows",'type'=>'api-bulk']];
+                $cfo['interface']['display_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['insert_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['update_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['copy_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['delete_fields'] = [$is_key =>$cfo['interface']['views']['default']['fields'][$is_key]];
+                $cfo['interface']['views']['default']['fields'][$is_key]['display_cfo'] = true;
+                $cfo['interface']['update_fields'][$is_key]['read_only'] = true;
+
+            }
+
+
+
+            return $cfo;
         }
     }
 }
