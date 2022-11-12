@@ -839,6 +839,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
 
                     if(!isset($tables[$table]['updateFields'])) $tables[$table]['updateFields']='';
+
+                    if(is_array($data[$field])) $data[$field] = json_encode($data[$field]);
                     if(strlen($data[$field]) && $data[$field] !=='NULL')
                         $tables[$table]['updateFields'] .= $sep.$field."=".(($fieldTypes[$field]['isNum'])?"%s":"'%s'");
                     else {

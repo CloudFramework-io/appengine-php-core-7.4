@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.11071';
+        var $_version = 'v74.11121';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5681,7 +5681,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     list($type,$entity) = explode(':',$object,2);
                     $namespace = (isset($options['namespace']))?$options['namespace']:$this->core->config->get('DataStoreSpaceName');
                     if(isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $namespace=$this->models[$object]['data']['interface']['namespace'];
-                    if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] paramater'));
+                    if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] parameter'));
 
                     //region EVALUATE extends the object from others
                     if(isset($this->models[$object]['data']['extends']) && $this->models[$object]['data']['extends']) {
