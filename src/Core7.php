@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.11121';
+        var $_version = 'v74.11161';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -491,13 +491,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $hash = hash('md5', $class . json_encode($params));
             if (key_exists($hash, $this->loadedClasses)) return $this->loadedClasses[$hash];
+            $bucket_path = $this->config->get('core.api.extra_path');
 
             if (is_file(__DIR__ . "/class/{$class}.php"))
                 include_once(__DIR__ . "/class/{$class}.php");
             elseif (is_file($this->system->app_path . "/class/" . $class . ".php"))
                 include_once($this->system->app_path . "/class/" . $class . ".php");
-            else {
-                $this->errors->add("Class $class not found in the following paths: [".__DIR__ . "/class/{$class}.php,".$this->system->app_path . "/class/" . $class . ".php]");
+            elseif($bucket_path)
+                @include_once($bucket_path . "/class/" . $class . ".php");
+
+            if(!class_exists($class))
+            {
+                $error = "Class $class not found in the following paths: [";
+                $error.= str_replace($this->system->root_path,'',__DIR__) . "/class/{$class}.php";
+                $error.= ', '.str_replace($this->system->root_path,'',$this->system->app_path) . "/class/" . $class . ".php";
+                if($bucket_path)
+                    $error.= ', '.str_replace($this->system->root_path,'',$bucket_path) . "/class/" . $class . ".php";
+                $error.= ']';
+                $this->errors->add($error);
                 return null;
             }
             $this->loadedClasses[$hash] = new $class($this, $params);
