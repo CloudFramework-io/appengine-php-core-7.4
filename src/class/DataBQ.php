@@ -41,7 +41,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         var $order = '';
         var $_last_query=null;
         var $_last_query_time=0;
+        var $_lastExecutionMicrotime = 0;
         var $_only_create_query = false;
+        var $debug = false;
         private $joins = [];
         private $queryFields = '';
         private $queryWhere = [];
@@ -60,11 +62,15 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         function __construct(Core7 &$core, $params)
         {
             $this->core = $core;
-            $this->core->__p->add('DataBQ new instance ', $params[0], 'note');
+            $this->core->__p->add('DataBQ new instance ', $params[0]??'', 'note');
+            if($this->core->is->development()) $this->debug = true;
 
             //region INIT $this->dataset_name,$this->table_name if isset($params[0]) and strpos($params[0],'.')
-            if(isset($params[0]) && strpos($params[0],'.'))
-                list($this->dataset_name,$this->table_name) = explode('.',$params[0],2);
+            if(isset($params[0])){
+                if(strpos($params[0],'.'))
+                    list($this->dataset_name,$this->table_name) = explode('.',$params[0],2);
+                else $this->dataset_name = $params[0];
+            }
             //endregion
 
             //region SET $this->entity_schema if isset($params[1])
@@ -80,6 +86,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             //region SET $this->client and ($this->dataset, $this->table if $this->dataset_name and $this->table_name exist)
             try {
+                if($this->options['keyFile']['project_id']??null) $this->options['projectId'] = $this->options['keyFile']['project_id'];
                 $this->client = new BigQueryClient($options);
                 if($this->dataset_name) {
                     $this->dataset = $this->client->dataset($this->dataset_name);
@@ -97,16 +104,22 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
         }
 
+        /**
+         * Process Schema
+         * @param $schema
+         * @return bool|void
+         */
         private function processSchema($schema) {
             if(!is_array($schema)) return;
             $this->entity_schema = $schema;
             if(isset($this->entity_schema['model'])) foreach ($this->entity_schema['model'] as $field => $item) {
-                if(isset($item[1]) && stripos($item[1],'isKey')!==false) {
+                if(in_array(strtolower($item[0]),['key','keyid','keyname']) || (isset($item[1]) && stripos($item[1],'isKey')!==false)) {
                     if($this->key) return($this->addError('There is two keys in the model: '.$this->key.','.$field));
                     $this->key = $field;
                 }
                 $this->fields[$field] = $item[0]??'string';
             }
+
             return true;
         }
 
@@ -127,6 +140,125 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @param $boolean
          */
         function onlyCreateQuery($boolean) {$this->_only_create_query = $boolean;}
+
+
+        /**
+         * Return datasets associated to the project
+         * @return array|void
+         */
+        public function getDataSets() {
+            try {
+                $datasets = $this->client->datasets();
+                $ret = [];
+                foreach ($datasets as $dataset) {
+                    $ret[] = $dataset->id();
+                }
+                return $ret;
+            } catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                $this->addError(['bigquery'=>$error]);
+            }
+        }
+
+        /**
+         * Return datasets associated to the project
+         * @return array|void
+         */
+        public function getDataSetInfo($dataset_name=null) {
+            if(!$dataset_name) $dataset_name = $this->dataset_name;
+            try {
+                $dataset = null;
+                if($dataset_name != $this->dataset_name) {
+                    $dataset = $this->client->dataset($dataset_name);
+                } else {
+                    $dataset = &$this->dataset;
+                }
+                return $dataset->info();
+
+            } catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                $this->addError(['bigquery'=>$error]);
+            }
+        }
+
+        /**
+         * Return datasets associated to the project
+         * @return array|void
+         */
+        public function getDataSetTables($dataset_name=null) {
+            if(!$dataset_name) $dataset_name = $this->dataset_name;
+            try {
+                $dataset = null;
+                if($dataset_name != $this->dataset_name) {
+                    $dataset = $this->client->dataset($dataset_name);
+                } else {
+                    $dataset = &$this->dataset;
+                }
+                $tables = $dataset->tables();
+                $ret = [];
+                if($tables) foreach ($tables as $table) {
+                    $ret[] = $table->id();
+                }
+                return $ret;
+            } catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                $this->addError(['bigquery'=>$error]);
+            }
+        }
+
+        /**
+         * Return datasets associated to the project
+         * @return array|void
+         */
+        public function getDataSetTableInfo($dataset_name=null,$table_name=null) {
+            if(!$dataset_name) $dataset_name = $this->dataset_name;
+            if(!$table_name) $table_name = $this->table_name;
+            try {
+                $dataset = null;
+                if($dataset_name != $this->dataset_name) {
+                    $dataset = $this->client->dataset($dataset_name);
+                    $table = $dataset->table($table_name);
+                } else {
+                    $dataset = &$this->dataset;
+                    $table = null;
+                    if($table_name != $this->table_name) {
+                        $table = $dataset->table($table_name);
+                    } else {
+                        $table = &$this->table;
+                    }
+                }
+                return ['table'=>$table->id(),'id'=>$this->project_id.':'.$dataset_name.':'.$table->id(),'query'=>'SELECT * FROM `'.$this->project_id.'.'.$dataset_name.'.'.$table->id().'` limit 10','info'=>$table->info()];
+
+            } catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                $this->addError(['bigquery'=>$error]);
+            }
+        }
+
+        /**
+         * Return datasets associated to the project
+         * @return array|void
+         */
+        public function createDataSetTableInfo(array $fields, $dataset_name=null,$table_name=null) {
+            if(!$dataset_name) $dataset_name = $this->dataset_name;
+            if(!$table_name) $table_name = $this->table_name;
+            try {
+                $dataset = null;
+                if($dataset_name != $this->dataset_name) {
+                    $dataset = $this->client->dataset($dataset_name);
+                    $table = $dataset->table($table_name);
+                } else {
+                    $dataset = &$this->dataset;
+                }
+
+                $table = $dataset->createTable($table_name, ['schema' => $fields]);
+                return(['table'=>'`'.$this->project_id.'.'.$dataset_name.'.'.$table->id().'`','info'=>$table->info()]);
+
+            } catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                $this->addError(['bigquery'=>$error]);
+            }
+        }
 
         /**
          * Execute a Query with a title
@@ -204,6 +336,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @return array|void
          */
         private function _query($q,$params=[]) {
+            $start_global_time = microtime(true);
             $this->core->__p->add('DataBQ._query '. substr($q,0,10).'..', '','note');
 
             $n_percentsS = substr_count($q,'%s');
@@ -218,7 +351,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             $this->_last_query = $q;
             if($this->_only_create_query) return [];
-            $start_global_time = microtime(true);
 
             try {
 
@@ -253,9 +385,14 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                             }elseif(get_class($value)=='Google\Cloud\BigQuery\Numeric') {
                                 /** @var Google\Cloud\BigQuery\Numeric $row[$key] */
                                 $row[$key] = $value->get();
+                            }elseif(get_class($value)=='DateTime') {
+                                /** @var DateTime $row[$key] */
+                                $row[$key] = $value->format('Y-m-d H:i:s');
                             }
                             else {
                                 $this->_last_query_time = round(microtime(true)-$start_global_time,4);
+                                if($this->debug)
+                                    $this->core->logs->add("DataBQ.fetch({$this->_last_query}) [".$this->_last_query_time." secs]",'DataBQ');
                                 return($this->addError($key.' field is of unknown class: '.get_class($value)));
                             }
                         } elseif(is_array($value)) {
@@ -267,10 +404,14 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 }
                 $this->core->__p->add('DataBQ._query '. substr($q,0,10).'..', '', 'endnote');
                 $this->_last_query_time = round(microtime(true)-$start_global_time,4);
+                if($this->debug)
+                    $this->core->logs->add("DataBQ.fetch({$this->_last_query}) [".$this->_last_query_time." secs]",'DataBQ');
+
                 return $ret;
             } catch (Exception $e) {
                 return($this->addError($e->getMessage()));
             }
+
         }
 
         /**
@@ -323,17 +464,13 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             $ret='';
             foreach ($fields as $i=>$field) {
                 if($ret) $ret.=',';
-                if(strpos($field,'(')!==false) {
-                    $ret.=str_replace('(','(`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.',$field);
-                } else {
-                   if(isset($this->entity_schema['model'][$field][0])) {
+                if(strpos($field,'(')===false && isset($this->entity_schema['model'][$field][0])) {
                         $ret.='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.'.$field;
-                    } else{
-                        $ret.=$field;
-                    }
+                } else{
+                    $ret.=$field;
                 }
-
             }
+
             return $ret;
             //$this->dataset_name.'.'.implode(','.$this->dataset_name.'.',$fields);
 
@@ -549,24 +686,27 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             return($ret);
         }
 
-        /**dele
+        /**
          * Update a record in db
          * It requires to add always the following condition: and _created < TIMESTAMP_SUB(_created, INTERVAL 30 MINUTE)
          * because you can not update or delete records inserted before 30' has passed
          * @param $data
          * @return bool|null|void
          */
-        public function update($data) {
+        public function update($data,$record_readed=[]) {
             if(!is_array($data) ) return($this->addError('update($data) $data has to be an array with key->value'));
             if(!isset($this->entity_schema['model'])) return $this->addError('update($data) there is no model defined');
             if(!$this->key) return $this->addError('update($data) there is no $this->key defined');
             if(!isset($data[$this->key]) || !$data[$this->key]) return $this->addError('update($data) missing key field in $data: '.$this->key);
             if(count($data)<2) return $this->addError('update($data) there is no fields to update ');
 
-            $ret = $this->fetchByKeys($data[$this->key]);
-            if($this->error) return($this->addError('update($data) error calling $this->fetchByKeys($data[$this->key])'));
-            if(!$ret) return($this->addError('update($data) contains a key that does not exist in the dataset: '.$this->key.'='.$data[$this->key]));
+            if(!$record_readed) {
+                $record_readed = $this->fetchByKeys($data[$this->key]);
+                if ($this->error) return ($this->addError('update($data) error calling $this->fetchByKeys($data[$this->key])'));
+            }
+            if(!$record_readed) return($this->addError('update($data) contains a key that does not exist in the dataset: '.$this->key.'='.$data[$this->key]));
 
+            foreach ($data as $field=>$value) if(!isset($this->entity_schema['model'][$field])) unset($data[$field]);
             $_sql = "UPDATE `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` SET ";
             $set = "";
             $params = [];
@@ -590,6 +730,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 $params[] = $value;
 
             }
+            $set.=',_updated=CURRENT_TIMESTAMP()';
 
             $_sql.=$set." WHERE {$this->key}=";
             if(isset($this->entity_schema['model'][$this->key][0]) &&  in_array($this->entity_schema['model'][$this->key][0],['integer','float','boolean'])) $_sql.='%s';
@@ -601,25 +742,57 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
         /**
          * Update a record in db
+         * It requires to add always the following condition: and _created < TIMESTAMP_SUB(_created, INTERVAL 30 MINUTE)
+         * because you can not update or delete records inserted before 30' has passed
          * @param $data
          * @return bool|null|void
          */
-        public function insert($data) {
+        public function softDelete($key) {
+            if(!$key ) return($this->addError('softDelete($key) $key has to be an array with key->value'));
+            if(!isset($this->entity_schema['model'])) return $this->addError('softDelete($key) there is no model defined');
+            if(!$this->key) return $this->addError('softDelete($key) there is no $this->key defined');
+            $_sql = "UPDATE `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` SET _deleted=CURRENT_TIMESTAMP() WHERE {$this->key}=";
+            if(isset($this->entity_schema['model'][$this->key][0]) &&  in_array($this->entity_schema['model'][$this->key][0],['integer','float','boolean'])) $_sql.='%s';
+            else $_sql.='"%s"';
+            $params[] = $key;
+            return $this->_query($_sql,$params);
+        }
+
+        /**
+         * Upsert a record in db
+         * @param $data
+         * @return bool|null|void
+         */
+        public function upsert($data)
+        {
+            return $this->insert($data,true);
+        }
+
+        /**
+         * Insert a record in db. If $upsert is true and the record exist then update it
+         * @param $data
+         * @param bool $upsert
+         * @return bool|null|void
+         */
+        public function insert($data, $upsert=false) {
             if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
             if(!isset($this->entity_schema['model'])) return $this->addError('insert($data) there is no model defined');
-            if(!$this->key) return $this->addError('insert($data) there is no $this->key defined');
-            if(!isset($data[$this->key]) || !$data[$this->key]) return $this->addError('insert($data) missing key field in $data: '.$this->key);
 
-            $ret = $this->fetchByKeys($data[$this->key]);
-            if($this->error) return($this->addError('insert($data) error calling $this->fetchByKeys($data[$this->key])'));
-            if($ret) return($this->addError('insert($data) contains a key that already exist in the dataset: '.$this->key.'='.$data[$this->key]));
+            if($this->key) {
+                if(!isset($data[$this->key]) || !$data[$this->key]) return $this->addError('insert($data) missing key field in $data: '.$this->key);
+                $record_readed = $this->fetchByKeys($data[$this->key]);
+                if($this->error) return($this->addError('insert($data) error calling $this->fetchByKeys($data[$this->key])'));
+                if($record_readed) {
+                    if($upsert) return $this->update($data,$record_readed);
+                    else return($this->addError('insert($data) contains a key that already exist in the dataset: '.$this->key.'='.$data[$this->key]));
+                }
+            }
 
-            $_sql = "INSERT INTO  `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` (".implode(',',array_keys($data)).",_created) values(";
+            foreach ($data as $field=>$value) if(!isset($this->entity_schema['model'][$field])) unset($data[$field]);
+            $_sql = "INSERT INTO  `{$this->project_id}.{$this->dataset_name}.{$this->table_name}` (".implode(',',array_keys($data)).",_created,_updated) values(";
             $set = "";
             $params = [];
             foreach ($data as $field=>$value) {
-                if(isset($this->entity_schema['model']) && !isset($this->entity_schema['model'][$field]))
-                    return $this->addError('update($data) has received a field not included in the model: '.$field);
 
                 if($set) $set.=', ';
 
@@ -636,9 +809,55 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 $params[] = $value;
 
             }
-            $_sql.=$set.',CURRENT_TIMESTAMP())';
+            $_sql.=$set.',CURRENT_TIMESTAMP(),CURRENT_TIMESTAMP())';
             return $this->_query($_sql,$params);
 
+        }
+
+        /**
+         * Streaming Insert a record in db. It couldn't be deleted or updated before 30' after insertion
+         * @param $data
+         * @return bool|null|void
+         */
+        public function insertWithStreamingBuffer($data) {
+            if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
+            if(!isset($this->entity_schema['model'])) return $this->addError('insert($data) there is no model defined');
+            if(!$this->table) return $this->addError('insert($data) there is $this->table initiated');
+            if(!$data || !is_array($data)) return($this->addError('insert($data) $data has received an empty or non array value'));
+            if(!isset($data[0])) $data = [$data];
+
+            //region PREPARE $bq_data from $data to be inserted and adding _created field
+            $bq_data = [];
+            foreach ($data as $i=>$record) {
+                // Delete unused records
+                foreach ($record as $key=>$datum)
+                    if(!isset($this->entity_schema['model'][$key])) unset($data[$i][$key]);
+
+                if(!$data[$i]) return($this->addError('insert($data) $data has received fields to be inserted'));
+                $data[$i]['_updated'] = 'AUTO';
+                $data[$i]['_created'] = 'AUTO';
+
+                $bq_data[] = ['data'=>&$data[$i]];
+            }
+            //endregion
+
+            //region INSERT ROWS
+            try {
+                $insertResponse = $this->table->insertRows($bq_data);
+                if (!$insertResponse->isSuccessful())  {
+                    foreach ($insertResponse->failedRows() as $row) {
+                        foreach ($row['errors'] as $error) {
+                            return $this->addError($error);
+                        }
+                    }
+                }
+            }  catch (Exception $e) {
+                $error = $e->getMessage();
+                return($this->addError(['bigquery'=>$error]));
+            }
+            //endregion
+
+            return $bq_data;
         }
 
         /**
@@ -646,7 +865,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @param $data
          * @return bool|null|void
          */
-        public function insertWithStreamingBuffer($data) {
+        public function _insertWithStreamingBuffer($data) {
             if(!$this->table ) return($this->addError('insert($data) called but there is not $this->table assigned'));
             if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
             if(!isset($data[0])) $data = [$data];
@@ -657,6 +876,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             foreach ($data as $i=>$foo) {
                 //region ADD _created field required from CLOUDFRAMEWORK
                 $data[$i]['_created'] = 'AUTO';
+                $data[$i]['_updated'] = 'AUTO';
                 //endregion
                 $bq_data[] = ['data'=>&$data[$i]];
                 if($this->key){
@@ -961,7 +1181,6 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if($fields && is_string($fields)) $fields = explode(',',$fields);
 
             $ret =  $this->getSQLSelectFields($fields);
-            if($ret=='*') $ret='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.*';
 
             foreach ($this->joins as $i=>$join) {
 
@@ -1128,12 +1347,218 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         }
 
         /**
-         * Return the json schema based on the table in the database
-         * @return mixed|null
+         * Return a structure with bigquery squema based on CF model
+         * @return array
          */
-        public function getSimpleModelFromTable() {
-            if(!$this->core->model->dbInit()) return;
-            return($this->core->model->db->getSimpleModelFromTable($this->table_name));
+        public function getBigQueryStructure() {
+            
+            $bq_structure = [];
+            foreach ($this->entity_schema['model'] as $field_name=>$item) {
+                $field = ["name"=>$field_name];
+                switch (strtolower($item[0])) {
+                    case "string":
+                        $field['type'] = "STRING";
+                        break;
+                    case "timestamp":
+                        $field['type'] = "TIMESTAMP";
+                        break;
+                    case "boolean":
+                        $field['type'] = "BOOLEAN";
+                        break;
+                    case "integer":
+                        $field['type'] = "INTEGER";
+                        break;
+                    case "float":
+                        $field['type'] = "FLOAT";
+                        break;
+                    case "date":
+                        $field['type'] = "DATE";
+                        break;
+                    case "datetime":
+                        $field['type'] = "DATETIME";
+                        break;
+                    default:
+                        $field['type'] = "STRING";
+                        break;
+                }
+                $field['mode'] = (($item[1]??null) && stripos($item[1],'allownull'))?'NULLABLE':'REQUIRED';
+                $field['description'] = "";
+                if(($item[1]??null) && stripos($item[1],'description:')) {
+                    list($foo, $description) = explode('description:',$item[1],2);
+                    $description = preg_replace('/\|.*/','',$description);
+                    $field['description'] = $description;
+                }
+
+                $bq_structure[] = $field;
+            }
+
+            if(!isset($this->entity_schema['model']['_created']))
+                $bq_structure[] = ['name'=>'_created','mode'=>'NULLABLE','type'=>"TIMESTAMP",'description'=>"Internal Field for CFO"];
+            if(!isset($this->entity_schema['model']['_updated']))
+                $bq_structure[] = ['name'=>'_updated','mode'=>'NULLABLE','type'=>"TIMESTAMP",'description'=>"Internal Field for CFO"];
+            if(!isset($this->entity_schema['model']['_deleted']))
+                $bq_structure[] = ['name'=>'_deleted','mode'=>'NULLABLE','type'=>"TIMESTAMP",'description'=>"Internal Field for CFO"];
+            return ['fields'=>$bq_structure];
+        }
+
+        /**
+         * Return a structure with bigquery squema based on CF model
+         * @return array
+         */
+        public function checkBigQueryStructure($fix=false) {
+
+
+            $ret = ['project'=>$this->project_id,'field_analysis'=>[]];
+
+            $datasetInfo = $this->getDataSetInfo();
+            if($this->error) {
+                $ret['field_analysis'] ="{$this->dataset_name} DATASET DOES NOT EXIST. Send [fix=1] to repair";
+                $ret['dataset'] = ["name"=>$this->dataset_name,'error'=>$this->errorMsg];
+            } else {
+                $ret['dataset'] = $datasetInfo;
+                $tableInfo = $this->getDataSetTableInfo();
+                if($this->error) {
+                    if($fix && ($this->errorMsg[0]['bigquery']['error']['code']??0)==404) {
+                        $this->error = false;
+                        $this->errorMsg = [];
+                        $create_table = $this->createDataSetTableInfo($this->getBigQueryStructure());
+                        if($this->error) {
+                            $ret['table'] = ["name"=>$this->table_name,'error'=>$this->errorMsg];
+                        } else {
+                            $ret['table']['info'] = $create_table['info'];
+                        }
+                    } else {
+                        $ret['field_analysis'] ="{$this->dataset_name}.{$this->table_name} TABLE DOES NOT EXIST. Send [fix=1] to repair";
+                        $ret['table'] = ["name"=>$this->table_name,'error'=>$this->errorMsg];
+                    }
+                } else {
+                    $ret['table'] = $tableInfo;
+                }
+            }
+
+            if(!$this->error) {
+                $ret['field_analysis'] =[];
+
+                $structure_from_model = [];
+                $structure_from_bq = [];
+                foreach ($this->getBigQueryStructure()['fields'] as $field) $structure_from_model[$field['name']] = $field;
+                foreach ($ret['table']['info']['schema']['fields'] as $field) $structure_from_bq[$field['name']] = $field;
+
+                foreach ($structure_from_model as $field=>$item) {
+
+                    $ret['field_analysis'][$field] = "OK";
+                    if(!isset($structure_from_bq[$field])) $ret['field_analysis'][$field] = 'ERROR: Field does not exist';
+                    else if(($structure_from_bq[$field]['type']??null) != $item['type']) $ret['field_analysis'][$field] = 'ERROR: type does not match';
+                    else if(($structure_from_bq[$field]['mode']??null) != $item['mode']) $ret['field_analysis'][$field] = 'ERROR: mode does not match';
+                }
+
+            }
+
+            return $ret;
+        }
+
+
+        /**
+         * Return a structure with bigquery squema based on CF model
+         * @return array
+         */
+        public function getInterfaceModelFromDatasetTable()
+        {
+            $cfo = [
+                'KeyName'=>"{$this->dataset_name}.{$this->table_name}"
+                ,'type'=>'bq'
+                ,'entity'=>"{$this->dataset_name}.{$this->table_name}"
+                ,'extends'=>null
+                ,'GroupName'=>'CFOs'
+                ,'model'=>[
+                    'model'=>[]
+                    ,'bq'=>[]
+                    ,'dependencies'=>[]
+                ]
+                ,'securityAndFields'=>[
+                    'security'=>[
+                        'cfo_locked'=>false,
+                        'user_privileges'=>[],
+                        'user_groups'=>[],
+                        'user_organizations'=>[],
+                        'user_namespaces'=>[],
+                        'allow_update'=>[
+                            'user_privileges'=>[],
+                            'user_groups'=>[],
+                            'user_organizations'=>[],
+                            'user_namespaces'=>[],
+                            'field_values'=>[]],
+                        'allow_display'=>[],
+                        'allow_delete'=>[],
+                        'allow_copy'=>[],
+                        'logs'=>['list'=>false,'display'=>false,'update'=>false,'delete'=>false],
+                        'backups'=>['update'=>false,'delete'=>false]
+                ],
+                    'fields'=>[]]
+                ,'interface'=>[
+                    'object'=>"{$this->dataset_name}.{$this->table_name}"
+                    ,'name'=>$this->table_name.' Report'
+                    ,'plural'=>$this->table_name.' Reports'
+                    ,'ico'=>'building'
+                    ,'modal_size'=>'xl'
+                    ,'secret'=>$this->options['keyFile']??null
+                    ,'filters'=>[]
+                    ,'buttons'=>[]
+                    ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'server_fields'=>null,'server_order'=>null,'server_where'=>null,'server_limit'=>200,'fields'=>[]]]
+                    ,'display_fields'=>null
+                    ,'update_fields'=>null
+                    ,'insert_fields'=>null
+                    ,'copy_fields'=>null
+                    ,'delete_fields'=>null
+                    ,'hooks'=>['on.insert'=>[],'on.update'=>[],'on.delete'=>[]]
+                ]
+            ];
+
+            $is_key = null;
+            if($bq_structure = $this->getDataSetTableInfo()['info']['schema']['fields']??null) {
+                foreach ($bq_structure as $item) {
+                    $cfo['model']['bq'][$item['name']] = $item;
+
+                    $attributues = "index|";
+                    if(in_array($item['name'],['id','KeyName','KeyId'])) {
+                        $attributues.='isKey|';
+                        $is_key=$item['name'];
+                    }
+                    if($item['mode']=='NULLABLE') $attributues.="allowNull|";
+                    $attributues.="description:".str_replace('|',',',$item['description']).'|';
+                    $cfo['model']['model'][$item['name']] = [strtolower($item['type']),$attributues];
+
+                    $cfo['securityAndFields']['fields'][$item['name']] = ['name'=>$item['name']];
+                    if(in_array($item['type'],['DATE','DATETIME','JSON'])) $cfo['securityAndFields']['fields'][$item['name']]['type'] = strtolower($item['type']);
+                    $cfo['securityAndFields']['fields'][$item['name']] = ['name'=>$item['name']];
+
+                    if($item['type']=='RECORD') {
+                        $cfo['model']['model'][$item['name']][0] = 'json';
+                        $cfo['model']['model'][$item['name']][1].= 'record:'.json_encode($item['fields']);
+                        $cfo['securityAndFields']['fields'][$item['name']]['type'] = 'json';
+                        $cfo['securityAndFields']['fields'][$item['name']]['record'] = json_encode($item['fields']);
+                    } else {
+                        $cfo['interface']['views']['default']['fields'][$item['name']] = ['field'=>$item['name']];
+                    }
+                    if($item['mode']=='NULLABLE') $cfo['securityAndFields']['fields'][$item['name']]['allow_empty'] = true;
+                }
+            }
+
+            if($is_key) {
+                $cfo['interface']['buttons'] = [['title'=>"Insert {$this->table_name} Report row",'type'=>'api-insert'],['title'=>"Bulk {$this->table_name} Report rows",'type'=>'api-bulk']];
+                $cfo['interface']['display_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['insert_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['update_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['copy_fields'] = $cfo['interface']['views']['default']['fields'];
+                $cfo['interface']['delete_fields'] = [$is_key =>$cfo['interface']['views']['default']['fields'][$is_key]];
+                $cfo['interface']['views']['default']['fields'][$is_key]['display_cfo'] = true;
+                $cfo['interface']['update_fields'][$is_key]['read_only'] = true;
+
+            }
+
+
+
+            return $cfo;
         }
     }
 }

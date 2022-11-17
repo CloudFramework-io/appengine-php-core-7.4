@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.10281';
+        var $_version = 'v74.11161';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -491,13 +491,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $hash = hash('md5', $class . json_encode($params));
             if (key_exists($hash, $this->loadedClasses)) return $this->loadedClasses[$hash];
+            $bucket_path = $this->config->get('core.api.extra_path');
 
             if (is_file(__DIR__ . "/class/{$class}.php"))
                 include_once(__DIR__ . "/class/{$class}.php");
             elseif (is_file($this->system->app_path . "/class/" . $class . ".php"))
                 include_once($this->system->app_path . "/class/" . $class . ".php");
-            else {
-                $this->errors->add("Class $class not found in the following paths: [".__DIR__ . "/class/{$class}.php,".$this->system->app_path . "/class/" . $class . ".php]");
+            elseif($bucket_path)
+                @include_once($bucket_path . "/class/" . $class . ".php");
+
+            if(!class_exists($class))
+            {
+                $error = "Class $class not found in the following paths: [";
+                $error.= str_replace($this->system->root_path,'',__DIR__) . "/class/{$class}.php";
+                $error.= ', '.str_replace($this->system->root_path,'',$this->system->app_path) . "/class/" . $class . ".php";
+                if($bucket_path)
+                    $error.= ', '.str_replace($this->system->root_path,'',$bucket_path) . "/class/" . $class . ".php";
+                $error.= ']';
+                $this->errors->add($error);
                 return null;
             }
             $this->loadedClasses[$hash] = new $class($this, $params);
@@ -3223,18 +3234,18 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          *
          * @param string $token  token of the entity of CloudFrameWorkAPIKeys
          * @param string $key   key of the APIKey to evaluate if it exists
-         * @param string $spacename spacename of the data. Default cloudframework.
+         * @param string $namespace spacename of the data. Default cloudframework.
          * @param string $org organization of the entity inside of the spacename. Default common
          * @return bool[]|false[]|mixed|string[]|void
          */
-        public function checkAPIKey($token,$key,$spacename='cloudframework',$org='common') {
+        public function checkAPIKey($token, $key, $namespace='cloudframework', $org='common') {
 
             //Generate hash and evaluate return cached data
-            $hash = md5($token.$key.$spacename.$org);
+            $hash = md5($token.$key.$namespace.$org);
             if($data = $this->getCache($hash)) return $data;
 
             // Call CloudFrameWorkAPIKeys Service
-            $url = 'https://api.cloudframework.io/core/api-keys/'.$spacename.'/'.$org;
+            $url = 'https://api.cloudframework.io/core/api-keys/'.$namespace.'/'.$org;
             $ret = $this->core->request->get_json_decode($url,null,['X-WEB-KEY'=>$key,'X-DS-TOKEN'=>$token]);
             if($this->core->request->error) {
                 $this->addError(['checkAPIKey'=>$this->core->request->errorMsg]);
@@ -5569,7 +5580,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // To reset cache they have to call $this->resetCache();
             $ret_models = $this->getCache($models);
             if(!$ret_models || isset($ret_models['Unknown'])) {
-                $ret_models =  $this->core->request->get_json_decode('https://api.cloudframework.io/core/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
+                $ret_models =  $this->core->request->get_json_decode('https://api.cloudframework.io/erp/models/export',['models'=>$models],['X-WEB-KEY'=>$api_key]);
                 if($this->core->request->error)  return($this->addError($this->core->request->errorMsg));
                 $ret_models = $ret_models['data'];
                 if(!isset($ret_models['Unknown']))
@@ -5681,7 +5692,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     list($type,$entity) = explode(':',$object,2);
                     $namespace = (isset($options['namespace']))?$options['namespace']:$this->core->config->get('DataStoreSpaceName');
                     if(isset($this->models[$object]['data']['interface']['namespace']) && $this->models[$object]['data']['interface']['namespace']) $namespace=$this->models[$object]['data']['interface']['namespace'];
-                    if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] paramater'));
+                    if(empty($namespace)) return($this->addError('Missing DataStoreSpaceName config var or $options["namespace"] parameter'));
 
                     //region EVALUATE extends the object from others
                     if(isset($this->models[$object]['data']['extends']) && $this->models[$object]['data']['extends']) {
@@ -6257,7 +6268,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param null|string $app_id string Id of the app to which receive and action
          * @param null|string $title
          * @param null|mixed $data  values to add in bitacora if it is necessary
-         * @return bool|void
+         * @return integer|void It returns the KeyId of the Datastore
          */
         public function bitacora(string $user, string $action, string $solution, string $app, string $app_id=null, string $title=null, $data=null)
         {
@@ -6294,13 +6305,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
             //region $this->dsBitacora->createEntities($entity)
-            $this->dsBitacora->createEntities($entity);
+            $entity = $this->dsBitacora->createEntities($entity)[0]??null;
             if ($this->dsBitacora->error) {
                 $this->addError($this->dsBitacora->errorMsg);
                 return($this->core->logs->add(['data'=>$entity,'error'=>$this->dsLogs->errorMsg],'CFILog_bitacora_error'));
             } else {
                 $this->core->logs->add('CFILog_bitacora_ok');
-                return true;
+                return $entity['KeyId'];
             }
             //endregion
         }

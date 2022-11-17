@@ -839,6 +839,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
 
                     if(!isset($tables[$table]['updateFields'])) $tables[$table]['updateFields']='';
+
+                    if(is_array($data[$field])) $data[$field] = json_encode($data[$field]);
                     if(strlen($data[$field]) && $data[$field] !=='NULL')
                         $tables[$table]['updateFields'] .= $sep.$field."=".(($fieldTypes[$field]['isNum'])?"%s":"'%s'");
                     else {
@@ -1160,12 +1162,23 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
             if($this->tableExists($table)) {
                 $tmp['explain'] = $this->getDataFromQuery("SHOW FULL COLUMNS FROM %s", $table);
-                $tmp['index'] = $this->getDataFromQuery('SHOW INDEX FROM %s;',array($table));
+                $tmp['SQL_FIELDS'] = [];
+                $tmp['indexes'] = $this->getDataFromQuery('SHOW INDEX FROM %s;',array($table));
                 $tmp['SQL'] = $this->getDataFromQuery('SHOW CREATE TABLE %s;',array($table))[0];
-                $tmp['SCHEMA'] = $this->getDataFromQuery('SELECT * FROM information_schema.TABLES WHERE TABLE_NAME = "%s"',array($table))[0];
-                //$tmp['TRIGGERS'] = $this->getDataFromQuery('SHOW TRIGGERS IN %s;',array($table));
+                $tmp['TABLE_SCHEMA'] = $this->getDataFromQuery('SELECT * FROM information_schema.TABLES WHERE TABLE_NAME = "%s"',array($table))[0];
+                $tmp['triggers'] = $this->getDataFromQuery('SHOW TRIGGERS IN %s LIKE "%s";',array($this->_dbdatabase,$table));
+                $tmp['TRIGGERS'] = [];
+                $tmp['INDEXES'] = [];
+                if($tmp['triggers']) foreach ($tmp['triggers'] as $trigger) {
+                    $tmp['TRIGGERS'][$trigger['Event'].':'.$trigger['Trigger']] = $trigger;
+                }
+                if($tmp['indexes']) foreach ($tmp['indexes'] as $index) {
+                    $tmp['INDEXES'][$index['Key_name'].':'.$index['Column_name']] = $index;
+                }
 
                 foreach ($tmp['explain'] as $key => $value) {
+
+                    $tmp['SQL_FIELDS'][$value['Field']] = $value;
 
                     // TYPE OF THE FIELD
                     $tmp['Fields'][$value['Field']]['type'] = $value['Type'];
@@ -1193,7 +1206,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                 // CHECK if there is multiple Uniques id's
                 $indexes = [];
-                foreach($tmp['index'] as $index=>$indexValues) {
+                foreach($tmp['indexes'] as $index=>$indexValues) {
                     if($indexValues['Key_name']=='PRIMARY') $indexes[$indexValues['Column_name']]['primary'][] = $indexValues['Column_name'];
                     elseif($indexValues['Non_unique']=="0") $indexes[$indexValues['Key_name']]['unique'][] = $indexValues['Column_name'];
                     elseif($indexValues['Non_unique']=="1") $indexes[$indexValues['Key_name']]['index'][] = $indexValues['Column_name'];
@@ -1209,16 +1222,15 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     }
 
                 return (['table_exists'=>true,'model'=>['table' => $table
-                    , 'description' => $tmp['SCHEMA']['TABLE_COMMENT']
-                    , 'engine' => $tmp['SCHEMA']['ENGINE']
+                    , 'description' => $tmp['TABLE_SCHEMA']['TABLE_COMMENT']
+                    , 'engine' => $tmp['TABLE_SCHEMA']['ENGINE']
                     , 'fields' => $tmp['Fields']
                 ]
-                    , 'Schema' => $tmp['SCHEMA']
-                    , 'explain' => $tmp['explain']
-                    , 'indexes' => $tmp['index']
+                    , 'TABLE_SCHEMA' => $tmp['TABLE_SCHEMA']
+                    , 'SQL_FIELDS' => $tmp['SQL_FIELDS']
+                    , 'INDEXES' => $tmp['INDEXES']
+                    , 'TRIGGERS' => $tmp['TRIGGERS']
                     , 'SQL' => (isset($tmp['SQL']['Create Table']))?$tmp['SQL']['Create Table']:null
-                    , 'TRIGGERS' => (isset($tmp['TRIGGERS']))?$tmp['TRIGGERS']:null
-                    //, 'indexes' => $tmp['index']
                 ]);
             } else
                 return(['table_exists'=> false]);
@@ -1255,35 +1267,69 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
         function getInterfaceModelFromTable($table) {
 
-            $fields = [
-                'model'=>[]
-                ,'interface'=>['object'=>$table,'name'=>$table,'plural'=>$table
-                    ,'security'=>null
-                    ,'fields'=>[]
+            $cfo = [
+                'KeyName'=>$table
+                ,'type'=>'db'
+                ,'entity'=>$table
+                ,'extends'=>null
+                ,'GroupName'=>'CFOs'
+                ,'model'=>[
+                    'model'=>[]
+                    ,'sql'=>[]
+                    ,'dependencies'=>[]
+                ]
+                ,'securityAndFields'=>[
+                    'security'=>[
+                        'cfo_locked'=>false,
+                        'user_privileges'=>[],
+                        'user_groups'=>[],
+                        'user_organizations'=>[],
+                        'user_namespaces'=>[],
+                        'allow_update'=>[
+                            'user_privileges'=>[],
+                            'user_groups'=>[],
+                            'user_organizations'=>[],
+                            'user_namespaces'=>[],
+                            'field_values'=>[]],
+                        'allow_display'=>[],
+                        'allow_delete'=>[],
+                        'allow_copy'=>[],
+                        'logs'=>['list'=>false,'display'=>false,'update'=>false,'delete'=>false],
+                        'backups'=>['update'=>false,'delete'=>false]
+                    ],
+                    'fields'=>[]]
+                ,'interface'=>[
+                    'object'=>$table
+                    ,'name'=>$table.' table record'
+                    ,'plural'=>$table.' table records'
+                    ,'ico'=>'building'
+                    ,'modal_size'=>'xl'
+                    ,'secret'=>$this->options['keyFile']??null
+                    ,'dbName'=>null
+                    ,'dbProxy'=>null
                     ,'filters'=>[]
-                    ,'buttons'=>[['title'=>"Insert {$table}",'type'=>'api-insert'],['title'=>"Bulk {$table}",'type'=>'api-bulk']]
-                    ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'server_fields'=>null,'server_sort'=>null,'server_limit'=>1000,'fields'=>[]]]
-                    ,'delete_fields'=>null
-                    ,'insert_fields'=>null
-                    ,'update_fields'=>null
+                    ,'buttons'=>[['title'=>"Insert {$table} Record",'type'=>'api-insert'],['title'=>"Bulk {$table} Records",'type'=>'api-bulk']]
+                    ,'views'=>['default'=>['name'=>'Default View','all_fields'=>true,'server_fields'=>null,'server_order'=>null,'server_where'=>null,'server_limit'=>200,'fields'=>[]]]
                     ,'display_fields'=>null
+                    ,'update_fields'=>null
+                    ,'insert_fields'=>null
                     ,'copy_fields'=>null
+                    ,'delete_fields'=>null
+                    ,'hooks'=>['on.insert'=>[],'on.update'=>[],'on.delete'=>[]]
                 ]
             ];
 
             //get the $table['model']['fields'] from the $table
-            $table_name = $table;
             $table = $this->getModelFromTable($table);
-            if(!$table['table_exists']) {
-                $this->setError("{$table_name} does not exist");
-                return;
-            }
+            $cfo['model']['sql'] = $table;
+            unset($cfo['model']['sql']['model']);
+
             //region assign $fields['model'] taking MYSQL field types from $table
             if(isset($table['model']['fields'])) foreach ($table['model']['fields'] as $field=>$values) {
 
                 $is_key=false;
-                $fields['model'][$field][0] = $values['type'];
-                $fields['model'][$field][1] = (preg_match('/(varchar|varbinary|char|json)/',$values['type']))?'string':
+                $cfo['model']['model'][$field][0] = $values['type'];
+                $cfo['model']['model'][$field][1] = (preg_match('/(varchar|varbinary|char|json|text)/',$values['type']))?'string':
                     ((preg_match('/(timestamp|datetime)/',$values['type']))?'datetime':
                         ((preg_match('/(date)/',$values['type']))?'date':
                             ((preg_match('/(decimal|float)/',$values['type']))?'float':
@@ -1291,34 +1337,34 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                 if(isset($values['key']) && $values['key']) {
                     $is_key = true;
-                    $fields['model'][$field][1].='|isKey';
+                    $cfo['model']['model'][$field][1].='|isKey';
                 }
-                if(isset($values['null']) && $values['null']===false) $fields['model'][$field][1].='|mandatory';
-                else $fields['model'][$field][1].='|allowNull';
+                if(isset($values['null']) && $values['null']===false && ($values['extra']??'')!='auto_increment') $cfo['model']['model'][$field][1].='|mandatory';
+                else $cfo['model']['model'][$field][1].='|allowNull';
 
                 if(strpos($values['type'],'varchar')!==false)
-                    $fields['model'][$field][1].='|maxlength='.preg_replace('/[^0-9]/','',explode('varchar',$values['type'],2)[1]);
+                    $cfo['model']['model'][$field][1].='|maxlength='.preg_replace('/[^0-9]/','',explode('varchar',$values['type'],2)[1]);
                 if(strpos($values['type'],'varbinary')!==false)
-                    $fields['model'][$field][1].='|maxlength='.preg_replace('/[^0-9]/','',explode('varbinary',$values['type'],2)[1]);
+                    $cfo['model']['model'][$field][1].='|maxlength='.preg_replace('/[^0-9]/','',explode('varbinary',$values['type'],2)[1]);
 
-                if(isset($values['index']) && $values['index']) $fields['model'][$field][1].='|isIndex';
-                if(isset($values['default']) && strlen($values['default'])) $fields['model'][$field][1].='|defaultvalue='.$values['default'];
-                $fields['model'][$field][1].='|description='.$values['description'];
+                if(isset($values['index']) && $values['index']) $cfo['model']['model'][$field][1].='|isIndex';
+                if(isset($values['default']) && strlen($values['default'])) $cfo['model']['model'][$field][1].='|defaultvalue='.$values['default'];
+                $cfo['model']['model'][$field][1].='|description='.$values['description'];
 
                 // Mapping
-                $fields['interface']['fields'][$field] = ['name'=>$field];
-                if($fields['model'][$field][0]=='date') {
-                    $fields['interface']['fields'][$field]['type'] = 'date';
-                    $fields['interface']['filters'][] = [
+                $cfo['securityAndFields']['fields'][$field] = ['name'=>$field];
+                if($cfo['model']['model'][$field][0]=='date') {
+                    $cfo['securityAndFields']['fields'][$field]['type'] = 'date';
+                    $cfo['interface']['filters'][] = [
                         'field'=>$field,
                         'field_name'=>$field,
                         'type'=>'date',
                         'placeholder'=>"{$field} date or range: 2020-01/2020-03"
                     ];
                 }
-                if($fields['model'][$field][0]=='datetime') {
-                    $fields['interface']['fields'][$field]['type'] = 'datetime';
-                    $fields['interface']['filters'][] = [
+                if($cfo['model']['model'][$field][0]=='datetime') {
+                    $cfo['securityAndFields']['fields'][$field]['type'] = 'datetime';
+                    $cfo['interface']['filters'][] = [
                         'field'=>$field,
                         'field_name'=>$field,
                         'type'=>'datetime',
@@ -1326,21 +1372,20 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     ];
                 }
 
-                $fields['interface']['views']['default']['fields'][$field] = ['field'=>$field];
-                $fields['interface']['insert_fields'][$field] = ['field'=>$field];
-                $fields['interface']['display_fields'][$field] = ['field'=>$field];
-                $fields['interface']['update_fields'][$field] = ['field'=>$field];
+                $cfo['interface']['views']['default']['fields'][$field] = ['field'=>$field];
+                $cfo['interface']['insert_fields'][$field] = ['field'=>$field];
+                $cfo['interface']['display_fields'][$field] = ['field'=>$field];
+                $cfo['interface']['update_fields'][$field] = ['field'=>$field];
 
                 if($is_key) {
-                    $fields['interface']['views']['default']['fields'][$field]['display_cfo']=true;
-                    $fields['interface']['display_fields'][$field]['read_only'] = true;
-                    $fields['interface']['update_fields'][$field]['read_only'] = true;
-                    $fields['interface']['delete_fields'][$field]= ['field'=>$field];
+                    $cfo['interface']['views']['default']['fields'][$field]['display_cfo']=true;
+                    $cfo['interface']['update_fields'][$field]['read_only'] = true;
+                    $cfo['interface']['delete_fields'][$field]= ['field'=>$field];
                 }
 
             }
             //endregion
-            return $fields;
+            return $cfo;
         }
 
 
