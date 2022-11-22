@@ -602,7 +602,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @param null $fields
          * @return array|void
          */
-        function fetchOne($keysWhere=[], $fields=null, $params=[]) {
+        function fetchOne($keysWhere=[], $fields=null, $groupBy=null,$params=[]) {
             $this->limit = 1;
             $ret = $this->fetch($keysWhere, $fields, $params);
             if($ret) $ret=$ret[0];
@@ -614,9 +614,10 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * @param null $fields
          * @return array|void
          */
-        function fetch($keysWhere=[], $fields=null, $params=[]) {
+        function fetch($keysWhere=[], $fields=null, $groupBy=null, $params=[]) {
 
             if($this->error) return false;
+            if(!is_array($params)) $params=[];
             //--- WHERE
             // Array with key=>value or empty
             if(is_array($keysWhere) ) {
@@ -663,8 +664,9 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             }
 
             // --- GROUP BY
-            if($this->groupBy) {
-                $SQL .= " GROUP BY  {$this->groupBy}";
+            if(!$groupBy && $this->groupBy) $groupBy =$this->groupBy;
+            if($groupBy) {
+                $SQL .= " GROUP BY  {$groupBy}";
             }
 
             // --- ORDER BY
