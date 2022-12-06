@@ -12,6 +12,7 @@ if (!defined ("_Buckets_CLASS_") ) {
     class Buckets {
 
         private $core;
+        var $version = '202212061';
         var $bucket = '';
         var $error = false;
         var $code = '';
@@ -104,12 +105,11 @@ if (!defined ("_Buckets_CLASS_") ) {
             $time = microtime(true);
             $this->core->__p->add('Buckets.manageUploadFiles', $dest_bucket, 'note');
 
-            $public=($options['public'])?true:false;
-            $ssl=($options['ssl'])?true:false;
-            $apply_hash_to_filenames = ($options['apply_hash_to_filenames'])?true:false;
-            $allowed_extensions = ($options['allowed_extensions'])?explode(',',strtolower($options['allowed_extensions'])):[];
-            $allowed_content_types = ($options['allowed_content_types'])?explode(',',strtolower($options['allowed_content_types'])):[];
-
+            $public=($options['public']??false)?true:false;
+            $ssl=($options['ssl']??false)?true:false;
+            $apply_hash_to_filenames = ($options['apply_hash_to_filenames']??false)?true:false;
+            $allowed_extensions = ($options['allowed_extensions']??'')?explode(',',strtolower($options['allowed_extensions'])):[];
+            $allowed_content_types = ($options['allowed_content_types']??'')?explode(',',strtolower($options['allowed_content_types'])):[];
 
             // Calculate base_dir
             $base_dir = '';
@@ -132,10 +132,16 @@ if (!defined ("_Buckets_CLASS_") ) {
                 return($this->addError('the path to write the files does not exist: '.$base_dir));
             }
 
+            if($public && is_object($this->gs_bucket) && ($this->gs_bucket->info()['iamConfiguration']['publicAccessPrevention']??null) == 'enforced') {
+                $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
+                return($this->addError('The bucket does not allow public objects, publicAccessPrevention=enforced in '.$this->bucket));
+            }
+
             if($this->isUploaded)  {
                 foreach ($this->uploadedFiles as $key => $files) {
                     for($i=0,$tr=count($files);$i<$tr;$i++) {
                         $value = $files[$i];
+
                         if(!$value['error']) {
 
                             // If the name of the file uploaded has special chars, the system convert it into mime-encode-utf8
@@ -148,8 +154,10 @@ if (!defined ("_Buckets_CLASS_") ) {
                                 $extension = '.'.strtolower($parts[count($parts)-1]);
                             }
 
+
                             // Do I have allowed extensions
                             if($allowed_extensions) {
+
                                 $allow = false;
                                 if($extension)
                                     foreach ($allowed_extensions as $allowed_extension) {
@@ -158,11 +166,14 @@ if (!defined ("_Buckets_CLASS_") ) {
                                             break;
                                         }
                                     }
+
                                 if(!$allow) {
                                     $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
                                     return($this->addError($value['name'].' does not have any of the following extensions: '.$options['allowed_extensions'],'extensions'));
                                 }
                             }
+
+
 
                             // Do I have allowed content types
                             if($allowed_content_types) {
@@ -182,7 +193,6 @@ if (!defined ("_Buckets_CLASS_") ) {
 
                             // do not use the original name.. and transform to has+extension
                             if($apply_hash_to_filenames) {
-
                                 $this->uploadedFiles[$key][$i]['hash_from_name'] = $value['name'];
                                 $value['name'] = date('Ymshis').uniqid('_upload'). md5($value['name']).$extension;
                                 $this->uploadedFiles[$key][$i]['name'] = $value['name'];
@@ -190,6 +200,7 @@ if (!defined ("_Buckets_CLASS_") ) {
 
 
                             $dest = $base_dir.'/'.$value['name'];
+
 
                             // Let's try to move the temporal files to their destinations.
                             try {
@@ -208,8 +219,18 @@ if (!defined ("_Buckets_CLASS_") ) {
                                             $object = $this->gs_bucket->object($file);
 
                                             // Make public file into the internet
-                                            $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
-                                            $this->uploadedFiles[$key][$i]['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$file;
+                                            if(($this->gs_bucket->info()['iamConfiguration']['publicAccessPrevention']??null) == 'enforced')
+                                                $this->uploadedFiles[$key][$i]['publicAccessPrevention'] = "enforced. The bucket does not allow public objects";
+                                            elseif(($this->gs_bucket->info()['iamConfiguration']['uniformBucketLevelAccess']['enabled']??null))
+                                                $this->uploadedFiles[$key][$i]['uniformBucketLevelAccess'] = "active. You have to assign public permission manually";
+                                            else
+                                                $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
+                                            $this->uploadedFiles[$key][$i]['mediaLink'] = ($object->info()['mediaLink']??null);
+                                            if(($this->gs_bucket->info()['iamConfiguration']['publicAccessPrevention']??null) == 'enforced')
+                                                $this->uploadedFiles[$key][$i]['publicUrl'] = null;
+                                            else
+                                                $this->uploadedFiles[$key][$i]['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$file;
+
                                         }
                                     }
                                 } else {
@@ -228,6 +249,7 @@ if (!defined ("_Buckets_CLASS_") ) {
                 }
 
             }
+
 
             if($this->debug)
                 $this->core->logs->add("manageUploadFiles('{$dest_bucket}') [processing uploaded files:".count($this->uploadedFiles)."]". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
@@ -500,20 +522,51 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
 
 
-        /*
-         * Make the file public access
+        /**
+         * It returns a public URL for the object making it Public
+         * @param string $file file path without gs://<bucket-name>/
+         * @param string $content_type optionally you can set content_type
+         * @param string $name optionally you can set a anme
+         * @return string|void return string public url or void if error
          */
-        function getPublicUrl($file,$content_type=null,$name=null) {
+        function getPublicUrl(string $file,string $content_type='',string $name='') {
 
-            /** @var StorageObject $object */
-            $object = $this->gs_bucket->object($file);
-            $object->update(['acl' => []], ['predefinedAcl' => 'PUBLICREAD']);
 
-            $updates = [];
-            if($content_type) $updates['contentType'] = $content_type;
-            if($updates) $object->update($updates);
+            //region REMOVE from $file $this->bucket as part of the string
+            if($this->bucket && strpos($this->bucket,'gs://')===0) {
+                $bucket = $this->bucket.((substr($this->bucket,-1)!='/')?'/':'');
+                $file = str_replace($bucket,'',$file);
+            }
+            //endregion
 
-            $url = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$file;
+            //region REMOVE in $file first character '/' it exist
+            $file = ltrim($file,'/');
+            //endregion
+
+            $url=null;
+            try {
+                /** @var StorageObject $object */
+                $object = $this->gs_bucket->object($file);
+                $info = $object->info();
+                $updates = [];
+
+                if(!($info['mediaLink']??null))
+                    $updates = ['acl' => []];
+
+                if($content_type && $content_type!=($info['contentType']??null))
+                    $updates['contentType'] = $content_type;
+
+                if($updates) {
+                    $object->update($updates,(!($info['mediaLink']??null))?['predefinedAcl' => 'PUBLICREAD']:[]);
+                    $info = $object->info();
+                }
+
+                $url = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$file;
+
+            } catch (Exception $e){
+                return $this->addError($e->getMessage());
+            }
+
             return $url;
 
         }

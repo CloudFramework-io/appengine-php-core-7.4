@@ -154,7 +154,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.11161';
+        var $_version = 'v74.12061';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5178,13 +5178,23 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Set a privilege for a user
+         * Tell if the user has specific privilege
          * @param string $privilege
          * @return bool
          */
         function hasPrivilege(string $privilege)
         {
             return (isset($this->data['User']['UserPrivileges']) && in_array($privilege,$this->data['User']['UserPrivileges']));
+        }
+
+        /**
+         * Tell if the user has specific license
+         * @param string $license
+         * @return bool
+         */
+        function hasLicense(string $license)
+        {
+            return (isset($this->data['User']['UserLicenses']) && in_array($license,$this->data['User']['UserLicenses']));
         }
 
         /**
