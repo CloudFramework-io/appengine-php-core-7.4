@@ -102,9 +102,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 return;
             }
 
-            if($core)
-                $core->errors->add(["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline],'fatal_error','error');
+            if($core) {
+                $core->errors->add($error, 'fatal_error', 'error');
+                if(is_object($core->api)) {
+                    $core->api->setError('__fatal_handler',503,'system-error',$error["message"]);
+                    $core->api->send();
 
+                }
+            }
 //
 //            if(!$core || ($core->is->development() && !$core->is->terminal()))
 //                _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
@@ -154,7 +159,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.12062';
+        var $_version = 'v74.12081';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -187,6 +192,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cfiLog;
         /** @var string $gc_project_id GCP Google Project assciated */
         var $gc_project_id;
+        /** @var object $api if we are executing an API code it will be the RESTful class */
+        var $api;
         /**
          * @var array $loadedClasses control the classes loaded
          * @link Core::loadClass()
@@ -290,6 +297,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // API end points. By default $this->config->get('core_api_url') is '/'
             if ($this->isApiPath()) {
 
+                //region SET $apifile, $pathfile
                 // Extract $apifile route
                 $apifile = $this->system->url['parts'][$this->system->url['parts_base_index']];
                 // If empty by default it will be index
@@ -323,72 +331,78 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                             $pathfile = $this->config->get('core.api.extra_path') . "/{$apifile}.php";
                     }
                 }
+                //endregion
 
-
-                // IF NOT EXIST
-                include_once __DIR__ . '/class/RESTful.php';
-
+                //region INCLUDE $pathfile AND SET $this-api AND EXECUTE $this->api->main(); $this->api->send();
                 try {
+                    // Load BASE CLASS for APIs
+                    include_once __DIR__ . '/class/RESTful.php';
+
                     // Include the external file $pathfile
                     if (strlen($pathfile)) {
-                        // init data storage client wrapper if filepath starts with gs://
                         $this->__p->add('Loaded $pathfile', __METHOD__,'note');
                         @include_once $pathfile;
                         $this->__p->add('Loaded $pathfile', __METHOD__,'endnote');
-
                     }
 
                     // By default the ClassName will be called API.. if the include set $api_class var, we will use that class name
                     if(!isset($api_class)) $api_class = 'API';
 
                     if (class_exists($api_class)) {
-                        /** @var RESTful $api */
-                        $api = new $api_class($this,$this->system->url['parts_base_url']);
-                        if (array_key_exists(0,$api->params) && $api->params[0] == '__codes') {
-                            $__codes = $api->codeLib;
+                        /** @var RESTful $this->api */
+                        $this->api = new $api_class($this,$this->system->url['parts_base_url']);
+                        if (array_key_exists(0,$this->api->params) && $this->api->params[0] == '__codes') {
+                            $__codes = $this->api->codeLib;
                             foreach ($__codes as $key => $value) {
-                                $__codes[$key] = $api->codeLibError[$key] . ', ' . $value;
+                                $__codes[$key] = $this->api->codeLibError[$key] . ', ' . $value;
                             }
-                            $api->addReturnData($__codes);
+                            $this->api->addReturnData($__codes);
                         } else {
-                            $api->main();
+                            $this->api->main();
                         }
 
-                        $api->send();
+                        return $this->api->send();
 
-                    } else {
-                        $api = new RESTful($this);
-                        if(is_file($pathfile)) {
-                            $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
-                        } else {
-                            $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
-
-                        }
-                        $api->send();
                     }
-                } catch (Exception $e) {
-                    // ERROR CONTROL WHERE $api is not an object
-                    if(!is_object($api)) {
-                        $api = new RESTful($this);
-                        if(is_file($pathfile)) {
-                            $api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
-                        } else {
-                            $api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
-                        }
-                    }
-                    // If $api is an object then an exception has been captured
                     else {
-                        $api->setError("the code in '{$apifile}' has produced an exception ", 503);
+                        $this->api = new RESTful($this);
+                        if(is_file($pathfile)) {
+                            $this->api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
+                        } else {
+                            $this->api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
+
+                        }
+                        return $this->api->send();
+                    }
+                }
+                catch (Exception $e) {
+                    // ERROR CONTROL WHERE $this->api is not an object
+                    if(!is_object($this->api)) {
+                        $this->api = new RESTful($this);
+                        if(is_file($pathfile)) {
+                            $this->api->setError("the code in '{$apifile}' does not include a {$api_class} class extended from RESTFul. Use: <?php class API extends RESTful { ... your code ... } ", 404);
+                        } else {
+                            $this->api->setError("the file for '{$apifile}' does not exist in api directory: ".$pathfile, 404);
+                        }
+                    }
+                    // If $this->api is an object then an exception has been captured
+                    else {
+                        $this->api->setError("the code in '{$apifile}' has produced an exception ", 503);
 
                     }
 
                     $this->errors->add(error_get_last());
                     $this->errors->add($e->getMessage());
-                    $api->send();
+                    return $this->api->send();
                 }
+                //endregion
+
+                //region IF we reach this code then there are ERRORS
                 $this->__p->add("API including RESTfull.php and {$apifile}.php: ", 'There are ERRORS');
                 return false;
-            } // Take a LOOK in the menu
+                //endregion
+            }
+            // Take a LOOK in the menu
             elseif ($this->config->inMenuPath()) {
 
                 // Common logic

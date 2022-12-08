@@ -41,17 +41,22 @@ if($core->config->get('core.erp.platform_id') && !$core->config->get('core.erp.u
 }
 //endregion
 
-//region SET $datastore
+//region EVALUATE GOOGLE_APPLICATION_CREDENTIALS env_var
+if($core->is->development() && !getenv('GOOGLE_APPLICATION_CREDENTIALS') && is_file($core->system->root_path.'/local_data/application_default_credentials.json'))
+    putenv("GOOGLE_APPLICATION_CREDENTIALS={$core->system->root_path}/local_data/application_default_credentials.json");
+//endregion
+
+//region SET $datastore if $core->config->get('core.datastore.on') || $core->config->get('core.gcp.datastore.on')
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
-if((getenv('PROJECT_ID') || $core->config->get("core.gcp.datastore.project_id")) && ($core->config->get('core.datastore.on') || $core->config->get('core.gcp.datastore.on'))) {
+$project_id = $core->config->get("core.gcp.datastore.project_id")?:($core->config->get("core.gcp.project_id")?:getenv('PROJECT_ID'));
+if($project_id && ($core->config->get('core.datastore.on') || $core->config->get('core.gcp.datastore.on'))) {
 
     //2021-02-25: Fix to force rest transport instead of grpc because it crash for certain content.
     if(isset($_GET['_fix_datastore_transport'])) $core->config->set('core.datastore.transport','rest');
-
     $transport = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
-    $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID')]);
+    $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>$project_id]);
 }
 //endregion
 

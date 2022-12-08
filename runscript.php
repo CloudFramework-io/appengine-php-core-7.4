@@ -39,13 +39,19 @@ if($core->config->get('core.erp.platform_id')) {
 }
 //endregion
 
-//region EVALUATE create $datastore
+//region EVALUATE GOOGLE_APPLICATION_CREDENTIALS env_var
+if(!getenv('GOOGLE_APPLICATION_CREDENTIALS') && is_file($core->system->root_path.'/local_data/application_default_credentials.json'))
+    putenv("GOOGLE_APPLICATION_CREDENTIALS={$core->system->root_path}/local_data/application_default_credentials.json");
+//endregion
+
+//region SET GLOBAL $datastore if $core->config->get('core.datastore.on') || $core->config->get('core.gcp.datastore.on')
 // Load DataStoreClient to optimize calls
 use Google\Cloud\Datastore\DatastoreClient;
 $datastore = null;
-if((getenv('PROJECT_ID') || $core->config->get("core.gcp.datastore.project_id")) && $core->config->get('core.datastore.on')) {
-    $transport = ($core->config->get('core.datastore.transport'))?:'rest';
-    $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID')]);
+$project_id = $core->config->get("core.gcp.datastore.project_id")?:($core->config->get("core.gcp.project_id")?:getenv('PROJECT_ID'));
+if($project_id && ($core->config->get('core.datastore.on') || $core->config->get('core.gcp.datastore.on'))) {
+    $transport = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
+    $datastore = new DatastoreClient(['transport'=>$transport,'projectId'=>$project_id]);
 }
 //endregion
 

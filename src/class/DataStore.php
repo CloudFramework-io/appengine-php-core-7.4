@@ -18,7 +18,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
      */
     class DataStore
     {
-        var $core = null;                   // Core7 reference
+        protected $_version = '20221208';
+        /** @var Core7 $core */
+        private $core = null;                   // Core7 reference
         /** @var DatastoreClient|null  */
         var $datastore = null;              // DatastoreClient
         var $error = false;                 // When error true
@@ -44,36 +46,69 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
         var $debug = false;
         var $transformReadedEntities = true; // Transform readed entities
 
-        function __construct(Core7 &$core, $params)
+        /**
+         * Cloudframework Datastore Constructor
+         * @param Core7 $core
+         * @param array $params [
+         *
+         * * @type string $entity_name Name of the Datastore entity. Optionally you can pass it as $params[0],
+         * * @type string $namespace [optional] Namspace of the Datastore entity. Optionally you can pass it as $params[1],
+         * * @type array $schema [optional] Eschema to define a CloudFramework Model for the Entity. Optionally you can pass it as $params[2]
+         * * @type array $options [optional] Optons for security and transport. Optionally you can pass it as $params[3]: [
+         *
+         *   * @tyoe string $namespaceId [optional]
+         *   * @tyoe string $projectId [optional]
+         *   * @tyoe string $transport [optional] can be: grpc or rest. to stablish server protocol. Bu default is $core->config->get('core.datastore.transport') or rest
+         *   * @tyoe array $keyFile [optional] you can pass a server token generated in GCP to stablish access permissions
+         *
+         *   ]
+         *
+         * ]
+         */
+        function __construct(Core7 &$core, array $params)
         {
+
+            //region SET $this->core and START $this->core->__p performance
             $this->core = $core;
-            $this->core->__p->add('DataStore new instance ', $params[0], 'note');
+            $this->core->__p->add('DataStore new instance ', ($params['entity_name']??null)?:($params[0]??null), 'note');
+            //endregion
 
-            //Debug logs
-            if($this->core->is->development()) {
-                $this->debug = true;
-            }
+            //region SET $this->debug to true IF $this->core->is->development()
+            if($this->core->is->development()) {$this->debug = true;}
+            //endregion
 
-            $this->entity_name = $params[0];
-            $this->namespace = (isset($params[1]) && $params[1])?$params[1]:'default';
-            $this->loadSchema( $this->entity_name, (isset($params[2])) ? $params[2] : null); // Prepare $this->schema
-            $options = (isset($params[3]) && is_array($params[3])) ? $params[3] : [];
+            //region SET $this->entity_name from mandatory $params['entity_name']
+            $this->entity_name = ($params['entity_name']??null)?:($params[0]??null);
+            if(!$this->entity_name) return $this->addError('Missing [entity_name] en $params');
+            //endregion
 
+            //region SET $this->namespace from optional $params['namespace']. If it is not sent it will be 'default'
+            $this->namespace = ($params['namespace']??null)?:($params[1]??'default');
+            //endregion
+
+            //region SET $this->schema baaed on $params['schema']
+            $this->loadSchema( $this->entity_name, ($params['schema']??null)?:($params[2]??null)); // Prepare $this->schema
+            //endregion
+
+            //region SET $options from $params['options']
+            $options = ($params['options']??[])?:($params[3]??[]);
+            if(!is_array($options)) $options = [];
+            //endregion
+
+            //region SET $this->datastore, $this->project_id
             if($this->core->gc_project_id && !isset($options['projectId'])) $options['projectId'] = $this->core->gc_project_id;
             if(!isset($options['namespaceId'])) $options['namespaceId'] = $this->namespace;
             if(!isset($options['transport']) || !$options['transport'])
                 $options['transport'] = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
 
-            $this->options = $options;
             global $datastore;
             $this->project_id = ($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID');
             // Evaluate to use global $datastore for performance or to create a new one object
-            if($this->project_id!=$this->options['projectId'] || (isset($this->options['keyFile']) && $this->options['keyFile']) || !is_object($datastore)) {
+            if($this->project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
                 try {
-                    if($this->options['keyFile']['project_id']??null) $this->options['projectId'] = $this->options['keyFile']['project_id'];
-                    $this->datastore = new DatastoreClient($this->options);
-                    $this->project_id = $this->options['projectId'];
-                    if(isset($options['keyFile'])) $this->service_account = $this->options['keyFile']['client_email']??null;
+                    $this->datastore = new DatastoreClient($options);
+                    $this->project_id = $options['projectId'];
+                    if(isset($options['keyFile'])) $this->service_account = $options['keyFile']['client_email']??null;
                 } catch (Exception $e) {
                     return($this->addError($e->getMessage()));
                 }
@@ -84,15 +119,18 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     return($this->addError($e->getMessage()));
                 }
             }
-            // SETUP DatastoreClient
+            //endregion
 
-            //ASSIGN time zone to read data
+            //region SET $this->default_time_zone_to_read
             if(isset($this->core->system->time_zone[0]) && $this->core->system->time_zone[0]) {
                 $this->default_time_zone_to_read = $this->core->system->time_zone[0];
             }
+            //endregion
 
+            //region END  $this->core->__p performance
             $this->core->__p->add('DataStore new instance ', '', 'endnote');
             return true;
+            //endregion
 
         }
 
