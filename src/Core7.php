@@ -159,7 +159,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.12081';
+        var $_version = 'v74.12101';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5202,6 +5202,27 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * Set a privilege for a user
+         * @param string $privilege
+         * @return bool
+         */
+        function getPrivileges()
+        {
+            return $this->data['User']['UserPrivileges']??[];
+        }
+
+        /**
+         * Set a license for a user
+         * @param $license
+         * @param bool $active
+         */
+        function setLicense($license, $active=true)
+        {
+            if(!isset($this->data['User']['UserLicenses'])) $this->data['User']['UserLicenses'] = [];
+            if(!in_array($license,$this->data['User']['UserLicenses'])) $this->data['User']['UserLicenses'][] = $license;
+        }
+
+        /**
          * Tell if the user has specific license
          * @param string $license
          * @return bool
@@ -5212,13 +5233,25 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * Unset a license for a user
+         * @param $license
+         * @param bool $active
+         */
+        function unsetLicense($license)
+        {
+            if(!isset($this->data['User']['UserLicenses'])) $this->data['User']['UserLicenses'] = [];
+            if(($index = array_search($license,$this->data['User']['UserLicenses']))!==false)
+                array_splice($this->data['User']['UserLicenses'],$index,1);
+        }
+
+        /**
          * Set a privilege for a user
          * @param string $privilege
          * @return bool
          */
-        function getPrivileges()
+        function getLicenses()
         {
-            return $this->data['User']['UserPrivileges']??[];
+            return $this->data['User']['UserLicenses']??[];
         }
 
         /**
