@@ -104,11 +104,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             if($core) {
                 $core->errors->add($error, 'fatal_error', 'error');
-                if(is_object($core->api)) {
-                    $core->api->setError('__fatal_handler',503,'system-error',$error["message"]);
-                    $core->api->send();
-
-                }
+//                if(is_object($core->api)) {
+//                    $core->api->setError('__fatal_handler',503,'system-error',$error["message"]);
+//                    $core->api->send();
+//
+//                }
             }
 //
 //            if(!$core || ($core->is->development() && !$core->is->terminal()))
@@ -159,7 +159,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.12101';
+        var $_version = 'v74.12121';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
