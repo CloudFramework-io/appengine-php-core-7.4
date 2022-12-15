@@ -751,13 +751,22 @@ if (!defined("_RESTfull_CLASS_")) {
         }
 
 
-        function getHeader($str)
+        /**
+         * Return the user header key value. In PHP those are $_SERVER["HTTP_$headerKey}"].
+         * @param string $headerKey The name of the header. Vars like X-VAR or X_VAR are treated like the same
+         * @return string If the key does not exist return empty string
+         */
+        function getHeader(string $headerKey)
         {
-            $str = strtoupper($str);
-            $str = str_replace('-', '_', $str);
-            return ((isset($_SERVER['HTTP_' . $str])) ? $_SERVER['HTTP_' . $str] : '');
+            $headerKey = strtoupper($headerKey);
+            $headerKey = str_replace('-', '_', $headerKey);
+            return ((isset($_SERVER['HTTP_' . $headerKey])) ? $_SERVER['HTTP_' . $headerKey] : '');
         }
 
+        /**
+         * Return all the header keys sent by the user. In PHP those are $_SERVER['HTTP_{varname}']
+         * @return array
+         */
         function getHeaders()
         {
             $ret = array();

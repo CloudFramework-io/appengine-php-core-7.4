@@ -192,7 +192,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $cfiLog;
         /** @var string $gc_project_id GCP Google Project assciated */
         var $gc_project_id;
-        /** @var object $api if we are executing an API code it will be the RESTful class */
+        /** @var RESTful $api if we are executing an API code it will be the RESTful class */
         var $api;
         /**
          * @var array $loadedClasses control the classes loaded
