@@ -1,18 +1,24 @@
 <?php
-/**
- * @author Héctor López <hlopez@cloudframework.io>
- * @version 202003270757 - php7
- */
-// CloudSQL Class v10
 use Google\Cloud\Storage\StorageObject;
 
 if (!defined ("_Buckets_CLASS_") ) {
     define ("_Buckets_CLASS_", TRUE);
 
+    /**
+     * Class to Handle GCS Buckets
+     *
+     * ```
+     * $buckets = $this->core->loadClass('Buckets','gs://{BucketName}');
+     * if($buckets->error) return $buckets->errorMsg
+     * ```
+     *
+     * # https://github.com/googleapis/google-cloud-php/tree/main/Storage
+     * @package CoreClasses
+     */
     class Buckets {
 
         private $core;
-        var $version = '202212061';
+        var $version = '202212161';
         var $bucket = '';
         var $error = false;
         var $code = '';
@@ -521,65 +527,173 @@ if (!defined ("_Buckets_CLASS_") ) {
 
         }
 
-
         /**
-         * It returns a public URL for the object making it Public
-         * @param string $file file path without gs://<bucket-name>/
-         * @param string $content_type optionally you can set content_type
-         * @param string $name optionally you can set a anme
+         * Set the file as private
+         * @param string $file_path file path without gs://<bucket-name>/
          * @return string|void return string public url or void if error
          */
-        function getPublicUrl(string $file,string $content_type='',string $name='') {
-
+        function setFilePrivate(string $file_path)
+        {
+            $this->core->__p->add('Buckets.setPrivate', $file_path, 'note');
 
             //region REMOVE from $file $this->bucket as part of the string
             if($this->bucket && strpos($this->bucket,'gs://')===0) {
                 $bucket = $this->bucket.((substr($this->bucket,-1)!='/')?'/':'');
-                $file = str_replace($bucket,'',$file);
+                $file_path = str_replace($bucket,'',$file_path);
             }
             //endregion
 
             //region REMOVE in $file first character '/' it exist
-            $file = ltrim($file,'/');
+            $file_path = ltrim($file_path,'/');
             //endregion
 
-            $url=null;
+            //region SET (StorageObject)$object, $infoObject,$updateObject=[] taking $file_path
             try {
                 /** @var StorageObject $object */
-                $object = $this->gs_bucket->object($file);
-                $info = $object->info();
-                $updates = [];
-
-                if(!($info['mediaLink']??null))
-                    $updates = ['acl' => []];
-
-                if($content_type && $content_type!=($info['contentType']??null))
-                    $updates['contentType'] = $content_type;
-
-                if($updates) {
-                    $object->update($updates,(!($info['mediaLink']??null))?['predefinedAcl' => 'PUBLICREAD']:[]);
-                    $info = $object->info();
-                }
-
-                $url = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$file;
+                $object = $this->gs_bucket->object($file_path);
+                $object->update([], ['predefinedAcl' => 'private']);
+                $ret = ['info'=>$object->info(),'acl'=>$object->acl()->get()];
+                $this->core->__p->add('Buckets.setPrivate', null, 'note');
+                return $ret;
 
             } catch (Exception $e){
                 return $this->addError($e->getMessage());
             }
+            //endregion
+        }
 
-            return $url;
+        /**
+         * Set the file as publicRead
+         * @param string $file_path file path without gs://<bucket-name>/
+         * @return string|void return string public url or void if error
+         */
+        function setFilePublic(string $file_path)
+        {
+            $this->core->__p->add('Buckets.setPrivate', $file_path, 'note');
+
+            //region REMOVE from $file $this->bucket as part of the string
+            if($this->bucket && strpos($this->bucket,'gs://')===0) {
+                $bucket = $this->bucket.((substr($this->bucket,-1)!='/')?'/':'');
+                $file_path = str_replace($bucket,'',$file_path);
+            }
+            //endregion
+
+            //region REMOVE in $file first character '/' it exist
+            $file_path = ltrim($file_path,'/');
+            //endregion
+
+            //region SET (StorageObject)$object, $infoObject,$updateObject=[] taking $file_path
+            try {
+                /** @var StorageObject $object */
+                $object = $this->gs_bucket->object($file_path);
+                $object->update([], ['predefinedAcl' => 'publicRead']);
+                $ret = ['info'=>$object->info(),'acl'=>$object->acl()->get()];
+                $this->core->__p->add('Buckets.setPrivate', null, 'note');
+                return $ret;
+
+            } catch (Exception $e){
+                return $this->addError($e->getMessage());
+            }
+            //endregion
+        }
+
+            /**
+         * It returns a public URL for the object making it Public you have the rights and the Bucket is Granular
+         * @param string $file_path file path without gs://<bucket-name>/
+         * @param string $content_type optionally you can set content_type
+         * @return string|void return string public url or void if error
+         */
+        function getPublicUrl(string $file_path, string $content_type='') {
+
+            $this->core->__p->add('Buckets.getPublicUrl', $file_path, 'note');
+
+            //region REMOVE from $file $this->bucket as part of the string
+            if($this->bucket && strpos($this->bucket,'gs://')===0) {
+                $bucket = $this->bucket.((substr($this->bucket,-1)!='/')?'/':'');
+                $file_path = str_replace($bucket,'',$file_path);
+            }
+            //endregion
+
+            //region REMOVE in $file first character '/' it exist
+            $file_path = ltrim($file_path,'/');
+            //endregion
+
+            //region SET (StorageObject)$object, $infoObject,$updateObject=[] taking $file_path
+            try {
+                /** @var StorageObject $object */
+                $object = $this->gs_bucket->object($file_path);
+                $info = $object->info();
+            } catch (Exception $e){
+                return $this->addError($e->getMessage());
+            }
+            $updateObject = [];
+            //endregion
+
+            //region EVALUATING $content_type to modify $updateObject
+            if($content_type && $content_type!=($info['contentType']??null))
+                $updateObject['contentType'] = $content_type;
+            //endregion
+
+            //region EVALUATING if the object is Public to modify $updateObject
+            try {
+                $isPublic = $object->acl()->get(['entity'=>'AllUsers']);
+            } catch (Exception $e) {
+                $updateObject['acl']=[];
+            }
+            //endregion
+
+            //region IF $updateObject EXECUTE $object->update($updateObject, (isset($updateObject['acl']))?['predefinedAcl' => 'PUBLICREAD']:[]);
+            if($updateObject){
+                try {
+                    $object->update($updateObject, (isset($updateObject['acl']))?['predefinedAcl' => 'PUBLICREAD']:[]);
+                } catch (Exception $e) {
+                    return $this->addError($e->getMessage());
+                }
+            }
+            //endregion
+
+            $this->core->__p->add('Buckets.getPublicUrl', null, 'endnote');
+            return 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$file_path;
 
         }
 
-        /*
-         * Make the file public access
+        /**
+         * Returns the GCS bucket info
+         * @return array|void
          */
-        function getInfo($file) {
+        function getInfo() {
+            try {
+                return (is_object($this->gs_bucket))?$this->gs_bucket->info():null;
+            } catch (Exception $e){
+                return $this->addError($e->getMessage());
+            }
+        }
 
-            /** @var StorageObject $object */
-            $object = $this->gs_bucket->object($file);
+        /**
+         * Returns the GCS file info ['info'=>$object->info(),'acl' =>$object->acl()] inside the bucket
+         * @param string $file_path route to the file taking gs://{bucket_name}/ as the root path
+         * @return array|void
+         */
+        function getFileInfo(string $file_path) {
 
-            return $object->info();
+            //region VERIFY $this->gs_bucket is an object
+            if(!is_object($this->gs_bucket)) return $this->addError('getFileInfo($file) has been called but with no bucket initiated');
+            //endregion
+
+            //region VERIFY if $file_path status with '/' to delete it
+            if($file_path[0] == '/') $file_path = substr($file_path,1);
+            //endregion
+
+            //region CREATE (StorageObject)$object and Return object information
+            try {
+                /** @var StorageObject $object */
+                $object = $this->gs_bucket->object($file_path);
+                return ['info'=>$object->info(),'acl'=>$object->acl()->get()];
+            } catch (Exception $e){
+                return $this->addError($e->getMessage());
+            }
+            //endregion
+
 
         }
 
