@@ -495,6 +495,22 @@ if (!defined ("_Buckets_CLASS_") ) {
             return $ret;
         }
 
+        /**
+         * Deprecated method
+         * @param string $returnUrl is the url the system has to call once the file has been uploaded
+         * @return mixed
+         */
+        function getUploadUrl($returnUrl=null) {
+            return($returnUrl);
+            /*
+            if(!$returnUrl) $returnUrl = $this->vars['retUploadUrl'];
+            else $this->vars['retUploadUrl'] = $returnUrl;
+            $options = array( 'gs_bucket_name' => str_replace('gs://','',$this->bucket) );
+            $upload_url = CloudStorageTools::createUploadUrl($returnUrl, $options);
+            return($upload_url);
+            */
+        }
+
 
         /**
          * tell if path is a dir
