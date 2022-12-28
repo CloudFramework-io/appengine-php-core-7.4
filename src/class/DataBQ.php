@@ -31,6 +31,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
         var $error = false;
         var $errorMsg = [];
+        var $options = [];
         var $entity_schema = null;
         var $fields = [];
         var $mapping = [];
@@ -77,17 +78,20 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if(isset($params[1])) $this->processSchema($params[1]);
             //endregion
 
-            //region SET $options and read $params[2] if it exist
-            $options = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
+            //region SET $this->options and read $params[2] if it exist
+            $this->options = (isset($params[2]) && is_array($params[2])) ? $params[2] : [];
             $this->project_id = $this->core->gc_project_id;
-            if(isset($options['projectId'])) $this->project_id = $options['projectId'];
-            else $options['projectId'] = $this->project_id;
+            if(isset($this->options['projectId'])) $this->project_id = $this->options['projectId'];
+            else $this->options['projectId'] = $this->project_id;
             //endregion
 
             //region SET $this->client and ($this->dataset, $this->table if $this->dataset_name and $this->table_name exist)
             try {
-                if($this->options['keyFile']['project_id']??null) $this->options['projectId'] = $this->options['keyFile']['project_id'];
-                $this->client = new BigQueryClient($options);
+                if($this->options['keyFile']['project_id']??null) {
+                    $this->project_id = $this->options['keyFile']['project_id'];
+                    $this->options['projectId'] = $this->options['keyFile']['project_id'];
+                }
+                $this->client = new BigQueryClient($this->options);
                 if($this->dataset_name) {
                     $this->dataset = $this->client->dataset($this->dataset_name);
                     if($this->table_name) {
@@ -1527,7 +1531,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                         $is_key=$item['name'];
                     }
                     if($item['mode']=='NULLABLE') $attributues.="allowNull|";
-                    $attributues.="description:".str_replace('|',',',$item['description']).'|';
+                    $attributues.="description:".str_replace('|',',',$item['description']??'').'|';
                     $cfo['model']['model'][$item['name']] = [strtolower($item['type']),$attributues];
 
                     $cfo['securityAndFields']['fields'][$item['name']] = ['name'=>$item['name']];
