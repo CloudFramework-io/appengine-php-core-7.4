@@ -214,6 +214,10 @@ if (!defined ("_Buckets_CLASS_") ) {
          */
         function manageUploadFiles($path='', $options =[]) {
 
+            //region CHECK retro-compatible method receiving gs://
+            if(strpos($path,'gs://')===0) $path = str_replace($this->bucket,'',$path);
+            //endregion
+
             //region SET $base_dir to upload the files
             if($path && ($path[0]??null)!='/') return $this->addError('manageUploadFiles($path,$options) $path has to start with /');
             $base_dir = $this->bucket.$path;
