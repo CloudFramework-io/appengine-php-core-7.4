@@ -469,11 +469,11 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
 
         /**
-         * Create a folder inside the bucket
+         * Create a folder inside the bucket. If the folder exist then return true;
          *
          * example:
          * ```php
-         * $deleted = $bucket->mkdir('/tmp');
+         * $created = $bucket->mkdir('/tmp');
          * if($bucket->error) return ['errorCode'=>$bucket->errorCode,'errorMsg'=>$bucket->errorMsg];
          * if($deleted) echo "dir /tmp created";
          * ```
@@ -486,7 +486,7 @@ if (!defined ("_Buckets_CLASS_") ) {
             $value = $this->bucket.$path;
             $ret = false;
             try {
-                if(file_exists($value)) return false;
+                if(is_dir($value)) return true;
                 $ret = @mkdir($value);
             } catch(Exception $e) {
                 $this->addError($e->getMessage());
