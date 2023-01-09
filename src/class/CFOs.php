@@ -9,6 +9,7 @@ class CFOs {
 
     /** @var Core7  */
     var $core;
+    var $version = '202301051';
     /** @var string $integrationKey To connect with the ERP */
     var $integrationKey='';
     var $error = false;                 // When error true
