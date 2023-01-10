@@ -2549,7 +2549,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     }
                 }
                 $token = shell_exec($gcloud_token_command);
-                if(!$token) return($this->addError('CoreSecurity.getGoogleIdentityToken(...) The following command does not work: '.$gcloud_token_command));
+                if(!$token) return($this->addError('CoreSecurity.getGoogleIdentityToken(...) The following command does not work ['.$gcloud_token_command.']. Execute manually [gcloud auth login] and try again.'));
             } else {
                 try {
                     $url='instance/service-accounts/default/identity?format=full&licenses=true';

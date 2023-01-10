@@ -19,8 +19,7 @@ class CFGoogle
 
         $this->core = $core;
         if(!is_dir($this->core->system->root_path.'/vendor/google/apiclient')) {
-            $this->addError('Missing Google Client libreries. Execute from your document root: php composer.phar require google/apiclient:^2.0');
-            $this->addError('You can find composer.phar from: curl https://getcomposer.org/composer.phar');
+            $this->addError('Missing Google Client libreries. Execute from your document root: composer require google/apiclient:^2.0');
         } else {
             $this->client = new Google_Client();
             $this->client->setApplicationName('GoogleCloudFrameWork');
@@ -154,7 +153,7 @@ class GoogleVision extends CFGoogle
         try {
             $res = $service->images->annotate($body, $optParams);
         } catch (Exception $e) {
-            return($this->addError('Excepción capturada: ',  $e->getMessage()));
+            return($this->addError($e->getMessage()));
         }
 
         $ret=[];
@@ -165,41 +164,51 @@ class GoogleVision extends CFGoogle
             }
             //_printe($item->toSimpleObject());
             /** @var Google_Service_Vision_FaceAnnotation $faceAnnotation */
-            foreach ($item->getFaceAnnotations() as $faceAnnotation) {
-                $ret['faceAnnotations'][] = ['confidence'=>$faceAnnotation->detectionConfidence
-                    ,'joy'=>$faceAnnotation->joyLikelihood
-                    ,'sorrow'=>$faceAnnotation->sorrowLikelihood
-                    ,'anger'=>$faceAnnotation->angerLikelihood
-                    ,'surpise'=>$faceAnnotation->surpriseLikelihood
-                    ,'exposed'=>$faceAnnotation->underExposedLikelihood
-                    ,'blurred'=>$faceAnnotation->blurredLikelihood
-                    ,'headWear'=>$faceAnnotation->headwearLikelihood
-                    ,'rollAngle'=>$faceAnnotation->rollAngle
-                    ,'tiltAngle'=>$faceAnnotation->tiltAngle
-                    ,'panAngle'=>$faceAnnotation->panAngle
+            if($faceAnnotations=$item->getFaceAnnotations())
+                foreach ($faceAnnotations as $faceAnnotation) {
+                    $ret['faceAnnotations'][] = ['confidence'=>$faceAnnotation->detectionConfidence
+                        ,'joy'=>$faceAnnotation->joyLikelihood
+                        ,'sorrow'=>$faceAnnotation->sorrowLikelihood
+                        ,'anger'=>$faceAnnotation->angerLikelihood
+                        ,'surpise'=>$faceAnnotation->surpriseLikelihood
+                        ,'exposed'=>$faceAnnotation->underExposedLikelihood
+                        ,'blurred'=>$faceAnnotation->blurredLikelihood
+                        ,'headWear'=>$faceAnnotation->headwearLikelihood
+                        ,'rollAngle'=>$faceAnnotation->rollAngle
+                        ,'tiltAngle'=>$faceAnnotation->tiltAngle
+                        ,'panAngle'=>$faceAnnotation->panAngle
 
-                ];
-            }
+                    ];
+                }
 
             /** @var Google_Service_Vision_EntityAnnotation $landmarkAnnotation */
-            foreach ($item->getLandmarkAnnotations() as $landmarkAnnotation) {
-                $ret['landmarkAnnotations'][] = ['description'=>$landmarkAnnotation->description,'score'=>$landmarkAnnotation->score];
-            }
+            if($landmarkAnnotations = $item->getLandmarkAnnotations())
+                foreach ($landmarkAnnotations as $landmarkAnnotation) {
+                    $ret['landmarkAnnotations'][] = ['description'=>$landmarkAnnotation->description,'score'=>$landmarkAnnotation->score];
+                }
 
             /** @var Google_Service_Vision_EntityAnnotation $logoAnnotation */
-            foreach ($item->getLogoAnnotations() as $logoAnnotation) {
-                $ret['logoAnnotations'][] = ['description'=>$logoAnnotation->description,'score'=>$logoAnnotation->score];
-            }
+            if($logoAnnotations = $item->getLogoAnnotations())
+                foreach ($logoAnnotations as $logoAnnotation) {
+                    $ret['logoAnnotations'][] = ['description'=>$logoAnnotation->description,'score'=>$logoAnnotation->score];
+                }
 
             /** @var Google_Service_Vision_EntityAnnotation $labelAnnotation */
-            foreach ($item->getLabelAnnotations() as $labelAnnotation) {
-                $ret['labelAnnotations'][] = ['description'=>$labelAnnotation->description,'score'=>$labelAnnotation->score];
-            }
+            if($labelAnnotations=$item->getLabelAnnotations())
+                foreach ($labelAnnotations as $labelAnnotation) {
+                    $ret['labelAnnotations'][] = ['description'=>$labelAnnotation->description,'score'=>$labelAnnotation->score];
+                }
 
-            /** @var Google_Service_Vision_EntityAnnotation $text */
-            foreach ($item->getTextAnnotations() as $text) {
-                $ret['textAnnotations'][] = ['description'=>$text->description,'score'=>$text->score];
-            }
+            /** @var Google_Service_Vision_EntityAnnotation $textAnnotation */
+            if($textAnnotations=$item->getTextAnnotations())
+                foreach ($textAnnotations as $textAnnotation) {
+                    $annotation = ['description'=>$textAnnotation->description,'vertices'=>[]];
+                    /** @var Google_Service_Vision_Vertex $vertex */
+                    foreach ($textAnnotation->getBoundingPoly()->vertices as $vertex) {
+                        $annotation['vertices'][] = ['x'=>$vertex->getX(),'y'=>$vertex->getY()];
+                    }
+                    $ret['textAnnotations'][] = $annotation;
+                }
 
             /** @var Google_Service_Vision_SafeSearchAnnotation $safe */
             $safe = $item->getSafeSearchAnnotation();
