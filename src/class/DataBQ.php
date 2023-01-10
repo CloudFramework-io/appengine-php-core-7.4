@@ -172,7 +172,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if(!$dataset_name) $dataset_name = $this->dataset_name;
             try {
                 $dataset = null;
-                if($dataset_name != $this->dataset_name) {
+                if($dataset_name != $this->dataset_name || !is_object($this->dataset)) {
                     $dataset = $this->client->dataset($dataset_name);
                 } else {
                     $dataset = &$this->dataset;
@@ -1356,9 +1356,12 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
          * Return a structure with bigquery squema based on CF model
          * @return array
          */
-        public function getBigQueryStructure() {
-            
+        public function getBigQueryStructureFromModel() {
+
             $bq_structure = [];
+            if(!isset($this->entity_schema['model']))
+                return $this->addError('There is not model [$this->entity_schema]');
+
             foreach ($this->entity_schema['model'] as $field_name=>$item) {
                 $field = ["name"=>$field_name];
                 switch (strtolower($item[0])) {
@@ -1418,28 +1421,50 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
             $datasetInfo = $this->getDataSetInfo();
             if($this->error) {
-                $ret['field_analysis'] ="{$this->dataset_name} DATASET DOES NOT EXIST. Send [fix=1] to repair";
-                $ret['dataset'] = ["name"=>$this->dataset_name,'error'=>$this->errorMsg];
-            } else {
-                $ret['dataset'] = $datasetInfo;
-                $tableInfo = $this->getDataSetTableInfo();
-                if($this->error) {
-                    if($fix && ($this->errorMsg[0]['bigquery']['error']['code']??0)==404) {
-                        $this->error = false;
-                        $this->errorMsg = [];
-                        $create_table = $this->createDataSetTableInfo($this->getBigQueryStructure());
+                if($fix && ($this->errorMsg[0]['bigquery']['error']['code']??0)==404) {
+                    $this->error=false;
+                    $this->errorMsg = [];
+                    try {
+                        $this->dataset = $this->client->createDataset($this->dataset_name);
+                        $datasetInfo = $this->getDataSetInfo();
                         if($this->error) {
-                            $ret['table'] = ["name"=>$this->table_name,'error'=>$this->errorMsg];
-                        } else {
-                            $ret['table']['info'] = $create_table['info'];
+                            $ret['field_analysis'] ="{$this->dataset_name} DATASET CAN NOT BE CREATED IN PROJECT ".$this->project_id;
+                            $ret['dataset'] = ["name"=>$this->dataset_name,'error'=>$this->errorMsg];
+                            return $ret;
                         }
-                    } else {
-                        $ret['field_analysis'] ="{$this->dataset_name}.{$this->table_name} TABLE DOES NOT EXIST. Send [fix=1] to repair";
+                    } catch (Exception $e) {
+                        $error = json_decode($e->getMessage(),true);
+                        $this->addError(['bigquery'=>$error]);
+                        $ret['field_analysis'] ="{$this->dataset_name} DATASET CAN NOT BE CREATED IN PROJECT ".$this->project_id;
+                        $ret['dataset'] = ["name"=>$this->dataset_name,'error'=>$this->errorMsg];
+                        return $ret;
+                    }
+
+                } else {
+                    $ret['field_analysis'] ="{$this->dataset_name} DATASET DOES NOT EXIST. Send [fix=1] to repair";
+                    $ret['dataset'] = ["name"=>$this->dataset_name,'error'=>$this->errorMsg];
+                    return $ret;
+                }
+            }
+
+            $ret['dataset'] = $datasetInfo;
+            $tableInfo = $this->getDataSetTableInfo();
+            if($this->error) {
+                if($fix && ($this->errorMsg[0]['bigquery']['error']['code']??0)==404) {
+                    $this->error = false;
+                    $this->errorMsg = [];
+                    $create_table = $this->createDataSetTableInfo($this->getBigQueryStructureFromModel());
+                    if($this->error) {
                         $ret['table'] = ["name"=>$this->table_name,'error'=>$this->errorMsg];
+                    } else {
+                        $ret['table']['info'] = $create_table['info'];
                     }
                 } else {
-                    $ret['table'] = $tableInfo;
+                    $ret['field_analysis'] ="{$this->dataset_name}.{$this->table_name} TABLE DOES NOT EXIST. Send [fix=1] to repair";
+                    $ret['table'] = ["name"=>$this->table_name,'error'=>$this->errorMsg];
                 }
+            } else {
+                $ret['table'] = $tableInfo;
             }
 
             if(!$this->error) {
@@ -1447,7 +1472,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
 
                 $structure_from_model = [];
                 $structure_from_bq = [];
-                foreach ($this->getBigQueryStructure()['fields'] as $field) $structure_from_model[$field['name']] = $field;
+                foreach ($this->getBigQueryStructureFromModel()['fields'] as $field) $structure_from_model[$field['name']] = $field;
                 foreach ($ret['table']['info']['schema']['fields'] as $field) $structure_from_bq[$field['name']] = $field;
 
                 foreach ($structure_from_model as $field=>$item) {
