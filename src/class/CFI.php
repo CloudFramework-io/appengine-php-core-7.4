@@ -149,7 +149,22 @@ class CFIField {
      * @param $value
      * @return CFIField $this
      */
-    public function value($value) { $this->cfi->json_object['fields'][$this->field]['value'] = $value; return $this;}
+    public function value($value) {
+        $this->cfi->json_object['fields'][$this->field]['value'] = $value; return $this;
+        $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $value; return $this;
+    }
+
+    /**
+     * Set a date type
+     * @param $value
+     * @return CFIField $this
+     */
+    public function date($title='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'date';
+        if($title)
+            $this->cfi->json_object['fields'][$this->field]['name'] = $title;
+        return $this;
+    }
 
     /**
      * Set a title for the field
@@ -217,6 +232,18 @@ class CFIField {
         if($image_with_pixels) $this->cfi->json_object['fields'][$this->field]['image_width'] = $image_with_pixels;
         if($image_height_pixels) $this->cfi->json_object['fields'][$this->field]['image_height'] = $image_height_pixels;
 
+        return $this;
+    }
+    /**
+     * Set and external_values field
+     * @param string $api Url to send the query..
+     *     'It normally starts with /cfi/<cfo-name>?fields=<fields-to-show-separated-by-comma>
+     * @param string $fields Fields to show
+     * @return CFIField $this
+     */
+    public function apiValues(string $api,string $fields) {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'api_select_partial';
+        $this->cfi->json_object['fields'][$this->field]['api'] = $api;
         return $this;
     }
     /**

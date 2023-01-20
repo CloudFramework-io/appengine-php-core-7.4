@@ -25,8 +25,9 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
         /** @var Google_Service_Sheets $spreedsheet with contain the properties to feed an Excel File*/
         var $spreedsheet = null;
 
-        /** @var Google_Service_Drive $drive will manage the drive access properties*/
+        /** @var Google\Service\Drive $drive will manage the drive access properties*/
         private $drive = null;
+        private $drives_data = [];
 
         /** @var Google_Service_Drive_DriveFile $file will manage  files in general*/
         private $file = null;
@@ -46,7 +47,7 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
             $client = $this->getGoogleClient($config);
             $this->spreedsheet = new Google_Service_Sheets($client);
             $this->drive = new Google_Service_Drive($client);
-            $this->file = new Google_Service_Drive($client);
+            $this->file = new Google_Service_Drive_DriveFile($client);
         }
 
 
@@ -122,10 +123,10 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
                 if($parent_id)
                     $file->setParents([$parent_id]);
 
-                $retFile = $this->drive->files->create($file);
+                $retFile = $this->drive->files->create($file,['supportsAllDrives'=>true]);
                 return $retFile->getId();
             } catch (Exception $e) {
-                return $this->addError($e->getMessage());
+                return $this->addError(['createSpreadSheet',$e->getMessage()]);
             }
 
         }
@@ -152,6 +153,95 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
         }
 
         /**
+         * Create a folder under a parent
+         * @param string $folder_name
+         * @param string $parent_id value of the parent folder id
+         */
+        public function fileInfo(string $id) {
+            try {
+                /** @var Google\Service\Drive\DriveFile $file */
+                $file = new Google_Service_Drive_DriveFile();
+                $file->setId($id);
+                return [
+                    'id'=>$file->getId(),
+                    'name'=>$file->getName(),
+                    'kind'=>$file->getKind(),
+                    'description'=>$file->getDescription(),
+                    'mimeType'=>$file->getMimeType(),
+                    'url'=>$this->getUrlFromMimeType($file),
+                    'created'=>$file->getCreatedTime(),
+                    'parents'=>$file->getParents(),
+                    'shared_drive_id'=>$file->getDriveId(),
+                    'shared_drive_name'=>$this->getSharedDriveInfo($file->getDriveId())['name']??null,
+                ];
+            } catch (Exception $e) {
+                return $this->addError($e->getMessage());
+            }
+
+        }
+
+        /**
+         * Delete a file
+         * @param string $id
+         */
+        public function deleteFile(string $id) {
+            try {
+                $this->drive->files->delete($id,['supportsAllDrives'=>true]);
+                return true;
+            } catch (Exception $e) {
+                return $this->addError($e->getMessage());
+            }
+
+        }
+
+        /**
+         * Delete a file
+         * @param string $id
+         */
+        public function copyFile($source_id, $name,$parent_id) {
+            try {
+                /** @var Google\Service\Drive\DriveFile $file */
+                $file = new Google_Service_Drive_DriveFile();
+                $file->setName($name);
+                if($parent_id)
+                    $file->setParents([$parent_id]);
+                $options = ['supportsAllDrives'=>true];
+                $file_copied = $this->drive->files->copy($source_id,$file,$options);
+                return [
+                    'id'=>$file->getId(),
+                    'name'=>$file->getName(),
+                    'kind'=>$file->getKind(),
+                    'description'=>$file->getDescription(),
+                    'mimeType'=>$file->getMimeType(),
+                    'url'=>$this->getUrlFromMimeType($file),
+                    'created'=>$file->getCreatedTime(),
+                    'parents'=>$file->getParents(),
+                    'shared_drive_id'=>$file->getDriveId(),
+                    'shared_drive_name'=>$this->getSharedDriveInfo($file->getDriveId())['name']??null,
+                ];
+                return true;
+            } catch (Exception $e) {
+                return $this->addError($e->getMessage());
+            }
+
+        }
+
+
+        /**
+         * Create a folder under a parent
+         * @param string $folder_id value of the folder to delete
+         */
+        public function deleteDriveFolder(string $file_id) {
+            try {
+                $this->drive->drives->delete($file_id,['supportsAllDrives'=>true]);
+
+            } catch (Exception $e) {
+                return $this->addError($e->getMessage());
+            }
+
+        }
+
+        /**
          * List the Files Shared we the user
          * @return array|void
          */
@@ -159,6 +249,50 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
             return $this->getFiles('sharedWithMe',$pageSize,$pageToken);
         }
 
+        public function getSharedDriveInfo($id_drive) {
+            if(isset($this->drives_data[$id_drive])) return $this->drives_data[$id_drive];
+            try {
+                $drive_info = $this->drive->drives->get('0AOLA5z-c1M42Uk9PVA');
+                $this->drives_data[$id_drive] =  [
+                    'name' => $drive_info->getName(),
+                    'kind' => $drive_info->getKind(),
+                    'created' => $drive_info->getCreatedTime(),
+                    'capabilities' => $drive_info->getCapabilities(),
+                ];
+                return $this->drives_data[$id_drive];
+            } catch (Exception $e) {
+                return $this->addError($e->getMessage());
+            }
+
+        }
+        public function getFolderFiles($id_folder) {
+            try {
+
+                //TODO: show only elements "trashed=false": https://developers.google.com/drive/api/v3/reference/files/list
+                //$options = ['corpora'=>'drive','driveId'=>'0AOLA5z-c1M42Uk9PVA','supportsAllDrives'=>true,'includeItemsFromAllDrives'=>true,'q'=>"'1UbGIWCwageqB-cO7AYAiVPywSrFKp49f' in parents"];
+                $options = ['supportsAllDrives'=>true,'includeItemsFromAllDrives'=>true,'q'=>"'{$id_folder}' in parents"];
+                $files = $this->drive->files->listFiles($options);
+                $ret_files = [];
+                /** @var Google\Service\Drive\DriveFile $file */
+                foreach ($files as $file) {
+                    $ret_files[] = [
+                        'id'=>$file->getId(),
+                        'name'=>$file->getName(),
+                        'kind'=>$file->getKind(),
+                        'description'=>$file->getDescription(),
+                        'mimeType'=>$file->getMimeType(),
+                        'url'=>$this->getUrlFromMimeType($file),
+                        'created'=>$file->getCreatedTime(),
+                        'parents'=>$file->getParents(),
+                        'shared_drive_id'=>$file->getDriveId(),
+                        'shared_drive_name'=>$this->getSharedDriveInfo($file->getDriveId())['name']??null,
+                    ];
+                }
+                return $ret_files;
+            } catch (Exception $e) {
+                return $this->addError($e->getMessage());
+            }
+        }
         /**
          * List the Files
          * @param string $q Some examples of queries: "'me' in owners and trashed = false" or "sharedWithMe"
@@ -173,15 +307,15 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
                     'pageSize' => $pageSize,
                     'fields' => 'nextPageToken,files(id,name,mimeType)',  // or '*'
                 ];
-                if($q) $opt['q'] = $q;
-                if($pageToken) $opt['pageToken'] = $pageToken;
+                if($q) $options['q'] = $q;
+                if($pageToken) $options['pageToken'] = $pageToken;
 
                 $files = $this->drive->files->listFiles($options);
                 $ret=[
-                    'pageToken'=>$pageToken
-                    ,'nextPageToken'=>$files->getNextPageToken()
-                    ,'pageSize'=>$pageSize
-                    ,'files'=>[]
+                    'pageToken'=>$pageToken,
+                    'nextPageToken'=>$files->getNextPageToken(),
+                    'pageSize'=>$pageSize,
+                    'files'=>[],
                 ];
                 /** @var Google\Service\Drive\DriveFile $file */
                 foreach ($files as $file) {
@@ -209,6 +343,27 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
             } catch (Exception $e) {
                 return $this->addError($e->getMessage());
             }
+        }
+
+        private function getUrlFromMimeType(Google\Service\Drive\DriveFile $file) {
+            $mimeType = $file->getMimeType();
+            $url='';
+            switch ($mimeType) {
+                case "application/vnd.google-apps.folder":
+                    $url = "https://drive.google.com/drive/folders/".$file->getId();
+                    break;
+                case "application/vnd.google-apps.spreadsheet":
+                    $url = "https://docs.google.com/spreadsheets/d/".$file->getId();
+                    break;
+                case "application/vnd.google-apps.presentation":
+                    $url = "https://docs.google.com/presentation/d/".$file->getId();
+                    break;
+                case "application/vnd.google-apps.document":
+                case "text/html":
+                    $url = "https://docs.google.com/document/d/".$file->getId();
+                    break;
+            }
+            return $url;
         }
 
         /**
