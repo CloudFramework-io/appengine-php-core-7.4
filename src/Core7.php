@@ -6644,7 +6644,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          *  $options['title'] = titlte to be shown
          *  $options['default'] = default value
          *  $options['values'] = [array of valid values]
-         *  $options['cache_var'] = 'name to cache the result. If result is cached it rewrites defaul'
+         *  $options['cache_var'] = 'name to cache the result. If result is cached it rewrites default'
          *  $options['type'] = password | number | float
          *  $options['allowed_values'] = allowed values
          *
