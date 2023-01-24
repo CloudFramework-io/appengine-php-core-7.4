@@ -96,6 +96,33 @@ class WorkFlows
     }
 
     /**
+     * Retrive a email template with if $slug
+     * @param $slug
+     * @param $data
+     * @return string|void HTML of the template or false if ERROR
+     */
+    public function renderMandrillTemplate(string $slug,array $data)
+    {
+        if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
+        try {
+            $vars = [];
+            if(is_array($data)) foreach ($data as $key=>$value) {
+                $vars[] = ['name'=>$key,'content'=>$value];
+            }
+            if(is_array($data['email_template_vars']??null)) foreach ($data['email_template_vars'] as $key=>$value) {
+                $vars[] = ['name'=>$key,'content'=>$value];
+            }
+
+            $template = $this->mandrill->templates->render($slug,[],$vars);
+        } catch (ErrorException $e) {
+            return $this->addError($e->getMessage());
+        }
+
+        return $template['html'];
+
+    }
+
+    /**
      * Retrive Mandrill WebHooks
      * @return array|void if there is no error it returns the array of templates in the server
      */
