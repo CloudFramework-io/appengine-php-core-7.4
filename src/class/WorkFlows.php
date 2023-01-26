@@ -16,6 +16,11 @@ class WorkFlows
     var $core;
     /** @var Mandrill */
     var $mandrill;
+
+    /** @var CFOs $cfos */
+    var $cfos = null;
+
+
     var $error = false;                 // When error true
     var $errorMsg = [];                 // When error array of messages
 
@@ -260,26 +265,167 @@ class WorkFlows
     }
 
     /**
-     * SET API for mandrill interation and SETUP $this->mandrill
+     * Retrieve an email template from the ERP
+     * @param CFOs $cfos
      * @param string $slug
-     * @param array $params
+     * @param string $type
+     */
+    public function getERPEmailTemplate(CFOs &$cfos,string $slug,string $type='Mandrill') {
+
+        $this->cfos = $cfos;
+
+
+        $dsTemplate = $this->cfos->ds('CloudFrameWorkEmailTemplates')->fetchOneByKey($slug);
+        if($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
+
+        if($type=='Mandrill') {
+            if(!$dsTemplate) {
+                if (!$mandrillTemplate = $this->getMandrillTemplate($slug)) return $this->addError($this->workFlows->errorMsg);
+                $template = $this->getEntityFromMandrillTemplate([], $mandrillTemplate);
+                $dsTemplate = $this->cfos->ds('CloudFrameWorkEmailTemplates')->createEntities($template)[0] ?? null;
+                if ($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
+//                $template = $this->getEntityFromMandrillTemplate($dsTemplate,$mandrillTemplate);
+//                if($template['DateUpdating'] != $dsTemplate['DateUpdating']) {
+//                    $this->cfos->ds('CloudFrameWorkEmailTemplates')->createEntities($template);
+//                    if($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
+//                }
+//                $dsTemplate = $template;
+            }
+        }
+
+        return $dsTemplate;
+
+    }
+
+    /**
+     * @param CFOs $cfo class to hangle ERP CFO models
+     * @param array $params {
+     *    Parameters by reference to send an email.
+     *      - slug string Template Id to send
+     *      - from string email from sender. [optional] if the Mandrill Template has DefaultFromEmail
+     *      - name string name from sender. [optional]
+     *      - subject string email subject. . [optional] if the Mandrill Template has DefaultSubject
+     *      - name string [optional] Name of the sender
+     *      - cat string [optional] Category for the email. If it is not sent it will take the Category of the email template
+     *      - data array [optional] array of objects [key=>value] to be sent as variables to merge with the template
+     *      - tags array [optional] array tags to add to the emial [tag1,tag2..]
+     *      - attachments array [optional] array objects to be sent as attachments. Format of each object: ['type'=>'{mime-type}(example:application/pdf)','name'=>'{filename}(example:file.pdf)','content'=>base64_encode({file-content})];
+     * }
+     * @param string $type [optional] has to value: Mandrill
+     */
+    public function sendERPEmail(CFOs &$cfos,array &$params,string $type='Mandrill') {
+        if($type!='Mandrill') return $this->addError('sendEmail($type,array $params) only $type="Mandrill" is supported');
+        $this->cfos = $cfos;
+        switch ($type) {
+            case "Mandrill":
+                if(!$slug = $params['slug']??null) return $this->addError('sendEmail($params) missing slug in $params because the template does not have a default from email');
+                if(!$from = $params['from']??null) return $this->addError('sendEmail($params) missing from in $params because the template does not have a default from email');
+                $from_name = $params['name']??null;
+                if(!$to = $params['to']??null) return $this->addError('sendEmail($params) missing to in $params because the template does not have a default from email');
+                if(!$subject = $params['subject']??null) return $this->addError('sendEmail($params) missing subject in $params because the template does not have a default from email');
+                $tags = $params['tags']??null;
+                $data = $params['data']??null;
+                $cc = $params['cc']??null;
+
+                if(!$template = $this->getERPEmailTemplate($this->cfos,$slug)) return;
+                $cat = $params['cat']??($template['Cat']??'NOT-DEFINED');
+                $html = $this->renderMandrillTemplate($slug,$data);
+
+                if(!is_array($to))
+                    $to = explode(',',$to);
+                if(!is_array($tags))
+                    $tags = explode(',',$tags);
+                if(!is_array($cc))
+                    $cc = explode(',',$tags);
+                $submission = [
+                    "Cat"=>$cat,
+                    "DateInsertion"=>'now',
+                    "From"=>$from,
+                    "To"=>$to,
+                    "Cc"=>$cc,
+                    "Subject"=>$subject,
+                    "EmailTemplateId"=>$slug,
+                    "Tags"=>$tags,
+                    "EngineType"=>'Mandrill',
+                    "TemplateHTML"=>$template['TemplateHTML'],
+                    "TemplateTXT"=>$template['TemplateTXT'],
+                    "DateProcessing"=>null,
+                    "StatusProcessing"=>'initiated',
+                    "JSONProcessing"=>['TemplateVariables'=>$data,'Result'=>null],
+                ];
+                $dsSubmission = $this->cfos->ds('CloudFrameWorkEmailsSubmissions')->createEntities($submission)[0]??null;
+                if($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
+
+                $result = $this->sendMandrillEmail($params);
+                $dsSubmission['StatusProcessing'] = $result['success']?'success':'error';
+                $dsSubmission['JSONProcessing']['Result'] = $result;
+                $dsSubmission['DateProcessing'] = "now";
+                $dsSubmission = $this->cfos->ds('CloudFrameWorkEmailsSubmissions')->createEntities($dsSubmission)[0]??null;
+                if($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
+
+                if($result['success']) foreach ( $result['result'] as $i=>$item) {
+                    $email = [
+                        "Cat"=>$dsSubmission['Cat'],
+                        "SubmissionId"=>$dsSubmission['KeyId'],
+                        "EmailTemplateId"=>$slug,
+                        "EngineType"=>'Mandrill',
+                        "EngineId"=>$item['_id'],
+                        "Type"=>'OUT',
+                        "DateInsertion"=>'now',
+                        "From"=>$from,
+                        "To"=>$item['email']??$to,
+                        "Cc"=>null,
+                        "Subject"=>$subject,
+                        "Tags"=>$tags,
+                        "Opens"=>0,
+                        "Clicks"=>0,
+                        "BODY_HTML"=>utf8_encode($html),
+                        "BODY_TXT"=>'.',
+                        "DateProcessing"=>"now",
+                        "StatusProcessing"=>$item['status']??'unknown',
+                        "JSONProcessing"=>['Result'=>$item,'Info'=>[]],
+                    ];
+                    $dsEmail = $this->cfos->ds('CloudFrameWorkEmails')->createEntities($email)[0]??null;
+                    if($this->cfos->ds('CloudFrameWorkEmails')->error) {
+                        $result['result'][$i]['CloudFrameWorkEmails'] = $this->cfos->ds('CloudFrameWorkEmails')->errorMsg;
+                    } else {
+                        $result['result'][$i]['CloudFrameWorkEmails'] = strval($dsEmail['KeyId']);
+                    }
+                }
+                return($result);
+                break;
+        }
+    }
+
+
+    /**
+     * SET API for mandrill interation and SETUP $this->mandrill
+     * @param array $params {
+     *      info to be sent in the email
+     *      - from string email from sender. [optional] if the Mandrill Template has DefaultFromEmail
+     *      - subject string email subject. . [optional] if the Mandrill Template has DefaultSubject
+     *      - name string [optional] Name of the sender
+     *      - data array [optional] array of objects [key=>value] to be sent as variables to merge with the template
+     *      - tags array [optional] array tags to add to the emial [tag1,tag2..]
+     *      - attachments array [optional] array objects to be sent as attachments. Format of each object: ['type'=>'{mime-type}(example:application/pdf)','name'=>'{filename}(example:file.pdf)','content'=>base64_encode({file-content})];
+     * }
      * @throws Mandrill_Error
      */
-    public function sendMandrillEmail(string $slug,array $params) {
+    public function sendMandrillEmail(array &$params) {
 
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
-        if(!$template = $this->getMandrillTemplate($slug)) return;
+        if(!($slug = $params['slug']??null)) return $this->addError('sendMandrillEmail($params) missing slug in $params because the template does not have a default from email');
 
-        if(!$from = $params['from']??($template['DefaultFromEmail']??null)) return $this->addError('sendMandrillEmail($slug,$params) missing email in $params because the template does not have a default from email');
-        if(!$subject = $params['subject']??($template['DefaultSubject']??null)) return $this->addError('sendMandrillEmail($slug,$params) missing subject in $params because the template does not have a default subject');
+        if(!$template = $this->getMandrillTemplate($slug)) return;
+        if(!$from = $params['from']??($template['DefaultFromEmail']??null)) return $this->addError('sendMandrillEmail($params) missing email in $params because the template does not have a default from email');
+        if(!$subject = $params['subject']??($template['DefaultSubject']??null)) return $this->addError('sendMandrillEmail($params) missing subject in $params because the template does not have a default subject');
         $from_name = $params['name']??($template['DefaultFromName']??'');
-        if(!$email_tos = $params['to']) return $this->addError('sendMandrillEmail($slug,$params) missing to in $params');
+        if(!$email_tos = $params['to']) return $this->addError('sendMandrillEmail($params) missing to in $params');
         if(!is_array($email_tos)) $email_tos = explode(',',$email_tos);
         $email_data= $params['data']??[];
         if(!is_array($email_data)) $email_data=[];
         $tags = $params['tags']??[];
         if(!is_array($tags)) $tags=explode(',',$tags);
-
 
         try {
             $message = array(
@@ -312,13 +458,18 @@ class WorkFlows
             $message['to'] = [];
             foreach ($email_tos as $email_to) {
                 if(is_array($email_to)) {
-                    if(!($email_to['email']??null)) return $this->addError('sendMandrillEmail($slug,$params) Wrong $params["to"] array. Missing email attribute');
+                    if(!($email_to['email']??null)) return $this->addError('sendMandrillEmail($params) Wrong $params["to"] array. Missing email attribute');
                     $message['to'][] = ['email' => $email_to['email'], 'name' => $email_to['name'] ?? $email_to['email'], 'type' => 'to'];
                 }else
                     $message['to'][] = ['email'=>$email_to,'name'=> $email_to,'type'=>'to'];
             }
             //endregion
 
+            //region ADD Attachments
+            if(($params['attachments']??null) ) {
+                $message['attachments'] = $params['attachments'];
+            }
+            //endregion
              //region Add $email_data into the email template
             if(is_array($email_data)) foreach ($email_data as $key=>$value) {
                 $template_content[] = ['name'=>$key,'content'=>$value];
@@ -331,7 +482,6 @@ class WorkFlows
 //            $result = $this->mandrill->messages->sendTemplate($slug, $template_content, $message, $async, $ip_pool, $send_at);
             $result = $this->mandrill->messages->sendTemplate($slug, $template_content, $message, $async, $ip_pool);
             return ['success'=>true,'result'=>$result];
-
         } catch (Error $e) {
             return ['success'=>false,'result'=>$e->getMessage()];
             return $this->addError($e->getMessage());
@@ -348,4 +498,46 @@ class WorkFlows
         $this->error = true;
         $this->errorMsg[] = $value;
     }
+
+    /**
+     * Return an array with the structure of ds:CloudFrameWorkEmailTemplates taking Mandrill $template array info
+     * @param array $entity
+     * @param array $template
+     * @return array value of $entity modified with template variables
+     */
+    private function getEntityFromMandrillTemplate(array $entity,array $template) {
+
+        $entity['KeyName']=$template['slug'];
+        $entity['TemplateDescription']=$template['name'];
+        $entity['Labels']=$template['labels'];
+        $entity['TemplateAcive']=true;
+        $entity['DefaultSubject']=$template['publish_subject'];
+        $entity['DefaultFromEmail']=$template['publish_from_email'];
+        $entity['DefaultFromName']=$template['publish_from_name'];
+        $entity['PublishedDate']=$template['published_at'];
+        $entity['DateInsertion']=$template['created_at'];
+        $entity['DateUpdating']=substr($template['updated_at'],0,19);
+        $entity['Type']='Mandrill';
+        $entity['TemplateHTML']=utf8_encode($template['publish_code']);
+        $entity['TemplateTXT']=utf8_encode($template['publish_text']);
+        $entity['TemplateURL']="https://mandrillapp.com/templates/code?id=".urlencode($template['slug']);
+        $entity['TemplateVariables']=[];
+
+        //region extract Variables
+        $code = utf8_encode($template['publish_code']);
+        do {
+
+            $found = null;
+            preg_match("/\*\|([A-z0-9_ ]*)\|\*/", $code, $found);
+            if($found) {
+                if(!strpos($found[1],':'))
+                    $entity['TemplateVariables'][] = $found[1];
+                $code = str_replace($found[0],$found[1],$code);
+            }
+        } while ($found);
+        //endregion
+
+        return $entity;
+    }
+
 }
