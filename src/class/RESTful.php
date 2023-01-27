@@ -933,7 +933,7 @@ if (!defined("_RESTfull_CLASS_")) {
             }
 
             // IF THE CALL comes from a queue then LOG the result to facilitate the debug
-            if(($this->core->security->isCron() || array_key_exists('cloudframework_queued',$this->formParams)) && !strpos($this->core->system->url['url'],'/queue/')) {
+            if(($this->core->security->isCron() || (isset($this->formParams) && array_key_exists('cloudframework_queued',$this->formParams))) && !strpos($this->core->system->url['url'],'/queue/')) {
                 $title = (isset($this->formParams['cloudframework_queued']) && $this->formParams['cloudframework_queued'])?'RESULT FROM QUEUE ':'';
                 if($this->core->security->isCron())
                     $title .= 'USING CRON';

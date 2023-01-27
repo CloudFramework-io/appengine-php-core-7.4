@@ -258,7 +258,7 @@ class WorkFlows
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
         try {
             $content = $this->mandrill->messages->content($id);
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
         return $content;
@@ -278,7 +278,7 @@ class WorkFlows
         $dsTemplate = $this->cfos->ds('CloudFrameWorkEmailTemplates')->fetchOneByKey($slug);
         if($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
 
-        if($type=='Mandrill') {
+        if($type=='Mandrill' && is_object($this->mandrill)) {
             if(!$dsTemplate) {
                 if (!$mandrillTemplate = $this->getMandrillTemplate($slug)) return $this->addError($this->workFlows->errorMsg);
                 $template = $this->getEntityFromMandrillTemplate([], $mandrillTemplate);
@@ -297,7 +297,33 @@ class WorkFlows
 
     }
 
+
+
     /**
+     * Retrieve an email template from the ERP
+     * @param CFOs $cfos
+     * @param string $slug
+     * @param string $type
+     */
+    public function getERPEmailMessage(CFOs &$cfos,string $id,string $type='Mandrill',$update_processing=null)
+    {
+        $this->cfos = $cfos;
+        $dsEmeail = $this->cfos->ds('CloudFrameWorkEmails')->fetchOne('*',['EngineId'=>$id])[0]??null;
+        if($this->cfos->ds('CloudFrameWorkEmails')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmails')->errorMsg);
+        if($type=='Mandrill' && is_object($this->mandrill)) {
+            if(!$dsEmeail) {
+                if (!$email_info = $this->getMandrillMessageInfo($id)) return;
+                if (!$email = $this->getMandrillMessageContent($id)) return;
+                $entity = $this->getEntityFromMandrillMessage([], $email,$email_info,$update_processing);
+                $dsEmeail = $this->cfos->ds('CloudFrameWorkEmails')->createEntities($entity)[0]??null;
+                if($this->cfos->ds('CloudFrameWorkEmails')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmails')->errorMsg);
+            }
+        }
+        if(!$dsEmeail) return $this->addError('EmailMessage not found: '.$id);
+        return $dsEmeail;
+    }
+
+        /**
      * @param CFOs $cfo class to hangle ERP CFO models
      * @param array $params {
      *    Parameters by reference to send an email.
@@ -382,6 +408,7 @@ class WorkFlows
                         "BODY_HTML"=>utf8_encode($html),
                         "BODY_TXT"=>'.',
                         "DateProcessing"=>"now",
+                        "UpdateProcessing"=>"now",
                         "StatusProcessing"=>$item['status']??'unknown',
                         "JSONProcessing"=>['Result'=>$item,'Info'=>[]],
                     ];
@@ -537,6 +564,43 @@ class WorkFlows
         } while ($found);
         //endregion
 
+        return $entity;
+    }
+
+
+
+    /**
+     * Return an array with the structure of ds:CloudFrameWorkEmails taking Mandrill $message array info
+     * @param array $entity
+     * @param array $message
+     * @param array $info
+     * @return array value of $entity modified with template variables
+     */
+    private function getEntityFromMandrillMessage(array $entity,array $message, array $info=[],$update_processing=null) {
+
+        if(!isset($entity["Cat"]))
+            $entity["Cat"]='WEBHOOK-CREATED';
+        if(!isset($entity["SubmissionId"]))
+            $entity["SubmissionId"]=null;
+        $entity["EmailTemplateId"]=$info['template']??null;
+        $entity["EngineType"]='Mandrill';
+        $entity["EngineId"]=$message['_id'];
+        $entity["EngineTemplate"]=$info['template']??null;
+        $entity["Type"]='OUT';
+        $entity["DateInsertion"]=date('Y-m-d H:i:s',$message['ts']);
+        $entity["From"]=$message['from_email'];
+        $entity["To"]=$message['to']['email'];
+        $entity["Subject"]=$message['subject'];
+        $entity["Tags"]=$message['tags'];
+        $entity["Opens"]=$info['opens']??0;
+        $entity["Clicks"]=$info['clicks']??0;
+        $entity["BODY_HTML"]=utf8_encode($message['html']);
+        $entity["BODY_TXT"]=utf8_encode($message['text']);
+        $entity["DateProcessing"]=date('Y-m-d H:i:s',$message['ts']);
+        $entity["UpdateProcessing"]=$update_processing;
+        $entity["StatusProcessing"]=$info['state']??'unknown';
+        $entity["JSONProcessing"]['Result']=['email'=>$message['to'],"status"=>($info['state']??'unknown'),'_id'=>$message['_id']];
+        $entity["JSONProcessing"]['Info']=$info;
         return $entity;
     }
 
