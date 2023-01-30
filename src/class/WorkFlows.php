@@ -329,9 +329,14 @@ class WorkFlows
      *    Parameters by reference to send an email.
      *      - slug string Template Id to send
      *      - from string email from sender. [optional] if the Mandrill Template has DefaultFromEmail
-     *      - name string name from sender. [optional]
-     *      - subject string email subject. . [optional] if the Mandrill Template has DefaultSubject
-     *      - name string [optional] Name of the sender
+     *      - name string [optional] name from sender.
+     *      - subject string email subject. [optional] if the Mandrill Template has DefaultSubject
+     *      - to string|array email/s to send the email. If it is string the emails has to be separated by ','. If it is an array it has to be an array
+     *           of objects with the following structure: ['email'=>(string),'name'=>(optional string)
+     *      - cc string|array [optional] email/s to send the email in cc. If it is string the emails has to be separated by ','. If it is an array it has to be an array
+     *           of objects with the following structure: ['email'=>(string),'name'=>(optional string)
+     *      - bcc string [optional] email to send a copy in bcc
+     *      - reply_to string [optional] email to redirect the replies of the email
      *      - cat string [optional] Category for the email. If it is not sent it will take the Category of the email template
      *      - data array [optional] array of objects [key=>value] to be sent as variables to merge with the template
      *      - tags array [optional] array tags to add to the emial [tag1,tag2..]
@@ -352,6 +357,8 @@ class WorkFlows
                 $tags = $params['tags']??null;
                 $data = $params['data']??null;
                 $cc = $params['cc']??null;
+                $reply_to = $params['reply_to']??null;
+                $bcc = $params['bcc']??null;
 
                 if(!$template = $this->getERPEmailTemplate($this->cfos,$slug)) return;
                 $cat = $params['cat']??($template['Cat']??'NOT-DEFINED');
@@ -362,7 +369,7 @@ class WorkFlows
                 if(!is_array($tags))
                     $tags = explode(',',$tags);
                 if(!is_array($cc))
-                    $cc = explode(',',$tags);
+                    $cc = explode(',',$cc);
                 $submission = [
                     "Cat"=>$cat,
                     "DateInsertion"=>'now',
@@ -377,7 +384,7 @@ class WorkFlows
                     "TemplateTXT"=>$template['TemplateTXT'],
                     "DateProcessing"=>null,
                     "StatusProcessing"=>'initiated',
-                    "JSONProcessing"=>['TemplateVariables'=>$data,'Result'=>null],
+                    "JSONProcessing"=>['Reply-To'=>$reply_to,'bcc'=>$bcc,'TemplateVariables'=>$data,'Result'=>null],
                 ];
                 $dsSubmission = $this->cfos->ds('CloudFrameWorkEmailsSubmissions')->createEntities($submission)[0]??null;
                 if($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
@@ -400,13 +407,11 @@ class WorkFlows
                         "DateInsertion"=>'now',
                         "From"=>$from,
                         "To"=>$item['email']??$to,
-                        "Cc"=>null,
                         "Subject"=>$subject,
                         "Tags"=>$tags,
                         "Opens"=>0,
                         "Clicks"=>0,
                         "BODY_HTML"=>utf8_encode($html),
-                        "BODY_TXT"=>'.',
                         "DateProcessing"=>"now",
                         "UpdateProcessing"=>"now",
                         "StatusProcessing"=>$item['status']??'unknown',
@@ -430,8 +435,14 @@ class WorkFlows
      * @param array $params {
      *      info to be sent in the email
      *      - from string email from sender. [optional] if the Mandrill Template has DefaultFromEmail
-     *      - subject string email subject. . [optional] if the Mandrill Template has DefaultSubject
-     *      - name string [optional] Name of the sender
+     *      - name string name from sender. [optional] if the Mandrill Template has DefaultFromEmail
+     *      - subject string email subject. [optional] if the Mandrill Template has DefaultSubject
+     *      - to string|array email/s to send the email. If it is string the emails has to be separated by ','. If it is an array it has to be an array
+     *           of objects with the following structure: ['email'=>(string),'name'=>(optional string)
+     *      - cc string|array [optional] email/s to send the email in cc. If it is string the emails has to be separated by ','. If it is an array it has to be an array
+     *           of objects with the following structure: ['email'=>(string),'name'=>(optional string)
+     *      - bcc string [optional] email to send a copy in bcc
+     *      - reply_to string [optional] email to redirect the replies of the email
      *      - data array [optional] array of objects [key=>value] to be sent as variables to merge with the template
      *      - tags array [optional] array tags to add to the emial [tag1,tag2..]
      *      - attachments array [optional] array objects to be sent as attachments. Format of each object: ['type'=>'{mime-type}(example:application/pdf)','name'=>'{filename}(example:file.pdf)','content'=>base64_encode({file-content})];
@@ -447,19 +458,31 @@ class WorkFlows
         if(!$from = $params['from']??($template['DefaultFromEmail']??null)) return $this->addError('sendMandrillEmail($params) missing email in $params because the template does not have a default from email');
         if(!$subject = $params['subject']??($template['DefaultSubject']??null)) return $this->addError('sendMandrillEmail($params) missing subject in $params because the template does not have a default subject');
         $from_name = $params['name']??($template['DefaultFromName']??'');
-        if(!$email_tos = $params['to']) return $this->addError('sendMandrillEmail($params) missing to in $params');
-        if(!is_array($email_tos)) $email_tos = explode(',',$email_tos);
+
+        if(!$emails_to = $params['to']??null) return $this->addError('sendMandrillEmail($params) missing to in $params');
+        if(!is_array($emails_to)) $emails_to = explode(',',$emails_to);
+
+        $emails_cc = $params['cc']??[];
+        if($emails_cc && !is_array($emails_cc)) $emails_cc = explode(',',$emails_cc);
+
+        $email_bcc = $params['bcc']??null;
+        $reply_to = $params['reply_to']??null;
+
         $email_data= $params['data']??[];
         if(!is_array($email_data)) $email_data=[];
         $tags = $params['tags']??[];
         if(!is_array($tags)) $tags=explode(',',$tags);
+
+        $headers = [];
+        if($reply_to && $this->core->is->validEmail($reply_to))
+            $headers['Reply-To'] =$reply_to;
 
         try {
             $message = array(
                 'subject' => $subject,
                 'from_email' => $from,
                 'from_name' => $from_name,
-                // 'headers' => array('Reply-To' => 'Cloudframework@cloudframework.io'),
+                'headers' => $headers,
                 'important' => false,
                 'track_opens' => null,
                 'track_clicks' => null,
@@ -469,7 +492,7 @@ class WorkFlows
                 'url_strip_qs' => null,
                 'preserve_recipients' => null,
                 'view_content_link' => null,
-                // 'bcc_address' => "Cloudframework@cloudframework.io",
+                'bcc_address' => ($email_bcc && $this->core->is->validEmail($email_bcc))?$email_bcc:null,
                 'tracking_domain' => null,
                 'signing_domain' => null,
                 'return_path_domain' => null,
@@ -480,15 +503,26 @@ class WorkFlows
                 //'metadata' => array('website' => $domain)
             );
 
-            //region to: into $message['to']
 
+
+            //region to: into $message['to']
             $message['to'] = [];
-            foreach ($email_tos as $email_to) {
+            foreach ($emails_to as $email_to) {
                 if(is_array($email_to)) {
                     if(!($email_to['email']??null)) return $this->addError('sendMandrillEmail($params) Wrong $params["to"] array. Missing email attribute');
                     $message['to'][] = ['email' => $email_to['email'], 'name' => $email_to['name'] ?? $email_to['email'], 'type' => 'to'];
                 }else
                     $message['to'][] = ['email'=>$email_to,'name'=> $email_to,'type'=>'to'];
+            }
+            //endregion
+
+            //region cc: into $message['to']
+            foreach ($emails_cc as $email_cc) {
+                if(is_array($email_cc)) {
+                    if(!($email_cc['email']??null)) return $this->addError('sendMandrillEmail($params) Wrong $params["to"] array. Missing email attribute');
+                    $message['to'][] = ['email' => $email_cc['email'], 'name' => $email_cc['name'] ?? $email_cc['email'], 'type' => 'cc'];
+                }else
+                    $message['to'][] = ['email'=>$email_cc,'name'=> $email_cc,'type'=>'cc'];
             }
             //endregion
 
