@@ -77,7 +77,7 @@ class WorkFlows
             [17] => publish_from_name
              */
             return $templates;
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
     }
@@ -92,7 +92,7 @@ class WorkFlows
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
         try {
             $template = $this->mandrill->templates->info($slug);
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
 
@@ -119,7 +119,7 @@ class WorkFlows
             }
 
             $template = $this->mandrill->templates->render($slug,[],$vars);
-        } catch (ErrorException $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
 
@@ -136,7 +136,7 @@ class WorkFlows
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
         try {
             $webhooks = $this->mandrill->webhooks->getList();
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
 
@@ -163,7 +163,7 @@ class WorkFlows
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
         try {
             $domains = $this->mandrill->senders->domains();
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
 
@@ -194,7 +194,7 @@ class WorkFlows
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
         try {
             $senders = $this->mandrill->senders->getList();
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
 
@@ -229,7 +229,7 @@ class WorkFlows
         if(!$this->mandrill) return $this->addError('Missing Mandrill API_KEY. use function setMandrillApiKey($pau_key)');
         try {
             $info = $this->mandrill->messages->info($id);
-        } catch (Error $e) {
+        } catch (Mandrill_Error $e) {
             return $this->addError($e->getMessage());
         }
         return $info;
@@ -280,7 +280,7 @@ class WorkFlows
 
         if($type=='Mandrill' && is_object($this->mandrill)) {
             if(!$dsTemplate) {
-                if (!$mandrillTemplate = $this->getMandrillTemplate($slug)) return $this->addError($this->workFlows->errorMsg);
+                if (!$mandrillTemplate = $this->getMandrillTemplate($slug)) return;
                 $template = $this->getEntityFromMandrillTemplate([], $mandrillTemplate);
                 $dsTemplate = $this->cfos->ds('CloudFrameWorkEmailTemplates')->createEntities($template)[0] ?? null;
                 if ($this->cfos->ds('CloudFrameWorkEmailTemplates')->error) return $this->addError($this->cfos->ds('CloudFrameWorkEmailTemplates')->errorMsg);
@@ -355,7 +355,7 @@ class WorkFlows
                 if(!$to = $params['to']??null) return $this->addError('sendEmail($params) missing to in $params because the template does not have a default from email');
                 if(!$subject = $params['subject']??null) return $this->addError('sendEmail($params) missing subject in $params because the template does not have a default from email');
                 $tags = $params['tags']??null;
-                $data = $params['data']??null;
+                $data = $params['data']??[];
                 $cc = $params['cc']??null;
                 $reply_to = $params['reply_to']??null;
                 $bcc = $params['bcc']??null;
@@ -400,7 +400,7 @@ class WorkFlows
                     $email = [
                         "Cat"=>$dsSubmission['Cat'],
                         "SubmissionId"=>$dsSubmission['KeyId'],
-                        "EmailTemplateId"=>$slug,
+                        "EngineTemplate"=>$slug,
                         "EngineType"=>'Mandrill',
                         "EngineId"=>$item['_id'],
                         "Type"=>'OUT',
@@ -532,6 +532,8 @@ class WorkFlows
             }
             //endregion
              //region Add $email_data into the email template
+            $template_content=[];
+            $message['global_merge_vars']=[];
             if(is_array($email_data)) foreach ($email_data as $key=>$value) {
                 $template_content[] = ['name'=>$key,'content'=>$value];
                 $message['global_merge_vars'][] = ['name'=>$key,'content'=>$value];
