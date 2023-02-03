@@ -30,7 +30,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * ```
          * @var string $version version of the class
          */
-        var $version = '202212281';
+        var $version = '202302031';
 
         /** @ignore */
         var $bucket = '';
@@ -716,14 +716,20 @@ if (!defined ("_Buckets_CLASS_") ) {
             if(!$filename || ($filename[0]??null)=='/') return $this->addError('putContents($filename, $data, $path) $filename can not be empty and can not start with /');
             if($path && ($path[0]??null)!='/') return $this->addError('putContents($filename,$path,...) $path has to start with /');
 
-            $ctx = stream_context_create($options);
-
             $ret = false;
             try{
-                if(@file_put_contents($this->bucket.$path.'/'.$filename, $data,0,$ctx) === false) {
-                    $this->addError(error_get_last());
+                if(strpos($this->bucket,'gs:')===0 && is_object($this->gs_bucket)) {
+                    $upload_options =['name'=>$filename];
+                    if($options['medatada']??null) $upload_options['metadata']=$options['medatada'];
+                    if($object = $this->gs_bucket->upload($data,$upload_options))
+                        $ret=true;
                 } else {
-                    $ret = true;
+                    $ctx = stream_context_create($options);
+                    if(@file_put_contents($this->bucket.$path.'/'.$filename, $data,0,$ctx) === false) {
+                        $this->addError(error_get_last());
+                    } else {
+                        $ret = true;
+                    }
                 }
             } catch(Exception $e) {
                 $this->addError($e->getMessage());
