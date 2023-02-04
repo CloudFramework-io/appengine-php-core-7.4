@@ -96,15 +96,19 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             //endregion
 
             //region SET $this->datastore, $this->project_id
-            if($this->core->gc_project_id && !isset($options['projectId'])) $options['projectId'] = $this->core->gc_project_id;
+            if($this->core->gc_project_id && !($options['projectId']??null)) $options['projectId'] = $this->core->gc_project_id;
             if(!isset($options['namespaceId'])) $options['namespaceId'] = $this->namespace;
             if(!isset($options['transport']) || !$options['transport'])
                 $options['transport'] = ($core->config->get('core.datastore.transport')=='grpc')?'grpc':'rest';
 
+            // ALLOW ACCESS to GLOBAL $datastore in order to increase performance
             global $datastore;
+
+            // SET $this->project_id
             $this->project_id = ($core->config->get("core.gcp.datastore.project_id"))?:getenv('PROJECT_ID');
-            // Evaluate to use global $datastore for performance or to create a new one object
-            if($this->project_id!=$options['projectId'] || (isset($options['keyFile']) && $options['keyFile']) || !is_object($datastore)) {
+
+            // ASSIGN $this->datastore to global $datastore o to a new DatastoreClient
+            if((($options['projectId']??null) && $this->project_id!=$options['projectId']) || ($options['keyFile']??null) || !is_object($datastore)) {
                 try {
                     $this->datastore = new DatastoreClient($options);
                     $this->project_id = $options['projectId'];
@@ -113,11 +117,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     return($this->addError($e->getMessage()));
                 }
             } else {
-                try {
-                    $this->datastore = &$datastore;
-                } catch (Exception $e) {
-                    return($this->addError($e->getMessage()));
-                }
+                $this->datastore = &$datastore;
             }
             //endregion
 
@@ -557,7 +557,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $this->core->__p->add('fetch: '.$this->entity_name, $type . ' fields:' . $fields . ' where:' . $this->core->jsonEncode($where) . ' order:' . $order . ' limit:' . $limit, 'note');
             $ret = [];
             if (!is_string($fields) || !strlen($fields)) $fields = '*';
-            if (!strlen($limit)) $limit = $this->limit;
+            if (!strlen($limit??'')) $limit = $this->limit;
             if ($type=='one') $limit = 1;
 
             $bindings=[];
@@ -674,7 +674,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 $_q .= " WHERE $where";
                 $where = null;
             }
-            if (strlen($order)) $_q .= " ORDER BY $order";
+            if (strlen($order??'')) $_q .= " ORDER BY $order";
 
             //region apply limit. 200 by default
             if (intval($limit)>0) {

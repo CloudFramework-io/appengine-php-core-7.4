@@ -101,6 +101,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 //Github issue: https://github.com/googleapis/google-cloud-php/issues/4744
                 return;
             }
+            //Catch StreamWrapper::stream_set_option
+            if (($errno == E_ERROR && strpos($errstr,'Uncaught TypeError: count')!==false)) {
+                //DO NOTHING. Google\Cloud\Datastore\Operations function runQuery(..) return Undefined index: entityResults line 527 for php 8
+                //Github issue: https://github.com/googleapis/google-cloud-datastore/issues/317
+                return;
+            }
 
             if($core) {
                 $core->errors->add($error, 'fatal_error', 'error');
@@ -159,7 +165,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.14031';
+        var $_version = 'v74.14041';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -484,7 +490,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(!is_array($paths)) $paths = explode(',',$paths);
 
             foreach ($paths as $path) {
-                if(strpos($this->system->url['url'], $path) === 0) {
+                if(strpos($this->system->url['url']??'', $path) === 0) {
                     $path = preg_replace('/\/$/','',$path);
                     $this->system->url['parts_base_index'] = count(explode('/',$path))-1;
                     $this->system->url['parts_base_url'] = $path;
@@ -823,17 +829,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
 
             // region  $server_var from $_SERVER
-            $server_var['HTTPS'] = (array_key_exists('HTTPS',$_SERVER))?$_SERVER['HTTPS']:null;
-            $server_var['DOCUMENT_ROOT'] = (array_key_exists('DOCUMENT_ROOT',$_SERVER))?$_SERVER['DOCUMENT_ROOT']:null;
-            $server_var['HTTP_HOST'] = (array_key_exists('HTTP_HOST',$_SERVER))?$_SERVER['HTTP_HOST']:null;
-            $server_var['REQUEST_URI'] = (array_key_exists('REQUEST_URI',$_SERVER))?$_SERVER['REQUEST_URI']:null;
-            $server_var['SCRIPT_NAME'] = (array_key_exists('SCRIPT_NAME',$_SERVER))?$_SERVER['SCRIPT_NAME']:null;
-            $server_var['HTTP_USER_AGENT'] = (array_key_exists('HTTP_USER_AGENT',$_SERVER))?$_SERVER['HTTP_USER_AGENT']:null;
-            $server_var['HTTP_ACCEPT_LANGUAGE'] = (array_key_exists('HTTP_ACCEPT_LANGUAGE',$_SERVER))?$_SERVER['HTTP_ACCEPT_LANGUAGE']:null;
-            $server_var['HTTP_X_APPENGINE_COUNTRY'] = (array_key_exists('HTTP_X_APPENGINE_COUNTRY',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_COUNTRY']:null;
-            $server_var['HTTP_X_APPENGINE_CITY'] = (array_key_exists('HTTP_X_APPENGINE_CITY',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_CITY']:null;
-            $server_var['HTTP_X_APPENGINE_REGION'] = (array_key_exists('HTTP_X_APPENGINE_REGION',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_REGION']:null;
-            $server_var['HTTP_X_APPENGINE_CITYLATLONG'] = (array_key_exists('HTTP_X_APPENGINE_CITYLATLONG',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_CITYLATLONG']:null;
+            $server_var['HTTPS'] = (array_key_exists('HTTPS',$_SERVER))?$_SERVER['HTTPS']:'';
+            $server_var['DOCUMENT_ROOT'] = (array_key_exists('DOCUMENT_ROOT',$_SERVER))?$_SERVER['DOCUMENT_ROOT']:'';
+            $server_var['HTTP_HOST'] = (array_key_exists('HTTP_HOST',$_SERVER))?$_SERVER['HTTP_HOST']:'';
+            $server_var['REQUEST_URI'] = (array_key_exists('REQUEST_URI',$_SERVER))?$_SERVER['REQUEST_URI']:'';
+            $server_var['SCRIPT_NAME'] = (array_key_exists('SCRIPT_NAME',$_SERVER))?$_SERVER['SCRIPT_NAME']:'';
+            $server_var['HTTP_USER_AGENT'] = (array_key_exists('HTTP_USER_AGENT',$_SERVER))?$_SERVER['HTTP_USER_AGENT']:'';
+            $server_var['HTTP_ACCEPT_LANGUAGE'] = (array_key_exists('HTTP_ACCEPT_LANGUAGE',$_SERVER))?$_SERVER['HTTP_ACCEPT_LANGUAGE']:'';
+            $server_var['HTTP_X_APPENGINE_COUNTRY'] = (array_key_exists('HTTP_X_APPENGINE_COUNTRY',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_COUNTRY']:'';
+            $server_var['HTTP_X_APPENGINE_CITY'] = (array_key_exists('HTTP_X_APPENGINE_CITY',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_CITY']:'';
+            $server_var['HTTP_X_APPENGINE_REGION'] = (array_key_exists('HTTP_X_APPENGINE_REGION',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_REGION']:'';
+            $server_var['HTTP_X_APPENGINE_CITYLATLONG'] = (array_key_exists('HTTP_X_APPENGINE_CITYLATLONG',$_SERVER))?$_SERVER['HTTP_X_APPENGINE_CITYLATLONG']:'';
             // endregion
 
             if (!strlen($root_path)) $root_path = (strlen($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : $_SERVER['PWD'];
@@ -845,14 +851,14 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $this->url['url'] = $server_var['REQUEST_URI'];
             $this->url['params'] = '';
-            if (strpos($server_var['REQUEST_URI'], '?') !== false)
+            if (strpos($server_var['REQUEST_URI']??'', '?') !== false)
                 list($this->url['url'], $this->url['params']) = explode('?', $server_var['REQUEST_URI'], 2);
 
             $this->url['host_base_url'] = (($server_var['HTTPS'] == 'on') ? 'https' : 'http') . '://' . $server_var['HTTP_HOST'];
             $this->url['host_url'] = (($server_var['HTTPS'] == 'on') ? 'https' : 'http') . '://' . $server_var['HTTP_HOST'] . $this->url['url'];
             $this->url['host_url_uri'] = (($server_var['HTTPS'] == 'on') ? 'https' : 'http') . '://' . $server_var['HTTP_HOST'] . $server_var['REQUEST_URI'];
             $this->url['script_name'] = $server_var['SCRIPT_NAME'];
-            $this->url['parts'] = explode('/', substr($this->url['url'], 1));
+            $this->url['parts'] = (isset($this->url['url']))?explode('/', substr($this->url['url'], 1)):[];
             $this->url['parts_base_index'] = 0;
             $this->url['parts_base_url'] = '/';
 
@@ -1270,12 +1276,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /**
          * Get a config var value. $var is empty return the array with all values.
          * @param string $var  Config variable
-         * @return mixed|null
+         * @return mixed
          */
         public function get($var='')
         {
             if(strlen($var))
-                return (key_exists($var, $this->data)) ? $this->data[$var] : null;
+                return (key_exists($var, $this->data)) ? $this->data[$var] : '';
             else return $this->data;
         }
 
@@ -3609,7 +3615,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             //endregion
 
 
-            $info = $this->cache->get($this->spacename . '-' . $key);
+            $info = $this->cache->get($this->spacename . '-' . $key)?:'';
             if (strlen($info) && $info !== null) {
 
                 $info = unserialize($info);
