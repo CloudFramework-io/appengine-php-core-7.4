@@ -365,11 +365,11 @@ class WorkFlows
                 $html = $this->renderMandrillTemplate($slug,$data);
 
                 if(!is_array($to))
-                    $to = explode(',',$to);
+                    $to = explode(',',$to??'');
                 if(!is_array($tags))
-                    $tags = explode(',',$tags);
+                    $tags = explode(',',$tags??'');
                 if(!is_array($cc))
-                    $cc = explode(',',$cc);
+                    $cc = explode(',',$cc??'');
                 $submission = [
                     "Cat"=>$cat,
                     "DateInsertion"=>'now',

@@ -821,7 +821,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 if($this->limit && $i++>=$this->limit) break;
 
                 $row =  $entity->get();
-                $this->last_cursor = base64_encode($entity->cursor());
+                $this->last_cursor = ($entity->cursor())?base64_encode($entity->cursor()):null;
                 if(isset($entity->key()->path()[0]['id'])) {
                     $row['KeyId'] = $entity->key()->path()[0]['id'];
                 } else {
