@@ -1712,13 +1712,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // Convert into string if we received an array
             if ($_array) $data = json_encode($data);
             // Tags Conversions
-            $data = str_replace('{{rootPath}}', $this->core->system->root_path, $data);
-            $data = str_replace('{{appPath}}', $this->core->system->app_path, $data);
+            $data = str_replace('{{rootPath}}', $this->core->system->root_path, $data??'');
+            $data = str_replace('{{appPath}}', $this->core->system->app_path, $data??'');
             $data = str_replace('{{lang}}', $this->lang, $data);
             while (strpos($data, '{{confVar:') !== false) {
-                list($foo, $var) = explode("{{confVar:", $data, 2);
+                list($foo, $var) = explode("{{confVar:", $data??'', 2);
                 list($var, $foo) = explode("}}", $var, 2);
-                $data = str_replace('{{confVar:' . $var . '}}', $this->get(trim($var)), $data);
+                $data = str_replace('{{confVar:' . $var . '}}', $this->get(trim($var)), $data??'');
             }
             // Convert into array if we received an array
             if ($_array) $data = json_decode($data, true);
