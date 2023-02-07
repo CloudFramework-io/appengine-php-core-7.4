@@ -85,25 +85,36 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         protected $_dblink=false;                // Database Connection Link
         var $_debug=false;
 
-        Function __construct (Core7 &$core,$h='',$u='',$p='',$db='',$port='3306',$socket='',$charset='') {
+        /**
+         * CLOUD SQL Constructor
+         * @param Core7 $core
+         * @param string $h
+         * @param string $u
+         * @param string $p
+         * @param string $db
+         * @param string $port
+         * @param string $socket
+         * @param string $charset
+         */
+        function __construct (Core7 &$core,$h='',$u='',$p='',$db='',$port='3306',$socket='',$charset='') {
 
             $this->core = $core;
 
-            if(strlen($h)) {
-                $this->_dbserver = trim($h);
-                $this->_dbuser = trim($u);
-                $this->_dbpassword = trim($p);
-                $this->_dbdatabase = trim($db);
-                $this->_port = trim($port);
-                $this->_dbsocket = trim($socket);
-                $this->_dbcharset = trim($charset);
+            if(strlen($h??'')) {
+                $this->_dbserver = trim($h??'');
+                $this->_dbuser = trim($u??'');
+                $this->_dbpassword = trim($p??'');
+                $this->_dbdatabase = trim($db??'');
+                $this->_port = trim($port??'');
+                $this->_dbsocket = trim($socket??'');
+                $this->_dbcharset = trim($charset??'');
             }  else if(strlen( trim($this->core->config->get("dbServer")))  || trim($this->core->config->get("dbSocket"))) {
                 // It load from $this->core->config->get("vars"): dbServer,dbUser,dbPassword,dbName,dbSocket,dbPort,dbPort
                 $this->loadCoreConfigVars();
                 // It rewrites: $this->_dbserver, $this->_dbuser,$this->_dbpassword,$this->_dbdatabase ,$this->_dbsocket, $this->_dbport
             }
-            if(!strlen($this->_dbserver.$this->_dbsocket)) $this->_dbserver='127.0.0.1';
-            if(!strlen($this->_dbdatabase)) $this->_dbdatabase='mysql';
+            if(!strlen(($this->_dbserver??'').($this->_dbsocket??''))) $this->_dbserver='127.0.0.1';
+            if(!strlen($this->_dbdatabase??'')) $this->_dbdatabase='mysql';
 
             /*
             set_error_handler(create_function(

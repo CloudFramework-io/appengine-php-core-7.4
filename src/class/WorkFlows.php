@@ -6,6 +6,7 @@
  * https://www.notion.so/cloudframework/CFI-PHP-Class-c26b2a1dd2254ddd9e663f2f8febe038
  * Mandrill references: https://mailchimp.com/developer/transactional/api/
  * last_update: 202201
+ * X-Mandrill-Signature: mYCSmflkBKULrfItXfIsmmpht8Q=
  * @package CoreClasses
  */
 class WorkFlows
