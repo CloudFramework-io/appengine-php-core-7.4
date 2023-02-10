@@ -652,7 +652,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             if(!$this->active) return;
             // Hidding full path (security)
-            $file = str_replace($_SERVER['DOCUMENT_ROOT'], '', $file);
+            $file = str_replace($_SERVER['DOCUMENT_ROOT'], '', $file??'');
 
 
             if ($type == 'note') {
