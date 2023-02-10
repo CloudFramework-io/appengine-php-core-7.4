@@ -670,7 +670,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $i++;
                     $bindings[$key]=$where[$key];
                 }
-            } elseif (strlen($where)) {
+            } elseif (strlen($where??'')) {
                 $_q .= " WHERE $where";
                 $where = null;
             }

@@ -125,16 +125,16 @@ if (!defined ("_MYSQLI_CLASS_") ) {
         }
 
         function loadCoreConfigVars() {
-            $this->_dbserver = trim($this->core->config->get("dbServer"));
-            $this->_dbuser = trim($this->core->config->get("dbUser"));
-            $this->_dbpassword = trim($this->core->config->get("dbPassword"));
-            $this->_dbdatabase = trim($this->core->config->get("dbName"));
-            $this->_dbsocket = trim($this->core->config->get("dbSocket"));
-            $this->_dbProxy = trim($this->core->config->get("dbProxy"));
-            $this->_dbProxyHeaders = $this->core->config->get("dbProxyHeaders");
-            $this->_dbcharset = ($this->core->config->get("dbCharset"))?$this->core->config->get("dbCharset"):'';
-            if(strlen(trim($this->core->config->get("dbPort"))))
-                $this->_dbport = trim($this->core->config->get("dbPort"));
+            $this->_dbserver = trim($this->core->config->get("dbServer")??'');
+            $this->_dbuser = trim($this->core->config->get("dbUser")??'');
+            $this->_dbpassword = trim($this->core->config->get("dbPassword")??'');
+            $this->_dbdatabase = trim($this->core->config->get("dbName")??'');
+            $this->_dbsocket = trim($this->core->config->get("dbSocket")??'');
+            $this->_dbProxy = trim($this->core->config->get("dbProxy")??'');
+            $this->_dbProxyHeaders = $this->core->config->get("dbProxyHeaders")??'';
+            $this->_dbcharset = ($this->core->config->get("dbCharset")??null)?$this->core->config->get("dbCharset"):'';
+            if(strlen(trim($this->core->config->get("dbPort")??'')))
+                $this->_dbport = trim($this->core->config->get("dbPort")??'');
 
         }
 
@@ -425,7 +425,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                     $params = $args[0];
 
                 } else {
-                    if(count($args)==1 && !strlen($args[0])) $params = array();
+                    if(count($args)==1 && !strlen($args[0]??'')) $params = array();
                     else $params = $args;
                 }
                 unset($args);
@@ -851,8 +851,8 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
                     if(!isset($tables[$table]['updateFields'])) $tables[$table]['updateFields']='';
 
-                    if(is_array($data[$field])) $data[$field] = json_encode($data[$field]);
-                    if(strlen($data[$field]) && $data[$field] !=='NULL')
+                    if(is_array($data[$field]??'')) $data[$field] = json_encode($data[$field]);
+                    if(strlen($data[$field]??'') && $data[$field] !=='NULL')
                         $tables[$table]['updateFields'] .= $sep.$field."=".(($fieldTypes[$field]['isNum'])?"%s":"'%s'");
                     else {
                         $data[$field] = 'NULL';

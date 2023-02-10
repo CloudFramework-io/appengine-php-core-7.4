@@ -618,8 +618,8 @@ if (!defined("_RESTfull_CLASS_")) {
             $this->setError(
                 $this->getCodeLib($code).$formatted_message
                 ,$this->getCodeLibError($code)
-                ,preg_replace('/:.*/','' ,$code)
-                ,($extramsg)?:$this->getCodeLib($code)
+                ,preg_replace('/:.*/','' ,$code??'')
+                ,($extramsg)?:$this->getCodeLib($code??'')
             );
         }
 
