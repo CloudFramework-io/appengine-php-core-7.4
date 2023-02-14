@@ -655,7 +655,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             if ($i == 0) $_q .= " WHERE $fieldname >= @{$key}_from AND $fieldname <= @{$key}_to";
                             else $_q .= " AND $fieldname >= @{$key}_from AND $fieldname < @{$key}_to";
                             $key .= '_to';
-                            $where[$key] = chr(ord($value[0])+1);  // Get the next char to set a <
+                            $value_to = $value.'z';  //122 = z
+                            $where[$key] = $value_to;
 
                         }
                         //endregion
