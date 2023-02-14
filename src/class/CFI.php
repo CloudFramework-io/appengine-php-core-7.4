@@ -121,6 +121,27 @@ class CFI
      * @param $title
      */
     public function closeButton($title) { $this->json_object['close']=$title;}
+
+    /**
+     * Change All the fields fields to readonly
+     * @param array $fields array of fields to change. If empty it will change every field.
+     */
+    public function changeFieldsToReadOnly(array $fields = []) {
+        if(!$fields) $fields = array_keys($this->fields);
+        foreach ($fields as $field) if(isset($this->fields[$field])){
+            $this->fields[$field]->readOnly();
+        }
+    }
+    /**
+     * Change All the fields fields to readonly
+     * @param array $fields array of fields to change. If empty it will change every field.
+     */
+    public function changeFieldsToDisabled(array $fields = []) {
+        if(!$fields) $fields = array_keys($this->fields);
+        foreach ($fields as $field) if(isset($this->fields[$field])){
+            $this->fields[$field]->disabled();
+        }
+    }
 }
 
 /*
@@ -363,6 +384,22 @@ class CFIField {
         elseif($n_cols==2) $class = "col col-9 ";
         elseif($n_cols==3) $class = "col col-12 ";
         $this->cfi->json_object['fields'][$this->field]['section_class'] = $class;
+        return $this;
+    }
+
+    /**
+     * Set a header before de field for a better structure of the information.
+     * @param string $title
+     * @param string $tag
+     * @param string $class
+     * @param string $style
+     * @return CFIField $this
+     */
+    public function header(string $title,$tag='h1',string $class='_alert-success',string $style='') {
+        $this->cfi->json_object['fields'][$this->field]['header']['title'] = $title;
+        $this->cfi->json_object['fields'][$this->field]['header']['tag'] = $tag;
+        $this->cfi->json_object['fields'][$this->field]['header']['class'] = $class;
+        $this->cfi->json_object['fields'][$this->field]['header']['style'] = $style;
         return $this;
     }
 }
