@@ -199,9 +199,9 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $this->_dbcharset = $charset;
             }
 
-            if(strlen($this->_dbserver) || strlen($this->_dbsocket)) {
+            if(strlen($this->_dbserver??'') || strlen($this->_dbsocket??'')) {
                 try {
-                    if(strlen($this->_dbsocket))
+                    if(strlen($this->_dbsocket??''))
                         $this->_db = new mysqli(null, $this->_dbuser, $this->_dbpassword, $this->_dbdatabase, 0,$this->_dbsocket);
                     else
                         $this->_db = new mysqli($this->_dbserver, $this->_dbuser, $this->_dbpassword, $this->_dbdatabase, $this->_dbport);
@@ -213,11 +213,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                         $this->_db->set_charset($this->_dbcharset);
 
                 } catch (Exception $e) {
-                    $err = 'Connect Error to: '.((strlen($this->_dbsocket))?$this->_dbsocket:$this->_dbserver);
+                    $err = 'Connect Error to: '.((strlen($this->_dbsocket??''))?$this->_dbsocket:$this->_dbserver);
                     if(is_object($this->_db)) $err.=' (' . $this->_db->connect_errno . ') ';
                     if(isset($mysqli) && is_object($mysqli)) $err .=$mysqli->connect_error;
                     if($this->core->is->development()) {
-                        $err.= " [User:{$this->_dbuser}  Password:".substr($this->_dbpassword,0,2).'***]';
+                        $err.= " [User:{$this->_dbuser}  Password:".substr($this->_dbpassword??'',0,2).'***]';
                     }
                     $this->setError($err);
                 }

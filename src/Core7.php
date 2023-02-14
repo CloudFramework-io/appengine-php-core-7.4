@@ -5204,7 +5204,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function hasPrivilege(string $privilege)
         {
-            return (isset($this->data['User']['UserPrivileges']) && in_array($privilege,$this->data['User']['UserPrivileges']));
+            if(!($this->data['User']['UserPrivileges']??null)) return false;
+            return (isset($this->data['User']['UserPrivileges']) && in_array($privilege,$this->data['User']['UserPrivileges']??[]));
         }
 
         /**
@@ -5913,7 +5914,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                     if($number_types)
                         foreach ($ret as $i=>$row) {
-                            foreach ($row as $field=>$value) if(isset($number_types[$field]) && strlen($value)) {
+                            foreach ($row as $field=>$value) if(isset($number_types[$field]) && strlen($value??'')) {
                                 if($number_types[$field]=='int') $value=intval($value);
                                 elseif($number_types[$field]=='float') $value=floatval($value);
                                 $ret[$i][$field] = $value;
