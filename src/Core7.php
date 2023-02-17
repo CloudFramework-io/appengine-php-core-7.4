@@ -165,7 +165,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.14071';
+        var $_version = 'v74.14171';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2343,7 +2343,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             // Read only when it is necessary
             if($this->secret_vars ===null || ($erp_secret_id && $this->secret_vars['secret-id']!=$erp_secret_id))
                 if(!$this->readERPSecretVars($erp_secret_id,$erp_platform_id,$erp_user)) return;
-
             return $this->secret_vars['secrets'][$var]??null;
         }
 

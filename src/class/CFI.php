@@ -308,6 +308,17 @@ class CFIField {
         if($title) $this->cfi->json_object['fields'][$this->field]['name'] = $title;
         return $this;}
 
+
+    /**
+     * Set if the field to type html
+     * @param string $title optional title
+     * @return CFIField $this
+     */
+    public function html($title='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'html';
+        if($title) $this->cfi->json_object['fields'][$this->field]['name'] = $title;
+        return $this;}
+
     /**
      * Set if the field to type select
      * @return CFIField $this
