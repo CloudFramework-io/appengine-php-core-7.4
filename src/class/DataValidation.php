@@ -106,7 +106,7 @@ if (!defined ("_DATAVALIDATION_CLASS_") ) {
                 }
 
                 if($this->error) {
-                    if(!strlen($this->field ))
+                    if(!strlen($this->field??''))
                         $this->field  = $extrakey.$key.': ['.$value['type'].']('.(isset($value['validation'])?:'').')';
                     return false;
                 }
