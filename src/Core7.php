@@ -3597,11 +3597,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Set a $spacename to set/get $objects
-         * @param $name
+         * @param string $name
          */
-        function setSpaceName($name)
+        function setSpaceName(string $name)
         {
-            if (strlen($name)) {
+            if (strlen($name??'')) {
                 $name = '_' . trim($name);
                 $this->spacename = preg_replace('/[^A-z_-]/', '_', 'CloudFrameWork_' . $this->type . $name);
             }
