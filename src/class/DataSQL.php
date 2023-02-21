@@ -169,10 +169,10 @@ class DataSQL
     /**
      * Return one record based on a key
      * @param $key can ba an string or number
-     * @param null $fields if null $fields = $this->getFields()
+     * @param string $fields if null $fields = $this->getFields()
      */
-    function fetchOneByKey($key, $fields=null) {
-        if(is_array($key)) return;
+    function fetchOneByKey($key, string $fields='') {
+        if(is_array($key) || !$key) return [];
         $ret = $this->fetchByKeys([$key],$fields);
         if($ret) $ret= $ret[0];
         return $ret;
@@ -181,9 +181,9 @@ class DataSQL
     /**
      * Return the tuplas with the $keyWhere including $fields
      * @param $keysWhere
-     * @param null $fields if null $fields = $this->getFields()
+     * @param string $fields if null $fields = $this->getFields()
      */
-    function fetchByKeys($keysWhere, $fields=null) {
+    function fetchByKeys($keysWhere, $fields='') {
         if($this->error) return;
 
         // Keys to find

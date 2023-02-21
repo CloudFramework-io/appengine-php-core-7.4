@@ -219,13 +219,13 @@ class Twig_Node implements Twig_NodeInterface
         unset($this->nodes[$name]);
     }
 
-    public function count()
+    public function count():int
     {
-        return count($this->nodes);
+        return count($this->nodes??[]);
     }
 
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->nodes);
+        return new ArrayIterator($this->nodes??[]);
     }
 }
