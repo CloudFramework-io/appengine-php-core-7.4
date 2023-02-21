@@ -413,6 +413,23 @@ class CFIField {
         $this->cfi->json_object['fields'][$this->field]['header']['style'] = $style;
         return $this;
     }
+
+    /**
+     * Set a header before de field for a better structure of the information.
+     * @param string $title
+     * @param string $tag
+     * @param string $class
+     * @param string $style
+     * @return CFIField $this
+     */
+    public function cfo(string $cfo,$id_field='',$api='',$update=false) {
+        $this->cfi->json_object['fields'][$this->field]['cfo'] = $cfo;
+        if($id_field) $this->cfi->json_object['fields'][$this->field]['id_field'] = $id_field;
+        if($api) $this->cfi->json_object['fields'][$this->field]['api'] = $api;
+        if($update) $this->cfi->json_object['fields'][$this->field]['update_cfo'] = true;
+        else $this->cfi->json_object['fields'][$this->field]['display_cfo'] = true;
+        return $this;
+    }
 }
 /*
  * Class to handle buttons in CFI
