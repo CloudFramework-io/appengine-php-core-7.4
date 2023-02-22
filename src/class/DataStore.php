@@ -811,12 +811,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
             $ret = [];
             $i=0;
-
-            function warning_handler() {
-                //DO NOTHING. Google\Cloud\Datastore\Operations function runQuery(..) return Undefined index: entityResults line 527 for php 7.4
-                //Github issue: https://github.com/googleapis/google-cloud-datastore/issues/317
-            }
-            set_error_handler("warning_handler", E_WARNING);
+            set_error_handler("__warning_handler_datastore", E_WARNING);
 
             // Security control to avoid more than 10K entities
             if($this->limit>10000) $this->limit=10000;

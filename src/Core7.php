@@ -110,6 +110,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
     }
     register_shutdown_function( "__fatal_handler" );
+    function __warning_handler_datastore() {
+        //DO NOTHING. Google\Cloud\Datastore\Operations function runQuery(..) return Undefined index: entityResults line 527 for php 7.4
+        //Github issue: https://github.com/googleapis/google-cloud-datastore/issues/317
+    }
 
     /**
      * Print a group of mixed vars passed as arguments. Example _print($object,$array,$class,...)
@@ -152,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.14221';
+        var $_version = 'v74.14222';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
