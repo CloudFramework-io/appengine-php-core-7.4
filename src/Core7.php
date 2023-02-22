@@ -95,18 +95,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $core->logs->add('gzuncompress() failed. Potential wrong credentials in CoreCache->get() or wrong content in CoreSession->get()','gzumcompress','warning');
                 return;
             }
-            //Catch StreamWrapper::stream_set_option
-            if ($errno == E_WARNING && strpos($errstr,'StreamWrapper::stream_set_option')) {
-                //DO NOTHING. Error of Google\\Cloud\\Storage\\StreamWrapper::stream_set_option is not implemented
-                //Github issue: https://github.com/googleapis/google-cloud-php/issues/4744
-                return;
-            }
-            //Catch StreamWrapper::stream_set_option
-            if (($errno == E_ERROR && strpos($errstr,'Uncaught TypeError: count')!==false)) {
-                //DO NOTHING. Google\Cloud\Datastore\Operations function runQuery(..) return Undefined index: entityResults line 527 for php 8
-                //Github issue: https://github.com/googleapis/google-cloud-datastore/issues/317
-                return;
-            }
 
             if($core) {
                 $core->errors->add($error, 'fatal_error', 'error');
@@ -121,7 +109,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 //                _print( ["ErrorCode"=>$errno, "ErrorMessage"=>$errstr, "File"=>$errfile, "Line"=>$errline]);
         }
     }
-
     register_shutdown_function( "__fatal_handler" );
 
     /**
@@ -165,7 +152,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.14211';
+        var $_version = 'v74.14221';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */

@@ -700,7 +700,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 if($this->debug)
                     $this->core->logs->add($this->entity_name.".fetch({$this->lastQuery}) [".(round(microtime(true)-$time,4))." secs]",'DataStore');
 
-            } catch (Exception $e) {
+            } catch (ErrorException $e) {
                 $this->setError($e->getMessage());
                 $this->addError('fetch');
             }
@@ -812,64 +812,75 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $ret = [];
             $i=0;
 
+            function warning_handler() {
+                //DO NOTHING. Google\Cloud\Datastore\Operations function runQuery(..) return Undefined index: entityResults line 527 for php 7.4
+                //Github issue: https://github.com/googleapis/google-cloud-datastore/issues/317
+            }
+            set_error_handler("warning_handler", E_WARNING);
+
             // Security control to avoid more than 10K entities
             if($this->limit>10000) $this->limit=10000;
+            try {
+                /** @var Google\Cloud\Datastore\Entity $entity */
+                foreach ($result as $entity) {
 
-            /** @var Google\Cloud\Datastore\Entity $entity */
-            foreach ($result as $entity) {
+                    // assure we do not return more than $this->limit records.
+                    if($this->limit && $i++>=$this->limit) break;
 
-                // assure we do not return more than $this->limit records.
-                if($this->limit && $i++>=$this->limit) break;
-
-                $row =  $entity->get();
-                $this->last_cursor = ($entity->cursor())?base64_encode($entity->cursor()):null;
-                if(isset($entity->key()->path()[0]['id'])) {
-                    $row['KeyId'] = $entity->key()->path()[0]['id'];
-                } else {
-                    $row['KeyName'] = $entity->key()->path()[0]['name'];
-                }
-
-                //set TimeZone to convert date objects
-                $tz = new DateTimeZone($this->default_time_zone_to_read);
-
-                // Transform result
-                if($this->transformReadedEntities)
-                foreach ($row as $key => $value) {
-                    // Update Types: Geppoint, JSON, Datetime
-                    if (!isset($this->schema['props'][$key]))
-                        $row[$key] = $value;
-                    elseif ($value instanceof Geopoint)
-                        $row[$key] = $value->getLatitude() . ',' . $value->getLongitude();
-                    elseif ($key == 'JSON' || $this->schema['props'][$key][1] == 'json') {
-                        // if is_array($value) then it is an EMBEDED ENTITY
-                        if(is_array($value)) $row[$key] = $value;
-                        else $row[$key] = json_decode($value, true);
-                    }elseif ($this->schema['props'][$key][1] == 'zip')
-                        $row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(utf8_decode($value)) : $value;
-                    elseif ($this->schema['props'][$key][1] == 'txt')
-                        $row[$key] = $value;
-                    elseif ($value instanceof DateTimeImmutable) {
-                        // Change timezone of the object
-                        if($tz) $value = $value->setTimezone($tz)??$value;
-                        if ($this->schema['props'][$key][1] == 'date') {
-                            $row[$key] = $value->format('Y-m-d');
-                        } elseif ($this->schema['props'][$key][1] == 'datetime')
-                            $row[$key] = $value->format('Y-m-d H:i:s');
-                        elseif ($this->schema['props'][$key][1] == 'datetimeiso')
-                            $row[$key] = $value->format('c');
-
-                    } elseif ($this->schema['props'][$key][1] == 'integer')
-                        $row[$key] = intval($value);
-                    elseif ($this->schema['props'][$key][1] == 'float')
-                        $row[$key] = floatval($value);
-                    elseif ($this->schema['props'][$key][1] == 'datetime' && is_numeric($value) && $value) {
-                        $row[$key] = date('Y-m-d H:i:s',$value/1000000);
+                    $row =  $entity->get();
+                    $this->last_cursor = ($entity->cursor())?base64_encode($entity->cursor()):null;
+                    if(isset($entity->key()->path()[0]['id'])) {
+                        $row['KeyId'] = $entity->key()->path()[0]['id'];
+                    } else {
+                        $row['KeyName'] = $entity->key()->path()[0]['name'];
                     }
+
+                    //set TimeZone to convert date objects
+                    $tz = new DateTimeZone($this->default_time_zone_to_read);
+
+                    // Transform result
+                    if($this->transformReadedEntities)
+                        foreach ($row as $key => $value) {
+                            // Update Types: Geppoint, JSON, Datetime
+                            if (!isset($this->schema['props'][$key]))
+                                $row[$key] = $value;
+                            elseif ($value instanceof Geopoint)
+                                $row[$key] = $value->getLatitude() . ',' . $value->getLongitude();
+                            elseif ($key == 'JSON' || $this->schema['props'][$key][1] == 'json') {
+                                // if is_array($value) then it is an EMBEDED ENTITY
+                                if(is_array($value)) $row[$key] = $value;
+                                else $row[$key] = json_decode($value, true);
+                            }elseif ($this->schema['props'][$key][1] == 'zip')
+                                $row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(utf8_decode($value)) : $value;
+                            elseif ($this->schema['props'][$key][1] == 'txt')
+                                $row[$key] = $value;
+                            elseif ($value instanceof DateTimeImmutable) {
+                                // Change timezone of the object
+                                if($tz) $value = $value->setTimezone($tz)??$value;
+                                if ($this->schema['props'][$key][1] == 'date') {
+                                    $row[$key] = $value->format('Y-m-d');
+                                } elseif ($this->schema['props'][$key][1] == 'datetime')
+                                    $row[$key] = $value->format('Y-m-d H:i:s');
+                                elseif ($this->schema['props'][$key][1] == 'datetimeiso')
+                                    $row[$key] = $value->format('c');
+
+                            } elseif ($this->schema['props'][$key][1] == 'integer')
+                                $row[$key] = intval($value);
+                            elseif ($this->schema['props'][$key][1] == 'float')
+                                $row[$key] = floatval($value);
+                            elseif ($this->schema['props'][$key][1] == 'datetime' && is_numeric($value) && $value) {
+                                $row[$key] = date('Y-m-d H:i:s',$value/1000000);
+                            }
 //                    elseif ($this->schema['props'][$key][1] == 'boolean')
 //                        $row[$key] = ($value)?true:false;
+                        }
+                    $ret[] = $row;
                 }
-                $ret[] = $row;
+            } catch (TypeError $e) {
+                //DO NONTING: google/cloud-datastore/src/Operation.php has an error in google/cloud-datastore/src/Operation.php line 527 allowing to pass a null into a count function
             }
+            restore_error_handler();
+
             return $ret;
         }
 
