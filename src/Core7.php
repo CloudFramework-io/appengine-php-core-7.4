@@ -199,6 +199,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /** @var StorageClient $gc_datastorage_client  */
         var $gc_datastorage_client = null;          // Google Cloud DataStorage Client
 
+        /** @var string $gc_project_service called */
+        var $gc_project_service = 'default';
+
         /**
          * Core constructor.
          * @param string $root_path
