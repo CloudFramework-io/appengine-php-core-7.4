@@ -700,7 +700,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                 if($this->debug)
                     $this->core->logs->add($this->entity_name.".fetch({$this->lastQuery}) [".(round(microtime(true)-$time,4))." secs]",'DataStore');
 
-            } catch (ErrorException $e) {
+            } catch (Exception $e) {
                 $this->setError($e->getMessage());
                 $this->addError('fetch');
             }
@@ -864,7 +864,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             elseif ($this->schema['props'][$key][1] == 'float')
                                 $row[$key] = floatval($value);
                             elseif ($this->schema['props'][$key][1] == 'datetime' && is_numeric($value) && $value) {
-                                $row[$key] = date('Y-m-d H:i:s',$value/1000000);
+                                $row[$key] = date('Y-m-d H:i:s',(int)($value/1000000));
                             }
 //                    elseif ($this->schema['props'][$key][1] == 'boolean')
 //                        $row[$key] = ($value)?true:false;
