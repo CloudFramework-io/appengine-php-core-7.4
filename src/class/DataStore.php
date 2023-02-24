@@ -594,6 +594,19 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     // SELECT * FROM PremiumContracts WHERE PremiumStartDate >= DATETIME("2020-03-01T00:00:00z") AND PremiumStartDate <= DATETIME("2020-03-01T23:59:59z")
                     if (array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['date', 'datetime', 'datetimeiso'])) {
 
+                        if(stripos($value,'now')!==false) $value = str_ireplace('now',date('Y-m-d'),$value);
+                        if (preg_match('/[=><]/', $value)) {
+                            if (strpos($value, '>=') === 0 || strpos($value, '<=') === 0) {
+                                $comp = substr($value, 0, 2);
+                                $value=substr($value,2);
+                            }
+                            else {
+                                $comp = substr($value, 0, 1);
+                                $value=substr($value,1);
+                            }
+
+                        }
+
                         // Allow Smart date ranges where comp = '='
                         if($comp=='=' && $value) {
                             //apply filters
