@@ -2271,7 +2271,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 //region SET $headers and call $url
                 $headers = ['X-WEB-KEY'=>$erp_user];
                 $keys = $this->core->request->get_json_decode($url,null,$headers);
-                if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.$keys['message'].' '));
+                if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.($keys['message']??'no-message').' '));
                 //endregion
 
                 //region SAVE from cache $keys if we are in production servers

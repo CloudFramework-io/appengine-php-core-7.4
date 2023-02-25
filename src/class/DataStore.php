@@ -663,6 +663,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         }
                         //region IF SPECIAL SEARCH for values ending in % let's emulate a like string search
                         if(is_string($value) && preg_match('/\%$/',$value) && strlen(trim($value))>1) {
+                            if($order && strpos($order,$key)===false) $order = "{$key},{$order}";
                             $value = preg_replace('/\%$/','',$value);
                             $bindings[$key.'_from']=$value;
                             if ($i == 0) $_q .= " WHERE $fieldname >= @{$key}_from AND $fieldname <= @{$key}_to";
