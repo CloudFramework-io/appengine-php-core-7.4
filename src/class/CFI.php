@@ -68,6 +68,12 @@ class CFI
 
     /**
      * Change title of the App
+     * @param bool $required
+     */
+    public function requireReloadOnReturn(bool $required=true) {$this->json_object['required_reload']=$required;}
+
+    /**
+     * Change title of the App
      * @param $title
      */
     public function addTab($title,$icon='home') {
