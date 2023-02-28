@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.14227';
+        var $_version = 'v74.14228';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2271,7 +2271,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 //region SET $headers and call $url
                 $headers = ['X-WEB-KEY'=>$erp_user];
                 $keys = $this->core->request->get_json_decode($url,null,$headers);
-                if($this->core->request->error) return($this->addError('Error in developer license for '.$erp_user.': '.($keys['message']??'no-message').' '));
+                if($this->core->request->error) return($this->addError(['Error in developer license for user: '.$erp_user,($keys['message']??'no-message')]));
                 //endregion
 
                 //region SAVE from cache $keys if we are in production servers
@@ -5302,6 +5302,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $errorMsg = [];
         var $cache = true;
 
+        var $api_service = null;
+        var $api_namespace = 'cloudframework';
+        var $api_user = 'user-unknown';
+        var $localize_files = null;
+
         function __construct(Core7 &$core)
         {
             $this->core = $core;
@@ -5334,6 +5339,83 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             }
 
             $this->init = true;
+        }
+
+        /**
+         * Se external API to feed localization tags
+         * @param string $namespace
+         * @param string $user
+         * @param string $api
+         */
+        public function initLocalizationService($namespace='cloudframework', $user = null, $api='https://api.cloudframework.io/erp/localizations') {
+            $this->api_service = $api;
+            $this->api_namespace = $namespace;
+            $this->api_user = ($user)?:($this->core->user->id?:'user-unknown');
+        }
+        /**
+         * Get a Localization code from a localization file
+         * @param string $code
+         * @param string $lang
+         * @param string $namespace [optional]
+         * @return mixed|string
+         */
+        function getCode(string $code, string $lang='en',$namespace='')
+        {
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            if(!$lang) $lang='en';
+            $parts = explode(';',$code);
+            if(count($parts)<3) return $code;
+            $locFile = "{$parts[0]};{$parts[1]}";
+            if(!$this->readLocalizeData($locFile,$lang,$namespace)) return $code;
+            return $this->data[$locFile][$lang][$code]??$code;
+        }
+
+        /**
+         * @param string $namespace
+         */
+        public function resetLocalizationsCache($namespace='') {
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace)?:[];
+            foreach ($this->localize_files as $key=>$foo) {
+                $this->core->cache->delete('LOCALIZE_FILES_LANGS_'.$key);
+            }
+            $this->core->cache->delete('LOCALIZE_FILES_'.$namespace);
+            $this->localize_files = null;
+        }
+
+        /**
+         * @param string $locFile
+         * @param string $lang
+         * @param string $namespace
+         */
+        public function readLocalizeData(string $locFile,string $lang,$namespace='') {
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            if(!$lang) $lang='en';
+            if(isset($this->data[$locFile][$lang])) return true;
+
+            if($this->localize_files===null) $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace)?:[];
+            if(($this->localize_files[$namespace.$locFile.$lang]??null)===null) {
+                if($this->api_service) {
+                    $this->core->logs->add('Reading Localizations from API: '.$this->api_service."/{$namespace}/{$this->api_user}/apps/{$locFile}?langs={$lang}",'localization_call');
+                    $data = $this->core->request->get_json_decode($this->api_service."/{$namespace}/{$this->api_user}/apps/{$locFile}",['langs'=>$lang]);
+                    if($this->core->request->error) {
+                        $this->core->logs->add(['api'=>$this->api_service."/{$namespace}/{$this->api_user}/apps/{$locFile}",'error'=>$this->core->request->errorMsg],'error_readLocalizeData');
+                        $this->core->request->reset();
+                        return false;
+                    }
+                    if($data['data'][$lang]??null) {
+                        $this->localize_files[$namespace.$locFile.$lang] = true;
+                        $this->core->cache->set('LOCALIZE_FILES_'.$namespace,$this->localize_files);
+
+                        $this->data[$locFile][$lang] = $data['data'][$lang];
+                        $this->core->cache->set('LOCALIZE_FILES_LANGS_'.$namespace.$locFile.$lang,$this->data[$locFile][$lang]);
+                    }
+                }
+            }
+            else {
+                $this->data[$locFile][$lang] = $this->core->cache->get('LOCALIZE_FILES_LANGS_'.$namespace.$locFile.$lang)?:[];
+            }
+            return ($this->data[$locFile][$lang]??null)?true:false;
         }
 
         /**
@@ -5572,7 +5654,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             $locFile = preg_replace('/[^A-z0-9_\-]/', '', $locFile);
             if (!strlen($locFile)) {
-                $this->core->errors->set('Localization has received a wrong spacename: ');
+                $this->core->errors->set('Localization has received a wrong namespace: ');
                 return false;
             }
             $code = preg_replace('/[^a-z0-9_\-;\.]/', '', strtolower($code));
