@@ -5363,6 +5363,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang='en';
+            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
+                list($namespace,$code) = explode(',',$code,2);
+                $namespace = str_replace('$namespace:','',$namespace);
+            }
             $parts = explode(';',$code);
             if(count($parts)<3) return $code;
             $locFile = "{$parts[0]};{$parts[1]}";
