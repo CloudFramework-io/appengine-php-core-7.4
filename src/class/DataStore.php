@@ -658,7 +658,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         }
                     }
                     else {
-                        if (strlen($value??'') && array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['integer'])) {
+                        if (is_string($value??'') && array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['integer'])) {
                             $where[$key] = $value = intval($value);
                         }
                         //region IF SPECIAL SEARCH for values ending in % let's emulate a like string search
