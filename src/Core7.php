@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.14228';
+        var $_version = 'v74.15011';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5375,16 +5375,28 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * Reset Cache for localizations. If $loc_file is not sent it will delete the whole namespace
+         * @param string $loc_file
          * @param string $namespace
          */
-        public function resetLocalizationsCache($namespace='') {
+        public function resetLocalizationsCache(string $loc_file='',$namespace='') {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace)?:[];
             foreach ($this->localize_files as $key=>$foo) {
-                $this->core->cache->delete('LOCALIZE_FILES_LANGS_'.$key);
+                if($loc_file) {
+                    if(strpos($key,"{$namespace}{$loc_file}")===0) {
+                        $this->core->cache->delete('LOCALIZE_FILES_LANGS_' . $key);
+                        unset($this->localize_files[$key]);
+                    }
+                } else {
+                    $this->core->cache->delete('LOCALIZE_FILES_LANGS_' . $key);
+                }
             }
-            $this->core->cache->delete('LOCALIZE_FILES_'.$namespace);
-            $this->localize_files = null;
+            if(!$loc_file) {
+                $this->core->cache->delete('LOCALIZE_FILES_'.$namespace);
+                $this->localize_files = null;
+            }
+            else $this->core->cache->set('LOCALIZE_FILES_'.$namespace,$this->localize_files);
         }
 
         /**
