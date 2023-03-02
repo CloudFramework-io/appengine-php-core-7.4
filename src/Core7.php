@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.15011';
+        var $_version = 'v74.15022';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5273,6 +5273,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
+         * Get a user lang. 'en' default
+         * @return string
+         */
+        function getLang()
+        {
+            return $this->data['User']['UserLang']??'en';
+        }
+
+        /**
+         * Set a lang for a user
+         * @param string $lang
+         */
+        function setLang(string $lang)
+        {
+            $this->data['User']['UserLang'] = $lang;
+        }
+
+        /**
          * Add an error Message
          * @param $code
          * @param null $message
@@ -5305,6 +5323,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $api_service = null;
         var $api_namespace = 'cloudframework';
         var $api_user = 'user-unknown';
+        var $api_lang = 'en';
         var $localize_files = null;
 
         function __construct(Core7 &$core)
@@ -5313,45 +5332,19 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
-        function init() {
-
-            // Maintain compatibilty with old variable
-            if (!strlen($this->core->config->get('core.localization.cache_path')) && strlen($this->core->config->get('LocalizePath')))
-                $this->core->config->set('core.localization.cache_path', $this->core->config->get('LocalizePath'));
-
-            // Maintain compatibilty with old variable
-            if (!strlen($this->core->config->get('core.localization.cache_path')) && strlen($this->core->config->get('localizeCachePath')))
-                $this->core->config->set('core.localization.cache_path', $this->core->config->get('localizeCachePath'));
-
-
-            // Read from Cache last Dics
-            if($this->cache) {
-                if (!isset($_GET['_reloadDics']) && !isset($_GET['_nocacheDics'])) {
-                    $this->data = $this->core->cache->get('Core:Localization:Data');
-                    if (!is_array($this->data)) $this->data = [];
-                }
-
-
-                if ($this->core->config->get('WAPPLOCA') && !isset($_GET['_nocacheDics'])) {
-                    $this->wapploca = $this->core->cache->get('Core:Localization:WAPPLOCA', $this->core->config->get('wapploca_cache_expiration_time'));
-                    if (!is_array($this->wapploca)) $this->wapploca = [];
-                }
-            }
-
-            $this->init = true;
-        }
-
         /**
          * Se external API to feed localization tags
          * @param string $namespace
          * @param string $user
          * @param string $api
          */
-        public function initLocalizationService($namespace='cloudframework', $user = null, $api='https://api.cloudframework.io/erp/localizations') {
+        public function initLocalizationService($namespace='cloudframework', $lang='en',$user = null, $api='https://api.cloudframework.io/erp/localizations') {
             $this->api_service = $api;
+            $this->api_lang = $lang;
             $this->api_namespace = $namespace;
             $this->api_user = ($user)?:($this->core->user->id?:'user-unknown');
         }
+
         /**
          * Get a Localization code from a localization file
          * @param string $code
@@ -5359,10 +5352,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function getCode(string $code, string $lang='en',$namespace='')
+        function getCode(string $code, string $lang='',$namespace='')
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
-            if(!$lang) $lang='en';
+            if(!$lang) $lang=$this->api_lang;
             if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
                 list($namespace,$code) = explode(',',$code,2);
                 $namespace = str_replace('$namespace:','',$namespace);
@@ -5372,6 +5365,29 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $locFile = "{$parts[0]};{$parts[1]}";
             if(!$this->readLocalizeData($locFile,$lang,$namespace)) return $code;
             return $this->data[$locFile][$lang][$code]??$code;
+        }
+
+        /**
+         * Get a Localization code from a localization file
+         * @param string $code
+         * @param string $lang
+         * @param string $namespace [optional]
+         * @return mixed|string
+         */
+        function setCode(string $code, string $value, string $lang='',$namespace='')
+        {
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            if(!$lang) $lang=$this->api_lang;
+
+            // make compatible tags with $namespace
+            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
+                list($namespace,$code) = explode(',',$code,2);
+            }
+            $parts = explode(';',$code);
+            if(count($parts)<3) return false;
+            $locFile = "{$parts[0]};{$parts[1]}";
+            $this->data[$locFile][$lang][$code] = $value;
+            return true;
         }
 
         /**
@@ -5404,9 +5420,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $lang
          * @param string $namespace
          */
-        public function readLocalizeData(string $locFile,string $lang,$namespace='') {
+        public function readLocalizeData(string $locFile,string $lang='',$namespace='') {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
-            if(!$lang) $lang='en';
+            if(!$lang) $lang=$this->api_lang;
             if(isset($this->data[$locFile][$lang])) return true;
 
             if($this->localize_files===null) $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace)?:[];
@@ -5432,253 +5448,6 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->data[$locFile][$lang] = $this->core->cache->get('LOCALIZE_FILES_LANGS_'.$namespace.$locFile.$lang)?:[];
             }
             return ($this->data[$locFile][$lang]??null)?true:false;
-        }
-
-        /**
-         * Get a Localization code from a localization file
-         * @param $locFile
-         * @param $code
-         * @param array $config
-         * @return mixed|string
-         */
-        function get($locFile, $code, $config = [])
-        {
-            if(!$this->init) $this->init();
-            $ret = null;
-
-            // Check syntax of $locFile & $code
-            if (!$this->checkLocFileAndCode($locFile, $code)) return 'Err in: [' . $locFile . "{{$code}}" . ']';
-            $lang = $this->core->config->getLang();
-            if (isset($config['lang']) && strlen($config['lang']) == 2) $lang = $config['lang'];
-            // The $locFile does not exist
-            if (!isset($_GET['_debugDics'])) {
-
-
-
-                // Trying read from file
-                if (!isset($this->data[$locFile][$lang]) && !isset($this->files_readed[$locFile][$lang])  ) {
-                    $this->readFromFile($locFile, $lang);
-                }
-
-                // Trying read from WAPPLOCA
-                $wapploca_readed = false;
-                if ($this->core->config->get('WAPPLOCA') && !isset($this->data[$locFile][$lang])) {
-                    if ($this->readFromWAPPLOCA($locFile, $code, $lang) && isset($this->data[$locFile][$lang][$code])) {
-                        // Writting Local file.
-                        $this->writeLocalization($locFile, $lang);
-                        $this->files_readed[$locFile][$lang] = true;
-
-                    }
-                }
-
-                // If this localization file exists but the $code does not exist because the cache
-                if (isset($this->data[$locFile][$lang]) && !isset($this->data[$locFile][$lang][$code]) && !isset($this->files_readed[$locFile][$lang]) ) {
-                    // $this->readFromFile($locFile, $lang);
-                }
-            }
-
-
-            if (isset($_GET['_debugDics'])) {
-                $ret = $lang . '_' . $locFile . ":({$code})";
-            } else if (isset($this->data[$locFile][$lang][$code])) {
-                $ret = $this->data[$locFile][$lang][$code];
-            } else {
-                $this->core->logs->add("Missing configuration for Localizations: {$locFile}-{$lang}-{$code}");
-                $this->core->logs->add('WAPPLOCA: ' . ((empty($this->core->config->get('WAPPLOCA'))) ? 'empty' : '***'));
-                $this->core->logs->add('core.localization.cache_path: ' . ((empty($this->core->config->get('core.localization.cache_path'))) ? 'empty' : '***'));
-            }
-
-            // Evaluate data conversion
-            if(array_key_exists('data',$config) && $config['data']) {
-                $ret = vsprintf($ret,$config['data']);
-            }
-
-            // Return
-            return $ret;
-        }
-
-        /**
-         * Set a Localization code
-         * @param $locFile
-         * @param $code
-         * @param $content
-         * @param array $config
-         * @return mixed|string
-         */
-        function set($locFile, $code, $content,$config = [])
-        {
-            if(!$this->init) $this->init();
-
-            // Check syntax of $locFile & $code
-            if (!$this->checkLocFileAndCode($locFile, $code)) return 'Err in: [' . $locFile . "{{$code}}" . ']';
-            if (isset($config['lang']) && strlen($config['lang']) == 2) $lang = $config['lang'];
-
-            if (!isset($this->data[$locFile][$lang]) || !isset($this->data[$locFile][$lang][$code]) || $this->data[$locFile][$lang][$code]!=$content) {
-                $this->data[$locFile][$lang][$code]=$content;
-            }
-        }
-
-
-        /**
-         * Read from a file the localizations and store the content into: $this->data[$locFile][$lang]
-         * @param $locFile
-         * @return bool
-         */
-        private function readFromFile($locFile, $lang = '')
-        {
-            if(!$this->init) $this->init();
-
-
-            if (!strlen($this->core->config->get('core.localization.cache_path'))) {
-                $this->core->config->set('core.localization.cache_path',$this->core->system->app_path.'/localize');
-            }
-            if (!strlen($lang)) $lang = $this->core->config->getLang();
-            $ok = true;
-            $this->core->__p->add('Localization->readFromFile: ', strtoupper($lang)."-{$locFile}", 'note');
-            // First read from local directory if {{core.localization.cache_path}} is defined.
-            $this->files_readed[$locFile][$lang] = true;
-            if (strlen($this->core->config->get('core.localization.cache_path'))) {
-                $filename = $this->core->config->get('core.localization.cache_path') . '/' . strtoupper($lang) . '_Core_' . $locFile . '.json';
-                try {
-                    $ret = @file_get_contents($filename);
-                    if ($ret !== false) {
-                        $this->data[$locFile][$lang] = json_decode($ret, true);
-
-                        // Cache result
-                        if($this->cache)
-                            $this->core->cache->set('Core:Localization:Data', $this->data);
-
-                        $this->core->__p->add('Success reading ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
-
-                    } else {
-                        $this->core->__p->add('Error reading ' .  strtoupper($lang) . '_Core_' . $locFile . '.json');
-                        $this->addError('CoreLoalization.readFromFile error. No file: '.$filename);
-                        $this->addError(error_get_last());
-                        $ok = false;
-                    }
-                } catch (Exception $e) {
-                    $ok = false;
-                    $this->core->logs->add('Error reading ' . $filename . ': ');
-                    $this->core->logs->add($e->getMessage() . ' ' . error_get_last());
-                }
-            }
-            $this->core->__p->add('Localization->readFromFile: ', '', 'endnote');
-            return $ok;
-        }
-
-        public function writeLocalization($locFile, $lang = '')
-        {
-            if(!$this->init) $this->init();
-
-
-            if (!strlen($this->core->config->get('core.localization.cache_path'))) return false;
-            if (!isset($this->data[$locFile])) return false;
-            if (!strlen($lang)) $lang = $this->core->config->getLang();
-            $ok = true;
-            $this->core->__p->add('Localization->writeLocalization: ', strtoupper($lang) . '_Core_' . $locFile . '.json', 'note');
-
-            $filename = $this->core->config->get('core.localization.cache_path') . '/' . strtoupper($lang) . '_Core_' . $locFile . '.json';
-            try {
-                $ret = @file_put_contents($filename, json_encode($this->data[$locFile][$lang], JSON_PRETTY_PRINT));
-                if ($ret === false) {
-                    $ok = false;
-                    $this->core->__p->add('Error writting ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
-                    $this->core->logs->add('Error writting ' . $filename);
-                    $this->core->logs->add(error_get_last());
-                } else {
-                    $this->core->__p->add('Success Writting ' . strtoupper($lang) . '_Core_' . $locFile . '.json');
-
-                    // Cache the result
-                    if($this->cache)
-                        $this->core->cache->set('Core:Localization:Data', $this->data);
-                }
-            } catch (Exception $e) {
-                $ok = false;
-                $this->core->logs->add('Error reading ' . $filename . ': ');
-                $this->core->logs->add($e->getMessage() . ' ' . error_get_last());
-            }
-            $this->core->__p->add('Localization->writeLocalization: ', '', 'endnote');
-            return $ok;
-        }
-
-
-        /**
-         * Read from a file the localizations
-         * @param $locFile
-         * @param $code
-         * @return bool
-         */
-        private function readFromWAPPLOCA($locFile, $code, $lang = '')
-        {
-            if(!$this->init) $this->init();
-
-            if (empty($this->core->config->get('WAPPLOCA'))) return false;
-            if (!strlen($lang)) $lang = $this->core->config->getLang();
-
-            list($org, $app, $cat, $loc_code) = explode(';', $code, 4);
-            if (!strlen($loc_code) || preg_match('/[^a-z0-9_-]/', $loc_code)) {
-                $this->core->logs->add('Localization->readFromWAPPLOCA: has a wrong value for $code: ' . $code);
-                return false;
-            }
-            $ok = true;
-            $lang = strtoupper($lang);
-            $key = "$org/$app/$cat?lang=" . $lang;
-            // Read From CloudService the info and put the cats into $this->wapploca
-            $url = $this->core->config->get('wapploca_api_url');
-            if (!isset($this->wapploca[$key][$lang])) {
-                $ret = $this->core->request->get($url . '/dics/' . $key);
-                if (!$this->core->request->error) {
-                    $ret = json_decode($ret, true);
-                    if (!$ret['success']) {
-                        $this->core->logs->add($ret);
-                        $ok = false;
-                    } else {
-                        if (is_array($ret['data'])) {
-                            $this->wapploca[$key] = $ret['data'];
-
-                            // Cache the result
-                            if($this->cache)
-                                $this->core->cache->set('Core:Localization:WAPPLOCA', $this->wapploca);
-
-                        } else {
-                            $this->core->logs->add('WAPPLOCA return data is not an array');
-                            $this->core->logs->add($ret);
-                        }
-                    }
-                } else $ok = false;
-            }
-
-
-            // Return the code required
-            if (isset($this->wapploca[$key][$lang][$code]))
-                $this->data[$locFile][$lang][$code] = $this->wapploca[$key][$lang][$code];
-            else
-                $this->data[$locFile][$lang][$code] = $code;
-            return $ok;
-        }
-
-
-        /**
-         * Check the formats for locaLizationFile and codes
-         * @param $locFile
-         * @param $code
-         * @return bool
-         */
-        private function checkLocFileAndCode(&$locFile, &$code)
-        {
-            if(!$this->init) $this->init();
-
-            $locFile = preg_replace('/[^A-z0-9_\-]/', '', $locFile);
-            if (!strlen($locFile)) {
-                $this->core->errors->set('Localization has received a wrong namespace: ');
-                return false;
-            }
-            $code = preg_replace('/[^a-z0-9_\-;\.]/', '', strtolower($code));
-            if (!strlen($code)) {
-                $this->core->errors->set('Localization has received a wrong code: ');
-                return false;
-            }
-            return true;
         }
 
         function addError($value)
