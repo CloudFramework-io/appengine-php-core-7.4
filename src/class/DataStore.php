@@ -260,7 +260,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
 
                             } elseif ($this->schema['props'][$i][1] == 'string') {
                                 if(is_numeric($value)) $value = strval($value);
-                                else return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value'));
+                                else if($value) return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value: '.json_encode($value)));
                             }
                         }
                         $record[$this->schema['props'][$i][0]] = $value;
