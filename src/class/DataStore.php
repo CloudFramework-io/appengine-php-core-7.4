@@ -239,8 +239,11 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                     if (json_last_error() !== JSON_ERROR_NONE) $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
                                 }
                             } elseif ($this->schema['props'][$i][1] == 'zip') {
-
                                 $value = utf8_encode(gzcompress($value));
+                            } elseif ($this->schema['props'][$i][1] == 'integer') {
+                                $value = intval($value);
+                            } elseif ($this->schema['props'][$i][1] == 'float') {
+                                $value = floatval($value);
                             }
                         } else {
                             if ($this->schema['props'][$i][1] == 'json') {
@@ -255,6 +258,9 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             } elseif ($this->schema['props'][$i][1] == 'txt') {
                                 return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value'));
 
+                            } elseif ($this->schema['props'][$i][1] == 'string') {
+                                if(is_numeric($value)) $value = strval($value);
+                                else return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value'));
                             }
                         }
                         $record[$this->schema['props'][$i][0]] = $value;
