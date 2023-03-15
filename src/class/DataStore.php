@@ -192,7 +192,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     // if the field is key or keyname feed $schema_key or $schema_keyname
                     if ($this->schema['props'][$i][1] == 'key') {
                         $schema_key = preg_replace('/[^0-9]/', '', $value);
-                        if (!strlen($schema_key)) $this->setError('wrong Key value');
+                        if (!strlen($schema_key)) return $this->setError('wrong Key value');
 
                     }
                     elseif ($this->schema['props'][$i][1] == 'keyname') {
@@ -219,9 +219,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                         else $value = $value_time;
 
                                     } catch (Exception $e) {
-                                        $ret[] = ['error' => 'field {' . $this->schema['props'][$i][0] . '} has a wrong date format: ' . $value];
-                                        $record = [];
-                                        break;
+                                        return $this->setError('field {' . $this->schema['props'][$i][0] . '} has a wrong date format: ' . $value);
                                     }
                                 } else {
                                     $value = null;
@@ -287,7 +285,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         $ret = false;
                     }
                 } else {
-                    return ($this->setError($this->entity_name . ': Structure of the data does not match with schema'));
+                    if(!$this->error) ($this->setError($this->entity_name . ': Structure of the data does not include any field to match with schema'));
+                    return;
                 }
             }
 
