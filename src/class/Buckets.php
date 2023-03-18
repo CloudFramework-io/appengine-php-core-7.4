@@ -30,7 +30,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * ```
          * @var string $version version of the class
          */
-        var $version = '202302031';
+        var $version = '202303181';
 
         /** @ignore */
         var $bucket = '';
@@ -214,13 +214,8 @@ if (!defined ("_Buckets_CLASS_") ) {
          */
         function manageUploadFiles($path='', $options =[]) {
 
-            //region CHECK retro-compatible method receiving gs://
-            if(strpos($path,'gs://')===0) $path = str_replace($this->bucket,'',$path);
-            //endregion
-
             //region SET $base_dir to upload the files
-            if($path && ($path[0]??null)!='/') return $this->addError('manageUploadFiles($path,$options) $path has to start with /');
-            $base_dir = $this->bucket.$path;
+            $base_dir = $this->getBucketPath($path);
             //endregion
 
             //region IF there is no files to upload return error
@@ -400,14 +395,14 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @return array|null|void
          */
         function scan(string $path='') {
-            if($path && ($path[0]??null)!='/') return $this->addError('scan($path) $path has to start with /');
             try{
-                if(!is_dir($this->bucket.$path)) return null;
+                $bucket_path = $this->getBucketPath($path);
+                if(!is_dir($bucket_path)) return null;
                 $ret = array();
                 $tmp = @scandir($this->bucket.$path);
                 foreach ($tmp as $key => $value) {
-                    $ret[$value] = array('type'=>(is_file($this->bucket.$path.'/'.$value))?'file':'dir');
-                    if(isset($_REQUEST['__p'])) __p('is_dir: '.$this->bucket.$path.'/'.$value);
+                    $ret[$value] = array('type'=>(is_file($bucket_path.'/'.$value))?'file':'dir');
+                    if(isset($_REQUEST['__p'])) __p('is_dir: '.$bucket_path.'/'.$value);
                 }
                 return($ret);
             } catch (Exception $e) {
@@ -433,10 +428,10 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @return array|void Array of files in the bucket. if there is any error it will return void
          */
         function fastScan(string $path='') {
-            if($path && ($path[0]??null)!='/') return $this->addError('fastScan($path) $path has to start with /');
             try{
-                if(!is_dir($this->bucket.$path)) return null;
-                return(@scandir($this->bucket.$path));
+                $bucket_path = $this->getBucketPath($path);
+                if(!is_dir($bucket_path)) return null;
+                return(@scandir($bucket_path));
             } catch (Exception $e) {
                 return $this->addError($e->getMessage(),'bucket-path-scandir-error');
             }
@@ -456,14 +451,12 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @return bool|void true of the path is dir and has been deleted. if there is any error it will return void
          */
         public function rmdir(string $path)  {
-            if($path && ($path[0]??null)!='/') return $this->addError('rmdir($path) $path has to start with /');
-
-            $value = $this->bucket.$path;
+            $bucket_path = $this->getBucketPath($path);
             $ret = false;
             try {
-                if(!is_dir($value)) return false;
-                $ret = @rmdir($value);
-                if(is_dir($value)) return false;
+                if(!is_dir($bucket_path)) return false;
+                $ret = @rmdir($bucket_path);
+                if(is_dir($bucket_path)) return false;
                 else return $ret;
             } catch(Exception $e) {
                 die($e->getMessage());
@@ -485,13 +478,11 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @return bool|void true if the path is dir and has been created. if there is any error it will return void
          */
         public function mkdir(string $path)  {
-            if($path && ($path[0]??null)!='/') return $this->addError('mkdir($path) $path has to start with /');
-
-            $value = $this->bucket.$path;
+            $bucket_path = $this->getBucketPath($path);
             $ret = false;
             try {
-                if(is_dir($value)) return true;
-                $ret = @mkdir($value);
+                if(is_dir($bucket_path)) return true;
+                $ret = @mkdir($bucket_path);
             } catch(Exception $e) {
                 $this->addError($e->getMessage());
                 $this->addError(error_get_last());
@@ -503,6 +494,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * Deprecated method
          * @param string $returnUrl is the url the system has to call once the file has been uploaded
          * @return mixed
+         * @deprecated
          */
         function getUploadUrl($returnUrl=null) {
             return($returnUrl);
@@ -526,13 +518,11 @@ if (!defined ("_Buckets_CLASS_") ) {
          *    else echo "/tmp does not exist or it is not a dir";
          * } else echo "/tmp is dir";
          * ```
-         * @param string $path path starting with '/' inside the bucket
+         * @param string $path path inside the bucket. If $path starts with gs:// it will try to find the file outside of $this->bucket
          * @return bool true if the path is dir.
          */
         public function isDir($path='')  {
-            if($path && ($path[0]??null)!='/') return $this->addError('isDir($path) $path has to start with /');
-            $value = $this->bucket.$path;
-            return(is_dir($value));
+            return(is_dir($this->getBucketPath($path)));
         }
 
         /**
@@ -544,14 +534,13 @@ if (!defined ("_Buckets_CLASS_") ) {
          *   var_dump ($info);
          * } else var_dump ['errorCode'=>$bucket->errorCode,'errorMsg'=>$bucket->errorMsg];
          * ```
-         * @param string $path path starting with '/' inside the bucket
+         * @param string $path path inside the bucket. If $path starts with gs:// it will try to find the file outside of $this->bucket
          * @return bool true if the path is file.
          */
         function isFile(string $path)  {
-            if($path && ($path[0]??null)!='/') return $this->addError('isFile($path) $path has to start with /');
-            $value = $this->bucket.$path;
-            return(is_file($value));
+            return(is_file($this->getBucketPath($path)));
         }
+
 
         /**
          * Deprecated.. call mkdir
@@ -561,7 +550,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @return bool|void
          */
         function isMkdir(string $path='')  {
-            return $this->mkdir($path);
+            return $this->mkdir($this->getBucketPath($path));
         }
 
 
@@ -651,13 +640,14 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @return array with the object created in the bucket
          */
         private function upload(&$file_descriptor, string $filename_path, array $options = [] ) {
-            if(!$filename_path || $filename_path[0]!='/') return $this->addError('uploadFile($filename_path,$source_file_path,...) $filename_path has to start with /');
+            if(!$filename_path) return $this->addError('uploadFile($filename_path,$source_file_path,...) $filename_path can not be empty');
+            if($filename_path[0]=='/') $filename_path = substr($filename_path,1);
 
             try{
 
                 //region SET $file = fopen($source_file_path) and INIT $optons_to_upload
                 $options_to_upload = [
-                    'name'=>substr($filename_path,1)
+                    'name'=>$filename_path
                 ];
                 //endregion
 
@@ -673,11 +663,11 @@ if (!defined ("_Buckets_CLASS_") ) {
                     elseif(($this->bucketInfo['iamConfiguration']['uniformBucketLevelAccess']['enabled'] ?? null)){
                         $extra_info['uniformBucketLevelAccess'] = "enabled. Objects can not be forced to be public. Check the bucket properties";
                         if($options['predefinedAcl']=='publicRead')
-                            $extra_info['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$filename_path;
+                            $extra_info['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$filename_path;
                     } else {
                         $options_to_upload['predefinedAcl'] = $options['predefinedAcl'];
                         if($options['predefinedAcl']=='publicRead')
-                            $extra_info['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$filename_path;
+                            $extra_info['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$filename_path;
                     }
                 }
                 if(is_array($options['metadata']??null)) {
@@ -709,23 +699,31 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @param string $filename name of the file to create
          * @param string $data Info to put in $file
          * @param string $path optinal path starting with '/' inside the bucket
-         * @param string $options Options to assign file properties
+         * @param array $options optional to assign file properties taking https://cloud.google.com/storage/docs/json_api/v1/objects/insert#request-body
+         *  - supported values: ['contentType' =>'text/html','metadata'=>['var1'=>,'value1',..]]
          * @return bool true if the path is file.
          */
-        function putContents($filename, $data, $path='',$options = ['gs' =>['Content-Type' => 'text/plain']] ) {
-            if(!$filename || ($filename[0]??null)=='/') return $this->addError('putContents($filename, $data, $path) $filename can not be empty and can not start with /');
-            if($path && ($path[0]??null)!='/') return $this->addError('putContents($filename,$path,...) $path has to start with /');
+        function putContents(string $filename, $data, string $path='',array $options = [] ) {
+            if(!$filename) return $this->addError('putContents($filename, $data, $path) $filename can not be empty');
+            if(($filename[0]??null)=='/') $filename = substr($filename,1);
+            if($path) {
+                if($path[0]=='/') $path = substr($path,1);
+                $filename = "{$path}/{$filename}";
+            }
 
             $ret = false;
             try{
-                if(strpos($this->bucket,'gs:')===0 && is_object($this->gs_bucket)) {
+                if(strpos($filename,'gs://')===false && strpos($this->bucket,'gs:')===0 && is_object($this->gs_bucket)) {
                     $upload_options =['name'=>$filename];
                     if($options['medatada']??null) $upload_options['metadata']=$options['medatada'];
+                    $upload_options['contentType'] = $options['contentType']??$this->getMimeTypeFromExtension(pathinfo($filename, PATHINFO_EXTENSION));
                     if($object = $this->gs_bucket->upload($data,$upload_options))
                         $ret=true;
                 } else {
-                    $ctx = stream_context_create($options);
-                    if(@file_put_contents($this->bucket.$path.'/'.$filename, $data,0,$ctx) === false) {
+                    $upload_options = [];
+                    $upload_options['gs']['Content-Type'] = $options['contentType']??$this->getMimeTypeFromExtension(pathinfo($filename, PATHINFO_EXTENSION));
+                    $ctx = stream_context_create($upload_options);
+                    if(@file_put_contents($this->getBucketPath($filename), $data,0,$ctx) === false) {
                         $this->addError(error_get_last());
                     } else {
                         $ret = true;
@@ -1013,7 +1011,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * example:
          * ```php
          * $filename = 'video.mp4';
-         * $mime_type = $this->bucket->getMimeTypeFromExtension(pathinfo($filename, PATHINFO_EXTENSION);
+         * $mime_type = $this->bucket->getMimeTypeFromExtension(pathinfo($filename, PATHINFO_EXTENSION));
          * $options = ['filename'=>$filename,'contentType'=>$mime_type,'public'=>true,'private'=>false];
          * $object_info =$this->bucket->updateFileObject('/uploads/upload_tmp_file',$options);
          * if($this->bucket->error) return $this->setErrorFromCodelib($this->bucket->errorCode,$this->bucket->errorMsg);
@@ -1374,7 +1372,7 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
 
         /**
-         * Return the mime type for $extesion. If the extension is not found it returns 'application/octet-stream'
+         * Return the mime type for $extension. If the extension is not found it returns 'application/octet-stream'
          *
          * Example of php code
          * ```php
@@ -1466,6 +1464,19 @@ if (!defined ("_Buckets_CLASS_") ) {
         }
 
 
+        /**
+         * Return the path including the bucket name
+         * @param string $path
+         * @return string
+         */
+        public function getBucketPath(string $path) {
+            $bucket_path = '';
+            if(strpos($path,'gs://')!==0) $bucket_path = $this->bucket;
+            if($path && ($path[0]??null)!='/') $bucket_path.= '/';
+            $bucket_path.= $path;
+            if(substr($bucket_path,-1)=='/') $bucket_path = substr($bucket_path,0,-1);
+            return $bucket_path;
+        }
 
         /**
          * Set an error in the class initiating $this->errorMsg
