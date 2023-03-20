@@ -30,7 +30,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * ```
          * @var string $version version of the class
          */
-        var $version = '202303181';
+        var $version = '202303201';
 
         /** @ignore */
         var $bucket = '';
@@ -228,7 +228,7 @@ if (!defined ("_Buckets_CLASS_") ) {
             //endregion
 
             //region CHECK if $base_dir is a directory
-            if(!is_dir($base_dir)) {
+            if(!$this->mkdir($base_dir)) {
                 $this->core->__p->add('Buckets.manageUploadFiles',null , 'endnote');
                 return($this->addError('the path to write the files does not exist: '.$base_dir));
             }
@@ -1471,8 +1471,11 @@ if (!defined ("_Buckets_CLASS_") ) {
          */
         public function getBucketPath(string $path) {
             $bucket_path = '';
-            if(strpos($path,'gs://')!==0) $bucket_path = $this->bucket;
-            if($path && ($path[0]??null)!='/') $bucket_path.= '/';
+            if(strpos($path,'gs://')!==0) {
+                $bucket_path = $this->bucket;
+                if($path && ($path[0]??null)!='/') $bucket_path.= '/';
+            }
+
             $bucket_path.= $path;
             if(substr($bucket_path,-1)=='/') $bucket_path = substr($bucket_path,0,-1);
             return $bucket_path;
