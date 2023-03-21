@@ -30,7 +30,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * ```
          * @var string $version version of the class
          */
-        var $version = '202303201';
+        var $version = '202303211';
 
         /** @ignore */
         var $bucket = '';
@@ -994,7 +994,7 @@ if (!defined ("_Buckets_CLASS_") ) {
                 $object = $this->gs_bucket->object($file_path);
                 $object->update([], ['predefinedAcl' => 'publicRead']);
                 $ret = $object->info(['projection'=>'full']);
-                $ret['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().$file_path;
+                $ret['publicUrl'] = 'https://storage.googleapis.com/'.$this->gs_bucket->name().'/'.$file_path;
                 $this->core->__p->add('Buckets.setPrivate', null, 'note');
                 return $ret;
 
