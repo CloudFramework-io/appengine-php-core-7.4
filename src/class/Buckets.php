@@ -96,11 +96,11 @@ if (!defined ("_Buckets_CLASS_") ) {
             //Performance
             $time = microtime(true);
             $this->core = $core;
-            $this->core->__p->add('Buckets', $bucket, 'note');
+            $this->core->__p->add('Buckets', $bucket??'', 'note');
 
             if($this->core->is->development()) $this->debug = true;
 
-            if(strlen($bucket)) $this->bucket = $bucket;
+            if(strlen($bucket??'')) $this->bucket = $bucket;
             else $this->bucket = $this->core->config->get('bucketUploadPath');
             if(!$this->bucket) return($this->addError('Missing bucketUploadPath config var or $bucket in the constructor'));
 
@@ -1411,7 +1411,8 @@ if (!defined ("_Buckets_CLASS_") ) {
                 'ico'=>'image/vnd.microsoft.icon',
                 'ics'=>'text/calendar',
                 'jar'=>'application/java-archive',
-                'jpeg, jpg'=>'image/jpeg',
+                'jpg'=>'image/jpeg',
+                'jpeg'=>'image/jpeg',
                 'js'=>'text/javascript (Specifications: HTML and RFC 9239)',
                 'json'=>'application/json',
                 'jsonld'=>'application/ld+json',
