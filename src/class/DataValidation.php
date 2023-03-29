@@ -183,12 +183,11 @@ if (!defined ("_DATAVALIDATION_CLASS_") ) {
 
             // database conversion types
             $type = preg_replace('/\(.*/','',$type);
-
             switch (strtolower($type)) {
                 case "varbinary": case "varchar": case "char": case "string": return is_string($data);
                 case "text": case "txt": return is_string($data);
                 case "number": $data = trim($data); return !preg_match('/[^0-9]/',$data);
-                case "integer": if(strval(intval($data))===strval($data)) $data=intval($data);return is_integer($data);
+                case "tinyint":case "integer": if(strval(intval($data))===strval($data)) $data=intval($data);return is_integer($data);
                 case "double": case "decimal": case "float": if(floatval($data)!=0 || $data==="0" || $data === 0) $data=floatval($data);return is_float($data);
                 case "bit": if(strval(intval($data))===strval($data)) $data=intval($data);return ($data==0 || $data==1);
                 case "model": return is_array($data) && !empty($data);
