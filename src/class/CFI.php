@@ -337,6 +337,18 @@ class CFIField {
         return $this;
     }
     /**
+     * Set if the field to type autocomplete
+     * @return CFIField $this
+     */
+    public function autocomplete(array $values,$defaultvalue='') {
+        $this->cfi->json_object['fields'][$this->field]['type'] = 'autocomplete';
+        $this->cfi->json_object['fields'][$this->field]['values'] = $values;
+        if($defaultvalue)
+            $this->cfi->json_object['fields'][$this->field]['defaultvalue'] = $defaultvalue;
+        return $this;
+    }
+
+    /**
      * Set if the field to type select
      * @return CFIField $this
      */
