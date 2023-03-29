@@ -306,6 +306,14 @@ if (!defined("_RESTfull_CLASS_")) {
             return $ret;
         }
 
+        /**
+         * Validate data received in $this->formParams to update a record
+         * @param $model
+         * @param string $codelibbase
+         * @param null $data
+         * @param array $dictionaries
+         * @return bool|void
+         */
         function validatePutData($model,$codelibbase='error-form-params',&$data=null,&$dictionaries=[]) {
             if(null===$data) $data = &$this->formParams;
             if(!($ret = $this->checkFormParamsFromModel($model,false,$codelibbase,$data,$dictionaries))) return;
@@ -319,6 +327,15 @@ if (!defined("_RESTfull_CLASS_")) {
             return $ret;
         }
 
+        /**
+         * Evaluate $data and if it is correct using $model. It uses the class DataValidation
+         * @param $model
+         * @param bool $all
+         * @param string $codelibbase
+         * @param null $data
+         * @param array $dictionaries
+         * @return bool|void
+         */
         function checkFormParamsFromModel(&$model, $all=true, $codelibbase='', &$data=null, &$dictionaries=[])
         {
             if(!is_array($model)) {
