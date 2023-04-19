@@ -247,7 +247,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             if ($this->schema['props'][$i][1] == 'json') {
                                 if (is_array($value) || is_object($value)) {
                                     $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
-                                } elseif (!strlen($value)) {
+                                } elseif (!strlen($value??'')) {
                                     $value = '{}';
                                 }
                             } elseif ($this->schema['props'][$i][1] == 'zip') {
