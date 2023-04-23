@@ -574,7 +574,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $comp = '=';
                     if (preg_match('/[=><]/', $key)) {
                         unset($where[$key]);
-                        if (strpos($key, '>=') === 0 || strpos($key, '<=') === 0) {
+                        if (strpos($key, '>=') === 0 || strpos($key, '<=') === 0 || strpos($key, '!=') === 0) {
                             $comp = substr($key, 0, 2);
                             $key = trim(substr($key, 2));
                         } else {
@@ -663,9 +663,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         }
                     }
                     else {
+
+                        //region IF field is integer transform value into integer
                         if (is_string($value??'') && array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['integer'])) {
                             $where[$key] = $value = intval($value);
                         }
+                        //endregion
+
                         //region IF SPECIAL SEARCH for values ending in % let's emulate a like string search
                         if(is_string($value) && preg_match('/\%$/',$value) && strlen(trim($value))>1) {
                             if($order && strpos($order,$key)===false) $order = "{$key},{$order}";
@@ -677,6 +681,19 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                             $value_to = $value.'z';  //122 = z
                             $where[$key] = $value_to;
 
+                        }
+                        //endregion
+                        //region IF value is ARRAY and the type is not list convert it into IN ARRAY
+                        elseif(is_array($value) && (!array_key_exists($key, $this->schema['props']) || !in_array($this->schema['props'][$key][1], ['list']))){
+
+                            if(array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['integer']))
+                            $values = implode(",",$value);
+                            else
+                                $values = "'".implode("','",$value)."'";
+                            if ($i == 0) $_q .= " WHERE $fieldname IN ARRAY({$values})";
+                            else $_q .= " AND $fieldname IN ARRAY ({$values})";
+                            $i++;
+                            continue;
                         }
                         //endregion
                         //region ELSE set normal to search
