@@ -1,11 +1,11 @@
 <?php
 /**
  * Class to facilitate the Google Drive and Google Documents creation
- * Last update: 2023-04-23
+ * Last update: 2023-04-24
  */
+
 if (!defined ("_Google_CLASS_GoogleDocuments") ) {
     define("_Google_CLASS_GoogleDocuments", TRUE);
-
 
     /**
      * Google Drive Class to give support to GoogleDocuments
@@ -14,7 +14,7 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
      */
     class GoogleDrive
     {
-        protected $version = '20230423';
+        protected $version = '20230424';
 
         /** @var Core7 $core */
         private $core;
@@ -562,12 +562,15 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
             $this->core->__p->add('getDriveFolderTree ',"{$folderId}",'note');
 
             try {
+                $tree = ['_parent'=>null,'_id'=>$folderId,'_name'=>$folderId,'_url'=>null,'_folders'=>[]];
                 if($folderId!='root') {
-                    $file = $this->drive->files->get($folderId, ['supportsAllDrives' => true]);
+                    $file = $this->drive->files->get($folderId, ['supportsAllDrives' => true,'fields'=>'*']);
                     if ($file->getKind() != 'drive#file') return $this->addError(400, 'folderId is not a folder');
+                    $tree['_parent'] = $file->parents[0]??null;
+                    $tree['_name'] = $file->getName();
+                    $tree['_url'] = $this->getUrlFromMimeType($file);
                 }
-                $tree = [];
-                $this->recursiveFolderTree($folderId,$tree);
+                $this->recursiveFolderTree($folderId,$tree['_folders']);
                 $this->core->__p->add('getDriveFolderTree ','','endnote');
 
                 return $tree;
@@ -593,18 +596,20 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
             try {
                 $files_query = $this->drive->files->listFiles(['q'=>$q,'orderBy'=>'name','supportsAllDrives'=>true]);
                 $files = $files_query->getFiles();
-                $folder[$parent_id] = [];
+                $index = count($folder);
+                $folder[$index] = [];
                 foreach ($files as $file) {
-                    $folder[$parent_id][] = [
-                        'id' => $file->getId(),
-                        'name' => $file->getName(),
-                        'url' => $this->getUrlFromMimeType($file),
+                    $folder[$index][] = [
+                        '_parent'=>$parent_id,
+                        '_id' => $file->getId(),
+                        '_name' => $file->getName(),
+                        '_url' => $this->getUrlFromMimeType($file),
                     ];
                 }
                 $level++;
-                foreach ($folder[$parent_id] as $i=>$info) {
-                    $folder[$parent_id][$i]['folders'] = [];
-                    if(!$this->recursiveFolderTree($info['id'],$folder[$parent_id][$i]['folders'],$level)) return;
+                foreach ($folder[$index] as $i=>$info) {
+                    $folder[$index][$i]['_folders'] = [];
+                    if(!$this->recursiveFolderTree($info['_id'],$folder[$index][$i]['_folders'],$level)) return;
                 }
                 return true;
             } catch (Exception $e) {
@@ -612,6 +617,34 @@ if (!defined ("_Google_CLASS_GoogleDocuments") ) {
                 $error['error']['folderId'] =$parent_id;
                 $this->addError($e->getCode(),$error);
                 return false;
+            }
+        }
+
+        /**
+         * Update a file in drive of any kind
+         * @param string $fileId
+         * @param array $data Data to update. Variables allowd: 'name'
+         * @return array|void
+         */
+        public function updateDriveFile(string $fileId,array $data) {
+
+            $start_time = microtime(true);
+            $this->core->__p->add('updateDriveFile ',"{$fileId}->".json_encode($data),'note');
+            /** @var Google\Service\Drive\DriveFile $file */
+            $file=null;
+            try {
+                $fileData = new \Google\Service\Drive\DriveFile();
+                if($data['name']??null) $fileData->setName($data['name']);
+                $optParams = array('supportsAllDrives' => true);
+                $file = $this->drive->files->update($fileId,$fileData,$optParams);
+                $this->core->__p->add('updateDriveFile ','','endnote');
+                return $this->getArrayFromDriveFile($file,true,['time-to-update-file'=>round(microtime(true)-$start_time,4)]);
+            } catch (Exception $e) {
+                $error = json_decode($e->getMessage(),true);
+                $error['error']['fileId'] =$fileId;
+                $this->addError($e->getCode(),$error);
+                $this->core->__p->add('updateDriveFile ','','endnote');
+                return;
             }
         }
 
