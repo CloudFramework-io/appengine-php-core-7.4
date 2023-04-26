@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.16261';
+        var $_version = 'v74.16262';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -6092,6 +6092,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     "User": ["string","index"],
                     "Ip": ["string","index"],
                     "Action": ["string","index"],
+                    "Id": ["string","index|allownull"],
                     "JSON": ["json","allownull"]
                   }',true);
             $model_bitacora = json_decode('{
