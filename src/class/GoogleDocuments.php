@@ -4,6 +4,12 @@
  * Last update: 2023-04-24
  */
 
+/*
+ *
+ SELECT * FROM EXTERNAL_QUERY("cloudframework-io.europe-west1.cf-alaskadeco-db", "SELECT LEFT(Date_insertion_showcase,7) yearmonth, User_showcase user,City_showcase city, Status_showcase as status,Name_style style, count(*) as total from alaskadeco_showcase left join alaskadeco_styles on (Style_showcase = Id_style) where Active_showcase=1 group by LEFT(Date_insertion_showcase,7),Status_showcase, User_showcase, City_showcase, Style_showcase order by Date_insertion_showcase DESC;");
+
+ */
+
 if (!defined ("_Google_CLASS_GoogleDocuments") ) {
     define("_Google_CLASS_GoogleDocuments", TRUE);
 
