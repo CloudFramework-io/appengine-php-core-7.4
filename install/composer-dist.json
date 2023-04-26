@@ -2,7 +2,7 @@
   "name": "company-name/project-name",
   "description": "Your description. More info https://www.notion.so/cloudframework/appengine-php-core20-74c573448dc94ebba7e51fc86b8ad9cb",
   "require": {
-    "cloudframework-io/appengine-php-core-7.4": "^v74.16241"
+    "cloudframework-io/appengine-php-core-7.4": "^v74.16261"
   },
   "scripts": {
     "clean": [

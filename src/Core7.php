@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.16241';
+        var $_version = 'v74.16261';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -6016,8 +6016,9 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param null|array $data
          * @param null|string $slack_url
          * @param null|array $rewrite_fingerprint if you want to rewrite the default fingerprint send it here
+         * @param $id
          */
-        public function add($app, $action, $title, $method, $user, $data=null, $slack_url=null, $rewrite_fingerprint=null) {
+        public function add($app, $action, $title, $method, $user, $data=null, $slack_url=null, $rewrite_fingerprint=null,$id=null) {
             if(!$this->initDSLogs()) return;
 
             //region SET $rewrite_fingerprint
@@ -6042,6 +6043,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $entity["Ip"]=$rewrite_fingerprint['ip'];
             $entity["Action"]=$action;
             $entity["Title"]=$title;
+            $entity["Id"]=$id;
             $entity["JSON"]=[
                 'url'=>(array_key_exists('REQUEST_URI',$_SERVER))?$_SERVER['REQUEST_URI']:''
                 ,'http_referer'=> $rewrite_fingerprint['http_referer']
