@@ -307,6 +307,7 @@ class CFOs {
         $this->core->config->set("dbProxyHeaders",$credentials['dbProxyHeaders']??null);
         $this->core->config->set("dbCharset",$credentials['dbCharset']??null);
         $this->core->config->set("dbPort",$credentials['dbPort']??'3306');
+        if($this->core->is->localEnvironment()) $this->core->config->set("dbSocket",null);
 
         if(!$this->core->model->dbInit($connection)) {
             $this->addError($this->core->model->errorMsg);
