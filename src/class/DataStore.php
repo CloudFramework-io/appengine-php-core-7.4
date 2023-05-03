@@ -18,7 +18,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
      */
     class DataStore
     {
-        protected $_version = '20221208';
+        protected $_version = '20230503';
         /** @var Core7 $core */
         private $core = null;                   // Core7 reference
         /** @var DatastoreClient|null  */
@@ -684,7 +684,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                         }
                         //endregion
                         //region IF value is ARRAY and the type is not list convert it into IN ARRAY
-                        elseif(is_array($value) && (!array_key_exists($key, $this->schema['props']) || !in_array($this->schema['props'][$key][1], ['list']))){
+                        elseif(is_array($value)){
 
                             if(array_key_exists($key, $this->schema['props']) && in_array($this->schema['props'][$key][1], ['integer']))
                             $values = implode(",",$value);
