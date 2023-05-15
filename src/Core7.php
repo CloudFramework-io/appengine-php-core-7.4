@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.17031';
+        var $_version = 'v74.17151';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -868,7 +868,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
             // About timeZone, Date & Number format
             if (isset($_SERVER['PWD']) && strlen($_SERVER['PWD'])) date_default_timezone_set('UTC'); // necessary for shell run
-            $this->time_zone = array(date_default_timezone_get(), date('Y-m-d h:i:s'), date("P"), time());
+            $this->time_zone = array(date_default_timezone_get(), date('Y-m-d H:i:s'), date("P"), time());
             //date_default_timezone_set(($this->core->config->get('timeZone')) ? $this->core->config->get('timeZone') : 'Europe/Madrid');
             //$this->_timeZone = array(date_default_timezone_get(), date('Y-m-d h:i:s'), date("P"), time());
             $this->format['formatDate'] = "Y-m-d";
@@ -894,9 +894,13 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
+        /**
+         * Set default timezone and feed with $this->time_zone = array(date_default_timezone_get(), date('Y-m-d H:i:s'), date("P"), time());
+         * @param $timezone
+         */
         function setTimeZone($timezone) {
             date_default_timezone_set($timezone);
-            $this->time_zone = array(date_default_timezone_get(), date('Y-m-d h:i:s'), date("P"), time());
+            $this->time_zone = array(date_default_timezone_get(), date('Y-m-d H:i:s'), date("P"), time());
         }
 
 
@@ -5529,7 +5533,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                     $this->updateCache($models,$ret_models);
             }
 
-            if(!$ret_models || isset($ret_models['Unknown']) || !$this->processModels($ret_models)) return($this->addError($ret_models));
+            if(!$ret_models || isset($ret_models['Unknown']) || !$this->processModels($ret_models)) {
+                if(isset($ret_models['Unknown']))
+                    $this->addError('The following models are unknown: '.implode(',',array_keys($ret_models['Unknown'])));
+                else
+                    return ($this->addError($ret_models));
+            }
             return $ret_models;
         }
 
@@ -5606,7 +5615,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
                     if(isset($this->models[$object]['data']['extends']) && $this->models[$object]['data']['extends']) {
                         $model_extended = 'db:'.$this->models[$object]['data']['extends'];
-                        if(!isset($this->models[$model_extended])) return($this->addError("Model extended $model_extended from model: $object does not exist",404));
+                        if(!isset($this->models[$model_extended])) {
+                            if(!$this->readModelsFromCloudFramework(preg_replace('/.*:/','',$model_extended),$options['cf_models_api_key'])) return;
+                            if(!isset($this->models[$model_extended])) {
+                                return ($this->addError("Model extended $model_extended from model: $object does not exist", 404));
+                            }
+                        }
 
                         // Rewrite model if it is defined
                         if(isset($this->models[$object]['data']['model']) && $this->models[$object]['data']['model']) {
@@ -5729,9 +5743,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /**
          * Init a DB connection
          * @param string $connection optional connection to use. By default $this->dbConnection
+         * @param array $db_credentials optional connection to use. By default $this->dbConnection
          * @return bool
          */
-        public function dbInit($connection =''): bool
+        public function dbInit($connection ='',$db_credentials=[]): bool
         {
 
             //region EVALUATE $connection
@@ -5745,6 +5760,17 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 else
                     $this->dbConnections[$this->dbConnection] = $this->core->loadClass('CloudSQL');
 
+                if($db_credentials) {
+                    $this->dbConnections[$this->dbConnection]->setConf('dbServer', $db_credentials['dbServer'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbSocket', $db_credentials['dbSocket'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbUser', $db_credentials['dbUser'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbPassword', $db_credentials['dbPassword'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbName', $db_credentials['dbName'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbPort', $db_credentials['dbPort'] ?? '3306');
+                    $this->dbConnections[$this->dbConnection]->setConf('dbCharset', $db_credentials['dbCharset'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbProxy', $db_credentials['dbProxy'] ?? null);
+                    $this->dbConnections[$this->dbConnection]->setConf('dbProxyHeaders', $db_credentials['dbProxyHeaders'] ?? null);
+                }
                 if(!$this->dbConnections[$this->dbConnection]->connect()) $this->addError($this->dbConnections[$this->dbConnection]->getError());
             }
             //endregion

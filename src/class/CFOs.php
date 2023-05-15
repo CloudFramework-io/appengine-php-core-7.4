@@ -22,7 +22,9 @@ class CFOs {
     var $dsObjects = [];
     var $bqObjects = [];
     var $dbObjects = [];
-    private $secrets = [];
+    /** @var CloudSQL $lastDBObject */
+    var $lastDBObject = null;
+    var $secrets = [];
     var $avoid_secrets = true;   // SET
 
 
@@ -42,33 +44,15 @@ class CFOs {
 
     /**
      * @param $cfos
+     * @return array|void if there is no error return an array with the model structure
      */
-    public function readCFOs ($cfos) {
+    public function readCFOs ($cfos)
+    {
         $models = $this->core->model->readModelsFromCloudFramework($cfos,$this->integrationKey);
         if($this->core->model->error) {
-            return $this->addError($this->core->model->errorMsg);
+            return $this->addError($this->core->model->errorMsg[0]??$this->core->model->errorMsg);
         }
         return $models;
-    }
-
-    /**
-     * @param $object
-     * @return DataStore
-     */
-    public function ds ($object): DataStore
-    {
-        if(!isset($this->dsObjects[$object]))
-            $this->dsInit($object);
-        return $this->dsObjects[$object];
-    }
-
-    /**
-     * Set secrets to be used by Datastore, Bigquery, Database
-     * @param $key
-     * @param array $value
-     */
-    public function setSecret ($key,array $value) {
-        $this->secrets[$key] = $value;
     }
 
     /**
@@ -90,12 +74,17 @@ class CFOs {
         if(!$service_account && !$this->avoid_secrets) {
             $model = ($this->core->model->models['ds:' . $object] ?? null);
             if (!$model) {
-                $this->readCFOs($object);
+                if(!$this->readCFOs($object)) {
+                    $this->createFooDatastoreObject($object);
+                    $this->dsObjects[$object]->error = true;
+                    $this->dsObjects[$object]->errorMsg = $this->errorMsg;
+                    return false;
+                }
                 $model = ($this->core->model->models['ds:' . $object] ?? null);
             }
             if (($service_account_secret = ($model['data']['secret'] ?? null))) {
                 if (is_string($service_account_secret)) {
-                    if (!$service_account = ($this->secrets[$service_account_secret] ?? null)) {
+                    if (!$service_account = $this->readSecret($service_account_secret)) {
                         $this->core->logs->add("CFO {$object} has a secret and it does not exist in CFOs->secrets[]. Set the secret value or call CFOs->avoidSecrets(true).", 'CFOs_warning');
                         $this->createFooDatastoreObject($object);
                         $this->dsObjects[$object]->error = true;
@@ -143,6 +132,17 @@ class CFOs {
     }
 
     /**
+     * @param $object
+     * @return DataStore
+     */
+    public function ds ($object): DataStore
+    {
+        if(!isset($this->dsObjects[$object]))
+            $this->dsInit($object);
+        return $this->dsObjects[$object];
+    }
+
+    /**
      * Initialize a bq $object
      * @param string $object
      * @param string $project_id
@@ -158,18 +158,24 @@ class CFOs {
 
         //region IF (!$service_account && !$this->avoid_secrets) READ $model to verify $model['data']['secret'] exist
         if(!$service_account && !$this->avoid_secrets) {
-            $model = ($this->core->model->models['ds:' . $object] ?? null);
+            $model = ($this->core->model->models['bq:' . $object] ?? null);
             if (!$model) {
-                $this->readCFOs($object);
-                $model = ($this->core->model->models['ds:' . $object] ?? null);
+                if(!$this->readCFOs($object)) {
+                    $this->createFooBQObject($object);
+                    $this->bqObjects[$object]->error = true;
+                    $this->bqObjects[$object]->errorMsg = $this->errorMsg;
+                    return false;
+                }
+                $model = ($this->core->model->models['bq:' . $object] ?? null);
             }
+
             if (($service_account_secret = ($model['data']['secret'] ?? null))) {
                 if (is_string($service_account_secret)) {
-                    if (!$service_account = ($this->secrets[$service_account_secret] ?? null)) {
+                    if (!$service_account = $this->readSecret($service_account_secret)) {
                         $this->core->logs->add("CFO {$object} has a secret and it does not exist in CFOs->secrets[]. Set the secret value or call CFOs->avoidSecrets(true).", 'CFOs_warning');
-                        $this->createFooDatastoreObject($object);
-                        $this->dsObjects[$object]->error = true;
-                        $this->dsObjects[$object]->errorMsg = 'CFO ['.$object.'] hash a secret ['.$service_account_secret.'] and it does not exist in CFOs->secrets. Programmer has to include [CFOs->setSecret(\''.$service_account_secret.'\', array secret] or to include [CFOs->setServiceAccount(array service_account])';
+                        $this->createFooBQObject($object);
+                        $this->bqObjects[$object]->error = true;
+                        $this->bqObjects[$object]->errorMsg = 'CFO ['.$object.'] hash a secret ['.$service_account_secret.'] and it does not exist in CFOs->secrets. Programmer has to include [CFOs->setSecret(\''.$service_account_secret.'\', array secret] or to include [CFOs->setServiceAccount(array service_account])';
                         return false;
                     }
                 } else {
@@ -185,9 +191,9 @@ class CFOs {
         elseif($this->project_id) $options['projectId'] = $this->project_id;
         if($service_account){
             if (!($service_account['private_key']??null) || !($service_account['project_id']??null)) {
-                $this->createFooDatastoreObject($object);
-                $this->dsObjects[$object]->error = true;
-                $this->dsObjects[$object]->errorMsg = "In CFO[{$object}] there service_account configured does not have private_key or project_id";
+                $this->createFooBQObject($object);
+                $this->bqObjects[$object]->error = true;
+                $this->bqObjects[$object]->errorMsg = "In CFO[{$object}] there service_account configured does not have private_key or project_id";
                 return false;
             }
             $options['keyFile'] = $service_account;
@@ -208,6 +214,7 @@ class CFOs {
         return true;
     }
 
+
     /**
      * Return a bq $object
      * @param $object
@@ -223,22 +230,92 @@ class CFOs {
     }
 
     /**
-     * @param $object
-     * @return DataSQL
+     * Initialize a bq $object
+     * @param string $object
+     * @param string $connection name of the connection
+     * @param array $db_credentials optional credentials for the connection
+     * @return bool
      */
-    public function db ($object,$connection='default'): DataSQL
+    public function dbInit (string $object, $connection='default', array $db_credentials = [])
     {
+
+        //region EVALUATE IF $this->dbObjects[$object]) exist to create it
         if(!isset($this->dbObjects[$object])) {
+
+            //region READ $model
+            $model = ($this->core->model->models['db:' . $object] ?? null);
+            if (!$model) {
+                if(!$this->readCFOs($object)) {
+                    $this->createFooDBObject($object);
+                    $this->dbObjects[$object]->error = true;
+                    $this->dbObjects[$object]->errorMsg = $this->errorMsg;
+                    return false;
+                }
+                $model = ($this->core->model->models['db:' . $object] ?? null);
+            }
+            //endregion
+
+            //region EVALUATE IF $model['data']['secret'] exist to update $db_connection
+            if (!$db_credentials && ($service_account_secret = ($model['data']['secret'] ?? null)) && !$this->avoid_secrets) {
+                if (is_string($service_account_secret)) {
+                    if(!$db_credentials = $this->readSecret($service_account_secret)) {
+                        $this->core->logs->add("CFO {$object} has a secret and it does not exist in CFOs->secrets[]. Use the CFOs->setSecret()  or set CFOs->useCFOSecret(true).", 'CFOs_warning');
+                        $this->createFooDBObject($object);
+                        $this->dbObjects[$object]->error = true;
+                        $this->dbObjects[$object]->errorMsg = ['CFO ['.$object.'] has a secret ['.$service_account_secret.'] and it does not exist in CFOs->secrets. Programmer has to include [CFOs->setSecret(\''.$service_account_secret.'\', array secret] or add it in CLOUD-DEVELOPMENT/Secrets'];
+                        if($this->error) $this->dbObjects[$object]->errorMsg[] = $this->errorMsg;
+                        return false;
+                    }
+
+                } else {
+                    $db_credentials = $service_account_secret;
+                }
+            }
+            //endregion
+
+            //region INIT $this->dbObjects[$object]
             $this->dbObjects[$object] = $this->core->model->getModelObject('db:'.$object,['cf_models_api_key'=>$this->integrationKey]);
             if($this->core->model->error) {
                 if(!is_object($this->dbObjects[$object]))
                     $this->createFooDBObject($object);
                 $this->dbObjects[$object]->error = true;
                 $this->dbObjects[$object]->errorMsg = $this->core->model->errorMsg;
+                return false;
             }
+            //endregion
+
+            //region EVALUATE $db_connection
+            if($db_credentials) {
+                //region REWRITE dbSocket to null for localEnvironment
+                if($this->core->is->localEnvironment() && ($db_credentials['dbServer']??null) && ($db_credentials['dbSocket']??null) )
+                    $db_credentials['dbSocket']=null;
+                //endregion
+            }
+            //endregion
+
         }
-        $this->core->model->dbInit($connection);
+        //endregion
+
+        //region ASSURE the object is created
+        $this->core->model->dbInit($connection,$db_credentials);
+        $this->lastDBObject = &$this->core->model->dbConnections[$connection];
+        //endregion
+
+        return true;
+    }
+
+    /**
+     * @param $object
+     * @return DataSQL
+     */
+    public function db ($object,$connection='default'): DataSQL
+    {
+
+        if(!isset($this->dbObjects[$object]))
+            $this->dbInit($object,$connection);
+
         return $this->dbObjects[$object];
+
     }
 
     /**
@@ -251,6 +328,8 @@ class CFOs {
     public function dbQuery ($q,$params=null,$connection='default')
     {
         $this->core->model->dbInit($connection);
+        $this->lastDBObject = &$this->core->model->dbConnections[$connection];
+
         $ret= $this->core->model->dbQuery('CFO Direct Query for connection  '.$connection,$q,$params);
         if($this->core->model->error) $this->addError($this->core->model->errorMsg);
         return($ret);
@@ -308,12 +387,30 @@ class CFOs {
         $this->core->config->set("dbCharset",$credentials['dbCharset']??null);
         $this->core->config->set("dbPort",$credentials['dbPort']??'3306');
 
+        // SET to null dbSocket if you are in localhost
+        if($this->core->is->localEnvironment() && $this->core->config->get("dbSocket") && $this->core->config->get("dbServer"))
+            $this->core->config->set("dbSocket",null);
+
         if(!$this->core->model->dbInit($connection)) {
             $this->addError($this->core->model->errorMsg);
             return false;
         }
         else return true;
 
+    }
+
+    /**
+     * @param string $secret
+     * @return array|void return the secret array of there is not errors
+     */
+    public function readSecret(string $secret)
+    {
+        if(isset($this->secrets[$secret])) return $this->secrets[$secret];
+        if($this->avoid_secrets) return [];
+        if(!strpos($secret,'.')) return $this->addError("secret [{$secret}] has a wrong format");
+        list($secret_id, $var_id ) = explode('.',$secret,2);
+        if(!$this->secrets[$secret] = $this->core->security->getERPSecretVar($var_id,$secret_id,$this->namespace)) return($this->addError($this->core->security->errorMsg));
+        return $this->secrets[$secret];
     }
 
     /**
@@ -380,11 +477,38 @@ class CFOs {
     }
 
     /**
-     * If ($avoid==true and if !$this->service_account) the secrets of Datastore and Bigquery CFOs will be try to be read
+     * If ($avoid==true and if !$this->service_account) the secrets of Datastore, Bigquery, Database CFOs will be tried to be read. False by default
      * @param bool $avoid
      */
     function avoidSecrets(bool $avoid) {
         $this->avoid_secrets = $avoid;
+    }
+
+    /**
+     * If ($use==true and if !$this->service_account) the secrets of Datastore, Bigquery, Database CFOs will be tried to be read. False by default
+     * @param bool $avoid
+     */
+    function useCFOSecret(bool $use) {
+        $this->avoid_secrets = !$use;
+    }
+
+
+
+    /**
+     * Set $this->integrationKey to connect with CFO models
+     * @param $key
+     */
+    public function setIntegrationKey (string $key) {
+        $this->integrationKey = $key;
+    }
+
+    /**
+     * Set secrets to be used by Datastore, Bigquery, Database
+     * @param $key
+     * @param array $value
+     */
+    public function setSecret ($key,array $value) {
+        $this->secrets[$key] = $value;
     }
 
     /**
