@@ -1593,3 +1593,5 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
         }
     }
 }
+
+include_once __DIR__.'/ValueMapper.php';
