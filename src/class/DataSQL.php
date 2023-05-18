@@ -70,6 +70,7 @@ class DataSQL
                     || stripos($item[0],'bit')!== false
                     || stripos($item[0],'float')!== false
                     || stripos($item[0],'double')!== false
+                    || stripos($item[0],'decimal')!== false
                     || stripos($item[0],'number')!== false)?'int':'char'];
             }
 
@@ -79,9 +80,14 @@ class DataSQL
                 || stripos($item[0],'float')!== false
                 || stripos($item[0],'double')!== false
                 || stripos($item[0],'number')!== false
+                || stripos($item[0],'decimal')!== false
             )?'int':'char';
         }
         if(!count($this->keys)) return($this->addError('Missing Keys in the schema: '.$this->entity_name));
+        //endregion
+
+        //region SET Default TimeZone from Core
+        $this->default_time_zone_to_read = $this->core->system->time_zone[0];
         //endregion
 
     }
@@ -312,7 +318,8 @@ class DataSQL
     function fetch($keysWhere=[], $fields=null, $params=[]) {
 
         if($this->error) return false;
-        //--- WHERE
+
+        //region SET $where
         // Array with key=>value or empty
         if(is_array($keysWhere) ) {
             list($where, $_params) = $this->getQuerySQLWhereAndParams($keysWhere);
@@ -326,8 +333,9 @@ class DataSQL
         } else {
             return($this->addError('fetch($keysWhere,$fields=null) $keyWhere has a wrong value'));
         }
+        //endregion
 
-        // --- FIELDS
+        //region SET $sqlFields
         $distinct = '';
         if(is_string($fields) && strpos($fields,'DISTINCT ')===0) {
             $fields = str_replace('DISTINCT ','',$fields);
@@ -340,8 +348,9 @@ class DataSQL
             foreach ($this->virtualFields as $field=>$value) {
                 $sqlFields.=",{$value} as {$field}";
             }
+        //endregion
 
-        // --- QUERY
+        //region SET $SQL with $where && $sqlFields
         $from = $this->getQuerySQLFroms();
         $SQL = "SELECT {$distinct}{$sqlFields} FROM {$from}";
 
@@ -372,11 +381,21 @@ class DataSQL
                 $SQL .= " offset {$this->offset}";
             }
         }
-
         if(!$sqlFields) return($this->addError('No fields to select found: '.json_encode($fields)));
+        //endregion
 
+        //region READ $ret with $SQL
         $ret= $this->core->model->dbQuery($this->entity_name.' fetch by querys: '.json_encode($keysWhere),$SQL,$params,$this->entity_schema['model']);
+
         if($this->core->model->error) $this->addError($this->core->model->errorMsg);
+        //endregion
+
+        //region EVALUATE to change datetime & timestamp to read timezone
+        if($ret && $this->default_time_zone_to_write!=$this->default_time_zone_to_read)
+            foreach ($ret as $i=>$item)
+                $this->convertDateFieldsReadValuesIntoTimeZoneValues($ret[$i]);
+        //endregion
+
         return($ret);
     }
 
@@ -388,7 +407,7 @@ class DataSQL
     public function update(&$data) {
         if(!is_array($data) ) return($this->addError('update($data) $data has to be an array with key->value'));
 
-        $this->checkDateNowValues($data);
+        if(!$this->convertDateFieldsToWriteValuesIntoTimeZoneValues($data)) return;
 
         // Let's convert from Mapping into SQL fields
         if($this->use_mapping) {
@@ -414,7 +433,7 @@ class DataSQL
     public function upsert($data) {
         if(!is_array($data) ) return($this->addError('upsert($data) $data has to be an array with key->value'));
 
-        $this->checkDateNowValues($data);
+        if(!$this->convertDateFieldsToWriteValuesIntoTimeZoneValues($data)) return;
 
         // Let's convert from Mapping into SQL fields
         if($this->use_mapping) {
@@ -440,7 +459,7 @@ class DataSQL
     public function insert($data) {
         if(!is_array($data) ) return($this->addError('insert($data) $data has to be an array with key->value'));
 
-        $this->checkDateNowValues($data);
+        if(!$this->convertDateFieldsToWriteValuesIntoTimeZoneValues($data)) return;
 
         // Let's convert from Mapping into SQL fields
         if($this->use_mapping) {
@@ -452,8 +471,12 @@ class DataSQL
             }
         }
 
-        $ret= $this->core->model->dbInsert($this->entity_name.' insert record: '.$this->entity_name,$this->entity_name,$data);
-        if($this->core->model->error) $this->addError($this->core->model->errorMsg);
+        try {
+            $ret= $this->core->model->dbInsert($this->entity_name.' insert record: '.$this->entity_name,$this->entity_name,$data);
+            if($this->core->model->error) return $this->addError($this->core->model->errorMsg);
+        }catch (Exception $e) {
+            return $this->addError($e->getMessage());
+        }
         return($ret);
 
     }
@@ -483,19 +506,58 @@ class DataSQL
     }
 
     /**
-     * Check if in Data there is a now value
+     * Convert "now" values in ['date','datetime','timestamp'] into TimeZoneValue before to update or insert
      * @param $data
+     * @return bool
      */
-    private function checkDateNowValues(&$data) {
-        $dt = new DateTime("now", new DateTimeZone($this->default_time_zone_to_write));
-        foreach ($data as $key=>$datum) if(in_array(($this->entity_schema['model'][$key][0]??null),['date','datetime','timestamp']) && $datum=='now'){
-            if($this->entity_schema['model'][$key][0]=='date')
-                $data[$key] = $dt->format('Y-m-d');
-            else
-                $data[$key] = $dt->format('Y-m-d H:i:s');
+    private function convertDateFieldsToWriteValuesIntoTimeZoneValues(&$data) {
+        try {
+            $dt = new DateTime("now", new DateTimeZone($this->default_time_zone_to_write));
+            $dt_r = new DateTime("now", new DateTimeZone($this->default_time_zone_to_read));
+            $tz_r = new DateTimeZone($this->default_time_zone_to_read);
+            $tz_w = new DateTimeZone($this->default_time_zone_to_write);
+
+
+            foreach ($data as $key=>$datum) if($datum && in_array(($this->entity_schema['model'][$key][0]??null),['date','datetime','timestamp']) && $datum){
+                if($datum=='now') {
+                    if ($this->entity_schema['model'][$key][0] == 'date')
+                        $data[$key] = $dt_r->format('Y-m-d');
+                    else
+                        $data[$key] = $dt->format('Y-m-d H:i:s');
+                } elseif($this->default_time_zone_to_read != $this->default_time_zone_to_write && in_array(($this->entity_schema['model'][$key][0]??null),['datetime','timestamp'])) {
+                    $dt_w = new DateTime($datum, $tz_r);
+                    $dt_w->setTimezone($tz_w);
+                    $data[$key] = $dt_w->format('Y-m-d H:i:s');
+                }
+            }
+            return true;
+        } catch (Exception $e) {
+            $this->addError($e->getMessage());
+            return false;
         }
     }
 
+    /**
+     * Convert "now" values in ['date','datetime','timestamp'] into TimeZoneValue
+     * @param $data
+     */
+    private function convertDateFieldsReadValuesIntoTimeZoneValues(&$data) {
+        if($this->default_time_zone_to_read == $this->default_time_zone_to_write) return true;
+
+        try {
+            $tz_w = new DateTimeZone($this->default_time_zone_to_write);
+            $tz_r = new DateTimeZone($this->default_time_zone_to_read);
+            foreach ($data as $key=>$datum) if($datum && in_array(($this->entity_schema['model'][$key][0]??null),['datetime','timestamp'])) {
+                $dt = new DateTime($datum, $tz_w);
+                $dt->setTimezone($tz_r);
+                $data[$key] = $dt->format('Y-m-d H:i:s');
+            }
+            return true;
+        } catch (Exception $e) {
+            $this->addError($e->getMessage());
+            return false;
+        }
+    }
 
     /** About Order */
     function unsetOrder() {$this->order='';}
@@ -545,16 +607,18 @@ class DataSQL
         // Custom query rewrites previous where.
         if(!count($keysWhere)) $keysWhere = $this->queryWhere;
 
+        // Create Time zones
+        $tz_r = new DateTimeZone($this->default_time_zone_to_read);
+        $tz_w = new DateTimeZone($this->default_time_zone_to_write);
 
         // Loop the wheres
         if(is_array($keysWhere))
         foreach ($keysWhere as $key=>$value) {
 
-            // Complex query
+            //region IF $key is a query. Ex: ['(a=>%s)'=>[5]] add it in $where and CONTINUE to next foreach
             if(strpos($key,'(')!== false || strpos($key,'%')!== false || stripos($key,' and ') || stripos($key,' or ')) {
                 if($where) $where.=' AND ';
                 $where.= $key;
-
 
                 // Avoid params
                 if($value===null) continue;
@@ -566,20 +630,34 @@ class DataSQL
                 $params = array_merge($params,$value);
                 continue;
             }
-            // Simple where
-            else {
-                // TODO: support >,>=
-                if($this->use_mapping) {
-                    if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong mapped key: '.$key));
-                    $key = $this->entity_schema['mapping'][$key]['field'];
-                } else {
-                    if(!isset($this->fields[$key])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong key: '.$key));
+            //endregion
+
+            //region INIT $comp and EVALUATE to add in $where.=' AND'
+            $comp = '=';  // default comparator;
+            if($where) $where.=' AND ';
+            //endregion
+
+
+            //region EVALUATE if $key includes
+            if (preg_match('/[=><]/', $key)) {
+                if (strpos($key, '>=') === 0 || strpos($key, '<=') === 0 || strpos($key, '!=') === 0) {
+                    $comp = substr($key, 0, 2);
+                    $key = trim(substr($key, 2));
+                } elseif (strpos($key, '>') === 0 || strpos($key, '<') === 0 || strpos($key, '<') === 0) {
+                    $comp = substr($key, 0, 1);
+                    $key = trim(substr($key, 1));
                 }
             }
+            //endregion
 
+            // Simple where
+            if($this->use_mapping) {
+                if(!isset($this->entity_schema['mapping'][$key]['field'])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong mapped key: '.$key));
+                $key = $this->entity_schema['mapping'][$key]['field'];
+            } else {
+                if(!isset($this->fields[$key])) return($this->addError('fetch($keysWhere, $fields=null) $keyWhere contains a wrong key: '.$key));
+            }
 
-
-            if($where) $where.=' AND ';
 
             switch ((!is_array($value))?strval($value):'default') {
                 case "__null__":
@@ -615,42 +693,91 @@ class DataSQL
                     }
                     // =
                     else {
-                        $op = '=';
                         if($this->fields[$key]=='int') {
-                            // Add operators
+                            // ALLOW to change comparator with the value
                             if(strpos($value,'>=')===0) {
-                                $op='>=';
+                                $comp='>=';
                                 $value = str_replace('>=','',$value);
                             }elseif(strpos($value,'<=')===0) {
-                                $op='<=';
+                                $comp='<=';
                                 $value = str_replace('<=','',$value);
                             }elseif(strpos($value,'>')===0) {
-                                $op='>';
+                                $comp='>';
                                 $value = str_replace('>','',$value);
                             }elseif(strpos($value,'<')===0) {
-                                $op='<';
+                                $comp='<';
                                 $value = str_replace('<','',$value);
                             }elseif(strpos($value,'!=')===0) {
-                                $op='!=';
-                                $value = str_replace('!=','',$value);
-                            }
-                            $where.="{$this->entity_name}.{$key} {$op} %s";
-                        }
-                        else {
-                            if(strpos($value,'%')!==false) {
-                                if(strpos($value,'!=')===0) {
-                                    $op = 'not like';
-                                    $value = str_replace('!=', '', $value);
-                                } else {
-                                    $op = 'like';
-                                }
-                            } elseif(strpos($value,'!=')===0) {
-                                $op='!=';
+                                $comp='!=';
                                 $value = str_replace('!=','',$value);
                             }
 
-                            $where.="{$this->entity_name}.{$key} {$op} '%s'";
+                            if(preg_match('/[^0-9\+\-\.]/',$value))
+                                $value = preg_replace('/[^0-9\+\-\.]/','',$value);
+
+                            if(strlen($value))
+                                $where.="{$this->entity_name}.{$key} {$comp} %s";
+                            else {
+                                break;
+                            }
                         }
+                        else {
+                            if(strpos($value,'%')!==false) {
+                                if(strpos($value,'>=')===0) {
+                                    $comp='>=';
+                                    $value = str_replace('>=','',$value);
+                                }elseif(strpos($value,'<=')===0) {
+                                    $comp='<=';
+                                    $value = str_replace('<=','',$value);
+                                }elseif(strpos($value,'>')===0) {
+                                    $comp='>';
+                                    $value = str_replace('>','',$value);
+                                }elseif(strpos($value,'<')===0) {
+                                    $comp='<';
+                                    $value = str_replace('<','',$value);
+                                }elseif(strpos($value,'!=')===0) {
+                                    $comp='!=';
+                                    $value = str_replace('!=','',$value);
+                                }
+
+                                if($comp=='!=') $comp='not like';
+                                else $comp='like';
+                            }elseif(in_array(($this->entity_schema['model'][$key][0]??null),['date','datetime','timestamp'])) {
+
+                                if(strpos($value,'>=')===0) {
+                                    $comp='>=';
+                                    $value = str_replace('>=','',$value);
+                                }elseif(strpos($value,'<=')===0) {
+                                    $comp='<=';
+                                    $value = str_replace('<=','',$value);
+                                }elseif(strpos($value,'>')===0) {
+                                    $comp='>';
+                                    $value = str_replace('>','',$value);
+                                }elseif(strpos($value,'<')===0) {
+                                    $comp='<';
+                                    $value = str_replace('<','',$value);
+                                }elseif(strpos($value,'!=')===0) {
+                                    $comp='!=';
+                                    $value = str_replace('!=','',$value);
+                                }
+
+                                if($this->default_time_zone_to_read != $this->default_time_zone_to_write) {
+                                    try {
+                                        $dt_w = new DateTime($value, $tz_r);
+                                        $dt_w->setTimezone($tz_w);
+                                        if($this->entity_schema['model'][$key][0]=='date')
+                                            $value = $dt_w->format('Y-m-d');
+                                        else
+                                            $value = $dt_w->format('Y-m-d H:i:s');
+                                    } catch (Exception $e) {
+                                        $this->addError($e->getMessage());
+                                        return false;
+                                    }
+                                }
+                            }
+                            $where.="{$this->entity_name}.{$key} {$comp} '%s'";
+                        }
+
                         $params[] = $value;
                     }
 

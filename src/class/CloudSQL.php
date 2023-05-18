@@ -225,8 +225,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $this->setError("No DB server or DB name provided. ");
             }
             $this->core->__p->add('db connect. Class:'.__CLASS__,__FILE__);
+
             // Read dates with current timezone.
-            if(!$this->error()) $this->command("set time_zone='%s'",array(date("P")));
+            // This will only do automatic conversions for TIMESTAMP fields and affect the results of NOW() and CURDATE() functions, but not DATE, TIME, and DATETIME fields
+            //if(!$this->error()) $this->command("set time_zone='%s'",array(date("P")));
+
             return($this->_dblink);
         }
 

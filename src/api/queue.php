@@ -36,6 +36,7 @@ class API extends RESTful
         $this->sendCorsHeaders();
         if(isset($this->formParams['_raw_input_'])) unset($this->formParams['_raw_input_']);
 
+
         // CALL URL and wait until the response is received
         if (isset($this->formParams['_interactive'])) {
 
@@ -44,7 +45,12 @@ class API extends RESTful
 
             // In interactive we use CloudService Class to send and receive data with http...
             //$_url = str_replace('/queue/', '/', urldecode($this->core->system->url['host_url_uri']));
+            if(!strpos($this->core->system->url['host_url_uri'],'/queue/'))
+                return $this->setErrorFromCodelib('params-error','call does not include /queue/. pattern');
+            if(strpos($this->core->system->url['host_url_uri'],'/queue/queue'))
+                return $this->setErrorFromCodelib('params-error','call does not allow /queue/queue. pattern');
             $_url = str_replace('/queue/', '/', ($this->core->system->url['host_url_uri']));
+
 
             // Requires to create a complete URL
             $value['url_queued'] = $_url;
@@ -99,10 +105,14 @@ class API extends RESTful
             $this->formParams['cloudframework_queued_fingerprint'] = json_encode($this->core->system->getRequestFingerPrint(), JSON_PRETTY_PRINT);
             //endregion
 
-            //region SET '$_url'
-            //$_url = str_replace('/queue/', '/', urldecode($this->core->system->url['url_uri']));
+            // In interactive we use CloudService Class to send and receive data with http...
+            //$_url = str_replace('/queue/', '/', urldecode($this->core->system->url['host_url_uri']));
+            if(strpos($this->core->system->url['url_uri'],'/queue/')===false)
+                return $this->setErrorFromCodelib('params-error','call does not include /queue/. pattern');
+            if(strpos($this->core->system->url['url_uri'],'/queue/queue')===0)
+                return $this->setErrorFromCodelib('params-error','call does not allow /queue/queue. pattern');
             $_url = str_replace('/queue/', '/', ($this->core->system->url['url_uri']));
-            //endregion
+
 
             //region CREATE $client, $queueName and $task to be queued
             $client = new CloudTasksClient();
@@ -120,6 +130,7 @@ class API extends RESTful
 
             // The path of the HTTP request to the App Engine service.
             $httpRequest->setRelativeUri($_url);
+
 
             $payload = json_encode($this->formParams);
 
