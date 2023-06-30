@@ -108,6 +108,8 @@ class DataSQL
         $this->virtualFields = [];
         $this->groupBy = '';
         $this->view = null;
+        $this->error = false;
+        $this->errorMsg = '';
     }
 
     /**
