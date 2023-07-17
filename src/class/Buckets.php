@@ -30,7 +30,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * ```
          * @var string $version version of the class
          */
-        var $version = '202303211';
+        var $version = '202305311';
 
         /** @ignore */
         var $bucket = '';
@@ -80,92 +80,14 @@ if (!defined ("_Buckets_CLASS_") ) {
         var $debug = false;
 
         /**
-         * Object constructor
-         * example:
-         *
-         * ```php
-         * $buckets = $this->core->loadClass('Buckets','gs://{BucketName}');
-         * if($buckets->error) return $buckets->errorMsg
-         * ```
-         * @ignore
-         * @param Core7 $core
-         * @param string $bucket
-         */
-        Function __construct (Core7 &$core,$bucket='') {
-
-            //Performance
-            $time = microtime(true);
-            $this->core = $core;
-            $this->core->__p->add('Buckets', $bucket??'', 'note');
-
-            if($this->core->is->development()) $this->debug = true;
-
-            if(strlen($bucket??'')) $this->bucket = $bucket;
-            else $this->bucket = $this->core->config->get('bucketUploadPath');
-            if(!$this->bucket) return($this->addError('Missing bucketUploadPath config var or $bucket in the constructor'));
-
-            if(strpos($this->bucket,'gs://')===0) {
-                // take the bucket name: ex: gs://cloudframework/adnbp/.. -> cloudframework
-                $bucket_root = preg_replace('/\/.*/','',str_replace('gs://','',$this->bucket));
-                try {
-                    $this->gs_bucket = $this->core->gc_datastorage_client->bucket($bucket_root);
-                    if(!$this->gs_bucket->exists()) $this->addError('I can not find bucket: '.$this->bucket,'bucket-not-found');
-                    $this->gs_bucket_url = 'https://console.cloud.google.com/storage/browser/'.$this->bucket;
-                    $this->bucketInfo = $this->gs_bucket->info(['projection'=>'full']);
-                } catch (Exception $e) {
-                    $this->addError($e->getMessage(),'bucket-can-not-be-assigned');
-                }
-
-                // Add logs for performance
-                if($this->debug)
-                    $this->core->logs->add("Buckets('{$bucket_root}')". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
-
-                if($this->error) {
-                    $this->core->__p->add('Buckets', null, 'endnote');
-                    return;
-                }
-            } else {
-                $this->core->__p->add('Bucket', null, 'endnote');
-                return($this->addError('The bucket has to begin with gs:// ['.$this->bucket.']','bucket-wrong-name-format'));
-            }
-
-            $time = microtime(true);
-            $this->vars['upload_max_filesize'] = ini_get('upload_max_filesize');
-            $this->vars['max_file_uploads'] = ini_get('max_file_uploads');
-            $this->vars['file_uploads'] = ini_get('file_uploads');
-            $this->vars['default_bucket'] = $this->bucket;
-            $this->vars['retUploadUrl'] = $this->core->system->url['host_url_uri'];
-
-            if(count($_FILES)) {
-                foreach ($_FILES as $key => $value) {
-                    if(is_array($value['name'])) {
-                        for($j=0,$tr2=count($value['name']);$j<$tr2;$j++) {
-                            foreach ($value as $key2 => $value2) {
-                                $this->uploadedFiles[$key][$j][$key2] = $value[$key2][$j];
-                            }
-                        }
-                    } else {
-                        $this->uploadedFiles[$key][0] = $value;
-                    }
-                    $this->isUploaded = true;
-                }
-
-                if($this->debug)
-                    $this->core->logs->add("__construct('{$bucket_root}') [storing temporally uploaded files:".count($_FILES)."]". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
-
-            }
-            $this->core->__p->add('Buckets', null, 'endnote');
-        }
-
-        /**
          * Move files uploaded in $_FILES to temporal space to Bucket $path taking $options
          *
          * example:
          * ```php
          * if(!$bucket->uploadedFiles) die('there are not files uploaded');
          * $options = [];
-         * $options['public'] = true;
-         * $options['apply_hash_to_filenames'] = true;
+         * $options['public'] = true; // It tries to make the document public returning "publicUrl" and "mediaLink" attributes in the returned array
+         * $options['apply_hash_to_filenames'] = true; // It rewrites filename with a format: {datetime}_{hash}.{extension} and add "hash_from_name" attribute in the returned array with the original name
          * $options['allowed_extensions'] = ['jpg'];
          * $options['allowed_content_types'] = ['image/jpeg'];
          * $uploaded_files = $this->bucket->manageUploadFiles('/uploads',$options);
@@ -176,6 +98,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * @param array $options [optional] {
          *
          *     @type string $public Makes the files to be public
+         *     @type string $field_name it says only to process documents with the variable $field_name otherwise it processes the document of all variables
          *     @type bool $apply_hash_to_filenames change the original name by a hash to avoid duplicated files
          *     @type array $allowed_extensions extensions to be allowed in file names: ['jpg','pdf',..]
          *     @type array $allowed_content_types content_types allowed to be allowed in file names: ['image','image/jpg','plain/txt',..]
@@ -185,7 +108,7 @@ if (!defined ("_Buckets_CLASS_") ) {
          * the output is an array with the following structure where 'files' if the name of formParms to send the files in this example:
          * ```json
          * {
-         *   "files": [
+         *   "field_name1": [
          *     {
          *     "name": "20221221042421_upload63a9cab5988acf3ccdd27d2000e3f9255a7e3e2c48800.jpg",
          *     "type": "image/jpeg",
@@ -196,17 +119,15 @@ if (!defined ("_Buckets_CLASS_") ) {
          *     "movedTo": "gs://academy-bucket-mix/uploads/20221221042421_upload63a9cab5988acf3ccdd27d2000e3f9255a7e3e2c48800.jpg",
          *     "publicUrl": "https://storage.googleapis.com/academy-bucket-mix/uploads/20221221042421_upload63a9cab5988acf3ccdd27d2000e3f9255a7e3e2c48800.jpg",
          *     "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/academy-bucket-mix/o/uploads%2F20221221042421_upload63a9cab5988acf3ccdd27d2000e3f9255a7e3e2c48800.jpg?generation=1672071863226633&alt=media"
-         *    },
+         *    }],
+         *  "field_name2":[
          *    {
-         *     "name": "20221223042423_upload63a9cab752d3dfa7ea700b267bf1ef4c9f556f17314bd.jpg",
+         *     "name": "IMAGE1.jpg",
          *     "type": "image/jpeg",
          *     "tmp_name": "/private/var/folders/hb/9499jh9s3jd9gx0q68sm5bj80000gn/T/php3uVF7y",
          *     "error": 0,
          *     "size": 1111558,
-         *     "hash_from_name": "IMG_4338.jpg",
          *     "movedTo": "gs://academy-bucket-mix/uploads/20221223042423_upload63a9cab752d3dfa7ea700b267bf1ef4c9f556f17314bd.jpg",
-         *     "publicUrl": "https://storage.googleapis.com/academy-bucket-mix/uploads/20221223042423_upload63a9cab752d3dfa7ea700b267bf1ef4c9f556f17314bd.jpg",
-         *     "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/academy-bucket-mix/o/uploads%2F20221223042423_upload63a9cab752d3dfa7ea700b267bf1ef4c9f556f17314bd.jpg?generation=1672071864738350&alt=media"
          *    }
          *  ]
          * }
@@ -255,6 +176,9 @@ if (!defined ("_Buckets_CLASS_") ) {
 
             //region LOOP $this->uploadedFiles and move them to $path
             foreach ($this->uploadedFiles as $key => $files) {
+
+                // only handle specific field_name documents if this var name is included in options
+                if(($options['field_name']??null) && $options['field_name']!=$key) continue;
 
                 //region VERIFY $allowed_extensions and $allowed_content_types
                 if($allowed_extensions || $allowed_content_types) for($i=0,$tr=count($files);$i<$tr;$i++) {
@@ -375,6 +299,84 @@ if (!defined ("_Buckets_CLASS_") ) {
             //region RETURN $this->uploadedFiles
             return($this->uploadedFiles);
             //endregion
+        }
+
+        /**
+         * Object constructor
+         * example:
+         *
+         * ```php
+         * $buckets = $this->core->loadClass('Buckets','gs://{BucketName}');
+         * if($buckets->error) return $buckets->errorMsg
+         * ```
+         * @ignore
+         * @param Core7 $core
+         * @param string $bucket
+         */
+        Function __construct (Core7 &$core,$bucket='') {
+
+            //Performance
+            $time = microtime(true);
+            $this->core = $core;
+            $this->core->__p->add('Buckets', $bucket??'', 'note');
+
+            if($this->core->is->development()) $this->debug = true;
+
+            if(strlen($bucket??'')) $this->bucket = $bucket;
+            else $this->bucket = $this->core->config->get('bucketUploadPath');
+            if(!$this->bucket) return($this->addError('Missing bucketUploadPath config var or $bucket in the constructor'));
+
+            if(strpos($this->bucket,'gs://')===0) {
+                // take the bucket name: ex: gs://cloudframework/adnbp/.. -> cloudframework
+                $bucket_root = preg_replace('/\/.*/','',str_replace('gs://','',$this->bucket));
+                try {
+                    $this->gs_bucket = $this->core->gc_datastorage_client->bucket($bucket_root);
+                    if(!$this->gs_bucket->exists()) $this->addError('I can not find bucket: '.$this->bucket,'bucket-not-found');
+                    $this->gs_bucket_url = 'https://console.cloud.google.com/storage/browser/'.$this->bucket;
+                    $this->bucketInfo = $this->gs_bucket->info(['projection'=>'full']);
+                } catch (Exception $e) {
+                    $this->addError($e->getMessage(),'bucket-can-not-be-assigned');
+                }
+
+                // Add logs for performance
+                if($this->debug)
+                    $this->core->logs->add("Buckets('{$bucket_root}')". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
+
+                if($this->error) {
+                    $this->core->__p->add('Buckets', null, 'endnote');
+                    return;
+                }
+            } else {
+                $this->core->__p->add('Bucket', null, 'endnote');
+                return($this->addError('The bucket has to begin with gs:// ['.$this->bucket.']','bucket-wrong-name-format'));
+            }
+
+            $time = microtime(true);
+            $this->vars['upload_max_filesize'] = ini_get('upload_max_filesize');
+            $this->vars['max_file_uploads'] = ini_get('max_file_uploads');
+            $this->vars['file_uploads'] = ini_get('file_uploads');
+            $this->vars['default_bucket'] = $this->bucket;
+            $this->vars['retUploadUrl'] = $this->core->system->url['host_url_uri'];
+
+            if(count($_FILES)) {
+                foreach ($_FILES as $key => $value) {
+                    if(is_array($value['name'])) {
+                        for($j=0,$tr2=count($value['name']);$j<$tr2;$j++) {
+                            foreach ($value as $key2 => $value2) {
+                                $this->uploadedFiles[$key][$j][$key2] = $value[$key2][$j];
+                            }
+                        }
+                    } else {
+                        $this->uploadedFiles[$key][0] = $value;
+                    }
+                    $this->isUploaded = true;
+                }
+
+                if($this->debug)
+                    $this->core->logs->add("__construct('{$bucket_root}') [storing temporally uploaded files:".count($_FILES)."]". ' [time='.(round(microtime(true)-$time,4)).' secs]','Buckets');
+
+            }
+            $this->core->__p->add('Buckets', null, 'endnote');
         }
 
 

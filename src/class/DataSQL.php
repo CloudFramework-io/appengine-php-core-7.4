@@ -108,6 +108,8 @@ class DataSQL
         $this->virtualFields = [];
         $this->groupBy = '';
         $this->view = null;
+        $this->error = false;
+        $this->errorMsg = '';
     }
 
     /**
@@ -143,7 +145,10 @@ class DataSQL
             foreach ($fields as $i=>$field) {
                 if($ret) $ret.=',';
                 if(strpos($field,'(')!==false) {
-                    $ret.=str_replace('(','('.$this->entity_name.'.',$field);
+                    if(strpos($field,'(*')===false)
+                        $ret.=str_replace('(','('.$this->entity_name.'.',$field);
+                    else
+                        $ret.=$field;
                 } else {
                     //JSON workaround https://bugs.php.net/bug.php?id=70384
                     if(isset($this->entity_schema['model'][$field][0]) && $this->entity_schema['model'][$field][0]=='json') {
