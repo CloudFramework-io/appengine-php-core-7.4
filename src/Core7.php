@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.20051';
+        var $_version = 'v74.20052';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2497,8 +2497,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 return $user;
             } else {
                 try {
+
+                    //get user using service account of the the server
                     $metadata = new Google\Cloud\Core\Compute\Metadata();
-                    $user = explode('/',$metadata->get('instance/service-accounts'))[0];
+                    $metaparts = explode('/',$metadata->get('instance/service-accounts'));
+
+                    //some times the service returns "default/\n<Service Account>" instead the name of the service directly
+                    $user = ($metaparts[0]=='default')?trim($metaparts[1]):$metaparts[0];
+
+                    // return the user calculated
                     return $user;
                 } catch (Exception $e) {
                     return($this->addError("getGoogleUserEmailAccount() has produced an error in metadata call: ".$e->getMessage()));
