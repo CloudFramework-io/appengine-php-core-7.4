@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.18221';
+        var $_version = 'v74.20051';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2391,6 +2391,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $key = 'getMyERPSecrets_'.$this->core->gc_project_id.'_'.$erp_platform_id.'_'.$erp_secret_id;
             $user_secrets = $this->getCache($key,'ERP.secrets');
 
+            //verify $user_secrets['id'] match with $erp_user
+            //fix bug when in production the $erp_user is returning default
+            if($erp_user=='default' && isset($user_secrets['id'])) $erp_user = $user_secrets['id'];
+
+            //check the
             if($erp_user && isset($user_secrets['id']) && $user_secrets['id']!=$erp_user) $user_secrets=[];
             if($user_secrets){
                 $this->secret_vars = ['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']];
