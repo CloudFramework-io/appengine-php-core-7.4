@@ -18,6 +18,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
     {
         var $core = null;                   // Core7 reference
         var $project_id = null;             // project_id
+        var $_version = '20230905';
         /** @var BigQueryClient|null  */
         var $client = null;                 // BQ Client
         // table to write Data
@@ -349,7 +350,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                     return $this->addError("Number of %s ($n_percentsS) doesn't count match with number of arguments (".count($params)."). Query: $q -> ".print_r($params,true));
                 }
                 foreach ($params as $param) {
-                    $q = preg_replace('/%s/',$param,$q,1);
+                    $q = preg_replace('/%s/',$param??'',$q,1);
                 }
             }
 
@@ -469,7 +470,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             foreach ($fields as $i=>$field) {
                 if($ret) $ret.=',';
                 if(strpos($field,'(')===false && isset($this->entity_schema['model'][$field][0])) {
-                        $ret.='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.'.$field;
+                    $ret.='`'.$this->project_id.'.'.$this->dataset_name.'.'.$this->table_name.'`.'.$field;
                 } else{
                     $ret.=$field;
                 }
@@ -724,13 +725,21 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 $set.= " {$field}=";
 
                 //region EVALUATE string values VS boolean or number values
-                if(isset($this->entity_schema['model'][$field][0]) &&  in_array($this->entity_schema['model'][$field][0],['integer','float','boolean'])) $set.='%s';
-                else $set.='"%s"';
+                if(isset($this->entity_schema['model'][$field][0]) &&  in_array($this->entity_schema['model'][$field][0],['integer','float','boolean'])) {
+                    $set.='%s';
+                } else {
+                    $set.='"%s"';
+                }
                 //endregion
 
-                //region modify boolean values
-                if(isset($this->entity_schema['model'][$field][0]) &&$this->entity_schema['model'][$field][0]=='boolean') {
-                    $value=$value?'true':'false';
+                //region modify boolean and numeric values values
+                if(($this->entity_schema['model'][$field][0]??null)=='boolean') {
+                    if($value===null) $value='NULL';
+                    else $value=$value?'true':'false';
+                }elseif(!strlen($value??'')) {
+                    if(in_array($this->entity_schema['model'][$field][0]??null,['integer','float'])) {
+                        $value='NULL';
+                    }
                 }
                 //endregion
                 $params[] = $value;
@@ -742,6 +751,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
             if(isset($this->entity_schema['model'][$this->key][0]) &&  in_array($this->entity_schema['model'][$this->key][0],['integer','float','boolean'])) $_sql.='%s';
             else $_sql.='"%s"';
             $params[] = $data[$this->key];
+
             return $this->_query($_sql,$params);
 
         }
@@ -807,9 +817,14 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                 else $set.='"%s"';
                 //endregion
 
-                //region modify boolean values
-                if(isset($this->entity_schema['model'][$field][0]) &&$this->entity_schema['model'][$field][0]=='boolean') {
-                    $value=$value?'true':'false';
+                //region modify boolean and numeric values values
+                if(($this->entity_schema['model'][$field][0]??null)=='boolean') {
+                    if($value===null) $value='NULL';
+                    else $value=$value?'true':'false';
+                }elseif(!strlen($value??'')) {
+                    if(in_array($this->entity_schema['model'][$field][0]??null,['integer','float'])) {
+                        $value='NULL';
+                    }
                 }
                 //endregion
                 $params[] = $value;
@@ -1524,7 +1539,7 @@ if (!defined ("_DATABQCLIENT_CLASS_") ) {
                         'allow_copy'=>[],
                         'logs'=>['list'=>false,'display'=>false,'update'=>false,'delete'=>false],
                         'backups'=>['update'=>false,'delete'=>false]
-                ],
+                    ],
                     'fields'=>[]]
                 ,'interface'=>[
                     'object'=>"{$this->dataset_name}.{$this->table_name}"
