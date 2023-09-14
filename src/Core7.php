@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.20053';
+        var $_version = 'v74.21141';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5304,6 +5304,36 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function setLang(string $lang)
         {
             $this->data['User']['UserLang'] = $lang;
+        }
+
+
+
+        /**
+         * Add Info to User data and try to store it in cache
+         * @param string $key Key name for the array of user data
+         * @param mix $data data to store
+         * @return void
+         */
+        public function addUserData(string $key,$data) {
+            $this->data[$key] = $data;
+
+            //region EVALUATE to store in cache the new data added
+            if($this->token) {
+                //region SET $user,$namespace,$key from token structure or return errorCode: WRONG_TOKEN_FORMAT
+                $tokenParts = explode('__',$this->token);
+                if(count($tokenParts) != 3
+                    || !($namespace=$tokenParts[0])
+                    || !($user_token=$tokenParts[1])
+                    || !($key=$tokenParts[2]) )
+                    return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
+                //endregion
+
+                if($userData = $this->core->cache->get($namespace.'_'.$user_token)) {
+                    $userData['data'] = $this->data;
+                    $this->core->cache->set($namespace.'_'.$user_token,$userData);
+                }
+            }
+            //endregion
         }
 
         /**
