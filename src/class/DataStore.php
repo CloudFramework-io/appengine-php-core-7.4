@@ -18,7 +18,7 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
      */
     class DataStore
     {
-        protected $_version = '20230503';
+        protected $_version = '20230927';
         /** @var Core7 $core */
         private $core = null;                   // Core7 reference
         /** @var DatastoreClient|null  */
@@ -169,45 +169,45 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
             $tz = new DateTimeZone($this->default_time_zone_to_write);
 
             // loop the array into $row
-            foreach ($data as $i => $row) {
+            foreach ($data as $row) {
                 $record = [];
                 $schema_key = null;
                 $schema_keyname = null;
 
                 if (!is_array($row)) return $this->setError('Wrong data structure');
                 // Loading info from Data. $i can be numbers 0..n or indexes.
-                foreach ($row as $i => $value) {
+                foreach ($row as $_key => $value) {
 
                     //$i = strtolower($i);  // Let's work with lowercase
 
                     // If the key or keyname is passed instead the schema key|keyname let's create
-                    if (strtolower($i) == 'key' || strtolower($i) == 'keyid' || strtolower($i) == 'keyname') {
-                        $this->schema['props'][$i][0] = $i;
-                        $this->schema['props'][$i][1] = (strtolower($i) == 'keyname') ? strtolower($i) : 'key';
+                    if (strtolower($_key) == 'key' || strtolower($_key) == 'keyid' || strtolower($_key) == 'keyname') {
+                        $this->schema['props'][$_key][0] = $_key;
+                        $this->schema['props'][$_key][1] = (strtolower($_key) == 'keyname') ? strtolower($_key) : 'key';
                     }
 
                     // Only use those variables that appears in the schema except key && keyname
-                    if (!isset($this->schema['props'][$i])) continue;
+                    if (!isset($this->schema['props'][$_key])) continue;
 
                     // if the field is key or keyname feed $schema_key or $schema_keyname
-                    if ($this->schema['props'][$i][1] == 'key') {
+                    if ($this->schema['props'][$_key][1] == 'key') {
                         $schema_key = preg_replace('/[^0-9]/', '', $value);
                         if (!strlen($schema_key)) return $this->setError('wrong Key value');
 
                     }
-                    elseif ($this->schema['props'][$i][1] == 'keyname') {
+                    elseif ($this->schema['props'][$_key][1] == 'keyname') {
                         $schema_keyname = $value;
 
                         // else explore the data.
                     }
-                    elseif ($this->schema['props'][$i][1] == 'boolean') {
-                        $record[$this->schema['props'][$i][0]] = ($value)?true:false;
+                    elseif ($this->schema['props'][$_key][1] == 'boolean') {
+                        $record[$this->schema['props'][$_key][0]] = ($value)?true:false;
                         // else explore the data.
                     }
                     else {
                         if (is_string($value)) {
                             // date & datetime values
-                            if ($this->schema['props'][$i][1] == 'date' || $this->schema['props'][$i][1] == 'datetime' || $this->schema['props'][$i][1] == 'datetimeiso') {
+                            if ($this->schema['props'][$_key][1] == 'date' || $this->schema['props'][$_key][1] == 'datetime' || $this->schema['props'][$_key][1] == 'datetimeiso') {
                                 if (strlen($value)) {
                                     // Fix the problem when value is returned as microtime
                                     try {
@@ -219,49 +219,49 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                         else $value = $value_time;
 
                                     } catch (Exception $e) {
-                                        return $this->setError('field {' . $this->schema['props'][$i][0] . '} has a wrong date format: ' . $value);
+                                        return $this->setError('field {' . $this->schema['props'][$_key][0] . '} has a wrong date format: ' . $value);
                                     }
                                 } else {
                                     $value = null;
                                 }
                                 // geo values
-                            } elseif ($this->schema['props'][$i][1] == 'geo') {
+                            } elseif ($this->schema['props'][$_key][1] == 'geo') {
                                 if (!strlen($value)) $value = '0.00,0.00';
                                 list($lat, $long) = explode(',', $value, 2);
                                 $value = new Geopoint($lat, $long);
-                            } elseif ($this->schema['props'][$i][1] == 'json') {
+                            } elseif ($this->schema['props'][$_key][1] == 'json') {
                                 if (!strlen($value)) {
                                     $value = '{}';
                                 } else {
                                     json_decode($value); // Let's see if we receive a valid JSON
                                     if (json_last_error() !== JSON_ERROR_NONE) $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
                                 }
-                            } elseif ($this->schema['props'][$i][1] == 'zip') {
+                            } elseif ($this->schema['props'][$_key][1] == 'zip') {
                                 $value = utf8_encode(gzcompress($value));
-                            } elseif ($this->schema['props'][$i][1] == 'integer') {
+                            } elseif ($this->schema['props'][$_key][1] == 'integer') {
                                 $value = intval($value);
-                            } elseif ($this->schema['props'][$i][1] == 'float') {
+                            } elseif ($this->schema['props'][$_key][1] == 'float') {
                                 $value = floatval($value);
                             }
                         } else {
-                            if ($this->schema['props'][$i][1] == 'json') {
+                            if ($this->schema['props'][$_key][1] == 'json') {
                                 if (is_array($value) || is_object($value)) {
                                     $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
                                 } elseif (!strlen($value??'')) {
                                     $value = '{}';
                                 }
-                            } elseif ($this->schema['props'][$i][1] == 'zip') {
-                                return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value'));
+                            } elseif ($this->schema['props'][$_key][1] == 'zip') {
+                                return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$_key][0] . ' has received a no string value'));
 
-                            } elseif ($this->schema['props'][$i][1] == 'txt') {
-                                return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value'));
+                            } elseif ($this->schema['props'][$_key][1] == 'txt') {
+                                return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$_key][0] . ' has received a no string value'));
 
-                            } elseif ($this->schema['props'][$i][1] == 'string') {
+                            } elseif ($this->schema['props'][$_key][1] == 'string') {
                                 if(is_numeric($value)) $value = strval($value);
-                                else if($value) return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$i][0] . ' has received a no string value: '.json_encode($value)));
+                                else if($value) return ($this->setError($this->entity_name . ': ' . $this->schema['props'][$_key][0] . ' has received a no string value: '.json_encode($value)));
                             }
                         }
-                        $record[$this->schema['props'][$i][0]] = $value;
+                        $record[$this->schema['props'][$_key][0]] = $value;
                     }
                 }
 
@@ -424,6 +424,13 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
          */
         function getCheckedRecordWithMapData($data, $all = true, &$dictionaries = [])
         {
+
+            // patch $this->schema['props']['__model']['KeyId']
+            if(isset($this->schema['props']['__model']['KeyId']) && !isset($data['KeyId'])) {
+                unset($this->schema['props']['__model']['KeyId']);
+            }
+
+            //set $entity
             $entity = array_flip(array_keys($this->schema['props']['__model']));
             if (!is_array($data)) $data = [];
 
@@ -433,6 +440,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                     $this->schema['data']['mapData'][$key] = $key;
                 }
             }
+
+
             // Explore the entity
             foreach ($entity as $key => $foo) {
                 $key_exist = true;
