@@ -5391,26 +5391,25 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->api_user = ($user)?:($this->core->user->id?:'user-unknown');
         }
 
+
         /**
          * Get a Localization code from a localization file
-         * @param string $code
+         * @param string $app_tag
          * @param string $lang
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function getCode(string $code, string $lang='',$namespace='')
+        function getAppCats(string $lang='',$namespace='')
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
-            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
-                list($namespace,$code) = explode(',',$code,2);
-                $namespace = str_replace('$namespace:','',$namespace);
+            $app_tags = $this->core->request->get_json_decode($this->api_service."/{$namespace}/{$this->api_user}/apps",['langs'=>$lang]);
+            if($this->core->request->error) {
+                $this->addError($this->core->request->errorMsg);
+                $this->core->request->reset();
+                return false;
             }
-            $parts = explode(';',$code);
-            if(count($parts)<3) return $code;
-            $locFile = "{$parts[0]};{$parts[1]}";
-            if(!$this->readLocalizeData($locFile,$lang,$namespace)) return $code;
-            return $this->data[$locFile][$lang][$code]??$code;
+            return $app_tags['data'];
         }
 
         /**
@@ -5420,7 +5419,36 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function setCode(string $code, string $value, string $lang='',$namespace='')
+        function getTag(string $code, string $lang='',$namespace='')
+        {
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            if(!$lang) $lang=$this->api_lang;
+            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
+                list($namespace,$code) = explode(',',$code,2);
+                $namespace = str_replace('$namespace:','',$namespace);
+            }
+            $parts = explode(';',$code);
+            if(count($parts)<2) return $code;
+            $locFile = "{$parts[0]};{$parts[1]}";
+            if(!$this->readLocalizationData($locFile,$lang,$namespace)) return $code;
+            if(count($parts)<3) return $this->data[$locFile][$lang]??$code;
+            return $this->data[$locFile][$lang][$code]??$code;
+        }
+
+        /**
+         * @deprecated  Use getTag
+         */
+        function getCode(string $code, string $lang='',$namespace='') {return $this->getTag($code,$lang,$namespace);}
+
+
+        /**
+         * Get a Localization code from a localization file
+         * @param string $code
+         * @param string $lang
+         * @param string $namespace [optional]
+         * @return mixed|string
+         */
+        function setTag(string $code, string $value, string $lang='',$namespace='')
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
@@ -5435,6 +5463,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->data[$locFile][$lang][$code] = $value;
             return true;
         }
+        /**
+         * @deprecated  Use getTag
+         */
+        function setCode(string $code, string $value, string $lang='',$namespace='') {return $this->setTag($code,$value,$lang,$namespace);}
+
 
         /**
          * Reset Cache for localizations. If $loc_file is not sent it will delete the whole namespace
@@ -5466,7 +5499,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $lang
          * @param string $namespace
          */
-        public function readLocalizeData(string $locFile,string $lang='',$namespace='') {
+        public function readLocalizationData(string $locFile,string $lang='',$namespace='') {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
             if(isset($this->data[$locFile][$lang])) return true;
