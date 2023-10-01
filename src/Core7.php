@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.22011';
+        var $_version = 'v74.22012';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -3627,12 +3627,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             try {
                 if($keys = $this->cache->keys($this->spacename . '-' .$search)) {
                     foreach ($keys as $i=>$key) {
-                        $keys[$i] = str_replace(this->spacename . '-' ,'',$key);
+                        $keys[$i] = str_replace($this->spacename . '-' ,'',$key);
                     }
                 }
             }  catch (Exception $e) {
-                $this->addError($e->getMessage());
                 $keys = null;
+                $this->addError($e->getMessage());
             }
             return $keys;
         }
