@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.21271';
+        var $_version = 'v74.22011';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -3616,6 +3616,26 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->spacename = preg_replace('/[^A-z_-]/', '_', 'CloudFrameWork_' . $this->type . $name);
             }
         }
+        /**
+         * Return the keys stored in the cache under $this->spacename
+         * @param $search [optional] default '*' allow to searcg for a pattern
+         * @return array|null if there is some error it will return null else the array of keys found
+         */
+        public function keys($search='*')
+        {
+            $keys = [];
+            try {
+                if($keys = $this->cache->keys($this->spacename . '-' .$search)) {
+                    foreach ($keys as $i=>$key) {
+                        $keys[$i] = str_replace(this->spacename . '-' ,'',$key);
+                    }
+                }
+            }  catch (Exception $e) {
+                $this->addError($e->getMessage());
+                $keys = null;
+            }
+            return $keys;
+        }
 
         /**
          * Return an object from Cache.
@@ -3794,7 +3814,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manate Cache in Files
+     * Class to implement cache over local files
      * @package Core.cache
      */
     class CoreCacheFile
@@ -3819,6 +3839,23 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(is_file($this->dir . $path))
                 return @unlink($this->dir . $path);
         }
+        function keys($pattern)
+        {
+            try {
+                if($files = scandir($this->dir)) {
+                    array_shift($files);
+                    array_shift($files);
+                    foreach ($files as $i=>$file) {
+                        $files[$i] = preg_replace('/^[^-]*\-/','',$file);
+                    }
+                }
+
+            } catch (Exception $e) {
+                $files = $e->getMessage();
+            }
+            return $files;
+        }
+
 
         function get($path)
         {
