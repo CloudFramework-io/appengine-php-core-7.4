@@ -237,8 +237,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                     if (json_last_error() !== JSON_ERROR_NONE) $value = $this->core->jsonEncode($value, JSON_PRETTY_PRINT);
                                 }
                             } elseif ($this->schema['props'][$_key][1] == 'zip') {
-                                //$value = mb_convert_encoding(gzcompress($value), 'UTF-8', mb_list_encodings());
-                                $value = utf8_encode(gzcompress($value));
+                                $value = mb_convert_encoding(gzcompress($value), 'UTF-8', 'ISO-8859-1');
+                                //$value = utf8_encode(gzcompress($value));
                             } elseif ($this->schema['props'][$_key][1] == 'integer') {
                                 $value = intval($value);
                             } elseif ($this->schema['props'][$_key][1] == 'float') {
@@ -890,8 +890,8 @@ if (!defined ("_DATASTORECLIENT_CLASS_") ) {
                                 if(is_array($value)) $row[$key] = $value;
                                 else $row[$key] = json_decode($value, true);
                             }elseif ($this->schema['props'][$key][1] == 'zip') {
-                                //$row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(mb_convert_encoding($value, 'ISO-8859-1', 'UTF-8')) : $value;
-                                $row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(utf8_decode($value)) : $value;
+                                $row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(mb_convert_encoding($value, 'ISO-8859-1', 'UTF-8')) : $value;
+                                //$row[$key] = (mb_detect_encoding($value) == "UTF-8") ? gzuncompress(utf8_decode($value)) : $value;
                             }elseif ($this->schema['props'][$key][1] == 'txt')
                                 $row[$key] = $value;
                             elseif ($value instanceof DateTimeImmutable) {
