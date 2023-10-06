@@ -108,7 +108,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $this->_port = trim($port??'');
                 $this->_dbsocket = trim($socket??'');
                 $this->_dbcharset = trim($charset??'');
-            }  else if(strlen( trim($this->core->config->get("dbServer")))  || trim($this->core->config->get("dbSocket"))) {
+            }  else if(strlen( trim($this->core->config->get("dbServer")??''))  || trim($this->core->config->get("dbSocket")??'')) {
                 // It load from $this->core->config->get("vars"): dbServer,dbUser,dbPassword,dbName,dbSocket,dbPort,dbPort
                 $this->loadCoreConfigVars();
                 // It rewrites: $this->_dbserver, $this->_dbuser,$this->_dbpassword,$this->_dbdatabase ,$this->_dbsocket, $this->_dbport

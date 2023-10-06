@@ -528,6 +528,164 @@ class CFOs {
         $this->db_connection = $db_connection;
     }
 
+
+
+    /**
+     * Execute a Manual Query
+     * @param string $txt
+     * @return array|void
+     */
+    public function transformTXTInDatastoreModel(string $txt, string $cfo)
+    {
+        $model_lines = explode("\n", $txt);
+        $ds_model = [];
+        $group = '';
+        if ($model_lines > 1) {
+            list($entity, $group) = explode(':', trim($model_lines[0]), 2);
+            if ($entity != $cfo) {
+                $error = 'Model first line entity does not match with DS:Entity: ' . $this->getFormParamater('entity');
+            } else {
+                list($key, $type, $info) = explode(',', trim($model_lines[1]), 3);
+                if (!in_array($key, ['KeyName', 'KeyId'])) {
+                    $error = 'First field has to be KeyId or KeyName';
+                } elseif (!$type) {
+                    $error = 'First field does not have second element type';
+                } else {
+                    $ds_model[$key] = [($key=='KeyName')?'keyname':'key', $info];
+                    for ($i = 2, $tr = count($model_lines); $i < $tr; $i++) if ($model_lines[$i]) {
+                        list($key, $type, $info) = explode(',', trim($model_lines[$i]), 3);
+                        if (!$type) {
+                            $error = "The field $key does not have type";
+                            break;
+                        }
+                        $ds_model[$key] = [$type, $info];
+                    }
+                }
+            }
+        }
+        if($error) return $this->setError($error);
+        else return ['group'=>$group,'model'=>$ds_model];
+    }
+
+
+
+    /**
+     * Return a structure with bigquery squema based on CF model
+     * @return array
+     */
+    public function getInterfaceModelFromDatastoreModel($entity,$model,$group,$secret_id='')
+    {
+
+        $fields_definition = [];
+        $fields = [];
+        $fields_list = [];
+        $key_type = $model['KeyName']?'KeyName':'KeyId';
+        $filters=[];
+
+        $order=null;
+        foreach ($model as $_key=>$item) {
+            $name = $_key;
+            if(stripos(($item[1]??''),'name:')!==false){
+                $name = preg_replace('/\|.*/','',explode('name:',$item[1],2)[1]);
+            }
+            $fields_definition[$_key] =  ['name'=>$name];
+            if(in_array($item[0],['date','datetime','json','html','zip','boolean'])) {
+                $fields_definition[$_key]['type'] = $item[0];
+            }
+
+            if(stripos(($item[1]??''),'allownull')!==false) {
+                $fields_definition[$_key]['allow_empty']=true;
+            }
+            if(strpos(($item[1]??''),'index')!==false || $_key==$key_type) {
+                $fields_list[$_key] = ['field' => $_key];
+                if ($_key == $key_type) {
+                    $fields_list[$_key]['display_cfo'] = true;
+                }
+                if(!$order && $_key!=$key_type) {
+                    $order = $fields_list[$_key]['order'] = 'asc';
+                }
+            }
+            $fields[$_key] =  ['field'=>$_key];
+
+            $type='text';
+            if(in_array($item[0],['date','datetime'])) {
+                $type=$item[0];
+
+            }
+            elseif(in_array($item[0],['list'])) $type='select';
+            if(strpos(($item[1]??''),'index')!==false) {
+                $filters[] = [
+                    'field'=>$_key,
+                    'name'=>$_key,
+                    'type'=>$type,
+                    'placeholder'=>'Example for '.$_key
+                ];
+            }
+        }
+
+        $cfo = [
+            'KeyName'=>"{$entity}"
+            ,'type'=>'ds'
+            ,'entity'=>"{$entity}"
+            ,'extends'=>null
+            ,'GroupName'=>"{$group}"
+            ,'model'=>[
+                'model'=>$model
+                ,'dependencies'=>[]
+            ]
+            ,'securityAndFields'=>[
+                'security'=>[
+                    'cfo_locked'=>false,
+                    'user_privileges'=>[],
+                    'user_groups'=>[],
+                    'user_organizations'=>[],
+                    'user_namespaces'=>[],
+                    'allow_update'=>[
+                        'user_privileges'=>[],
+                        'user_groups'=>[],
+                        'user_organizations'=>[],
+                        'user_namespaces'=>[],
+                        'field_values'=>[]],
+                    'allow_display'=>[],
+                    'allow_delete'=>[],
+                    'allow_copy'=>[],
+                    'logs'=>['list'=>false,'display'=>false,'update'=>false,'delete'=>false],
+                    'backups'=>['update'=>false,'delete'=>false]
+                ],
+                'fields'=>$fields_definition]
+            ,'interface'=>[
+                'object'=>"$entity"
+                ,'name'=>$entity.' Report'
+                ,'plural'=>$entity.' Reports'
+                ,'ico'=>'building'
+                ,'modal_size'=>'xl'
+                ,'secret'=>$secret_id
+                ,'filters'=>$filters
+                ,'buttons'=>[['type'=>'api-insert','title'=>'Insert'],['type'=>'api-bulk','title'=>'Bulk Insert']]
+                ,'views'=>['default'=>[
+                    'name'=>'Default View',
+                    'all_fields'=>true,
+                    'server_fields'=>null,
+                    'server_order'=>null,
+                    'server_where'=>null,
+                    'server_limit'=>200,
+                    'fields'=>$fields_list]]
+                ,'display_fields'=>$fields
+                ,'update_fields'=>$fields
+                ,'insert_fields'=>$fields
+                ,'copy_fields'=>$fields
+                ,'delete_fields'=>[$key_type=>['field'=>$key_type]]
+                ,'hooks'=>['on.insert'=>[],'on.update'=>[],'on.delete'=>[]]
+            ]
+        ];
+
+        if($key_type=='KeyId') {
+            unset($cfo['interface']['insert_fields']['KeyId']);
+            unset($cfo['interface']['copy_fields']['KeyId']);
+        }
+        return $cfo;
+    }
+
     /**
      * Reset the cache to load the CFOs
      * @param $namespace

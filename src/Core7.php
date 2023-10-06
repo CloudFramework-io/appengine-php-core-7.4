@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.18221';
+        var $_version = 'v74.22022';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -2391,6 +2391,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $key = 'getMyERPSecrets_'.$this->core->gc_project_id.'_'.$erp_platform_id.'_'.$erp_secret_id;
             $user_secrets = $this->getCache($key,'ERP.secrets');
 
+            //verify $user_secrets['id'] match with $erp_user
+            //fix bug when in production the $erp_user is returning default
+            if($erp_user=='default' && isset($user_secrets['id'])) $erp_user = $user_secrets['id'];
+
+            //check the
             if($erp_user && isset($user_secrets['id']) && $user_secrets['id']!=$erp_user) $user_secrets=[];
             if($user_secrets){
                 $this->secret_vars = ['id'=>$user_secrets['id'],'secret-id'=>$user_secrets['secret-id'],'secrets'=>$user_secrets['secrets']];
@@ -2492,8 +2497,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 return $user;
             } else {
                 try {
+
+                    //get user using service account of the the server
                     $metadata = new Google\Cloud\Core\Compute\Metadata();
-                    $user = explode('/',$metadata->get('instance/service-accounts'))[0];
+                    $metaparts = explode('/',$metadata->get('instance/service-accounts'));
+
+                    //some times the service returns "default/\n<Service Account>" instead the name of the service directly
+                    $user = ($metaparts[0]=='default')?trim($metaparts[1]):$metaparts[0];
+
+                    // return the user calculated
                     return $user;
                 } catch (Exception $e) {
                     return($this->addError("getGoogleUserEmailAccount() has produced an error in metadata call: ".$e->getMessage()));
@@ -3604,6 +3616,26 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 $this->spacename = preg_replace('/[^A-z_-]/', '_', 'CloudFrameWork_' . $this->type . $name);
             }
         }
+        /**
+         * Return the keys stored in the cache under $this->spacename
+         * @param $search [optional] default '*' allow to searcg for a pattern
+         * @return array|null if there is some error it will return null else the array of keys found
+         */
+        public function keys($search='*')
+        {
+            $keys = [];
+            try {
+                if($keys = $this->cache->keys($this->spacename . '-' .$search)) {
+                    foreach ($keys as $i=>$key) {
+                        $keys[$i] = str_replace($this->spacename . '-' ,'',$key);
+                    }
+                }
+            }  catch (Exception $e) {
+                $keys = null;
+                $this->addError($e->getMessage());
+            }
+            return $keys;
+        }
 
         /**
          * Return an object from Cache.
@@ -3782,7 +3814,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     }
 
     /**
-     * Class to manate Cache in Files
+     * Class to implement cache over local files
      * @package Core.cache
      */
     class CoreCacheFile
@@ -3807,6 +3839,23 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(is_file($this->dir . $path))
                 return @unlink($this->dir . $path);
         }
+        function keys($pattern)
+        {
+            try {
+                if($files = scandir($this->dir)) {
+                    array_shift($files);
+                    array_shift($files);
+                    foreach ($files as $i=>$file) {
+                        $files[$i] = preg_replace('/^[^-]*\-/','',$file);
+                    }
+                }
+
+            } catch (Exception $e) {
+                $files = $e->getMessage();
+            }
+            return $files;
+        }
+
 
         function get($path)
         {
@@ -5294,6 +5343,36 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->data['User']['UserLang'] = $lang;
         }
 
+
+
+        /**
+         * Add Info to User data and try to store it in cache
+         * @param string $key Key name for the array of user data
+         * @param mix $data data to store
+         * @return void
+         */
+        public function addUserData(string $key,$data) {
+            $this->data[$key] = $data;
+
+            //region EVALUATE to store in cache the new data added
+            if($this->token) {
+                //region SET $user,$namespace,$key from token structure or return errorCode: WRONG_TOKEN_FORMAT
+                $tokenParts = explode('__',$this->token);
+                if(count($tokenParts) != 3
+                    || !($namespace=$tokenParts[0])
+                    || !($user_token=$tokenParts[1])
+                    || !($key=$tokenParts[2]) )
+                    return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
+                //endregion
+
+                if($userData = $this->core->cache->get($namespace.'_'.$user_token)) {
+                    $userData['data'] = $this->data;
+                    $this->core->cache->set($namespace.'_'.$user_token,$userData);
+                }
+            }
+            //endregion
+        }
+
         /**
          * Add an error Message
          * @param $code
@@ -5349,26 +5428,25 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->api_user = ($user)?:($this->core->user->id?:'user-unknown');
         }
 
+
         /**
          * Get a Localization code from a localization file
-         * @param string $code
+         * @param string $app_tag
          * @param string $lang
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function getCode(string $code, string $lang='',$namespace='')
+        function getAppCats(string $lang='',$namespace='')
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
-            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
-                list($namespace,$code) = explode(',',$code,2);
-                $namespace = str_replace('$namespace:','',$namespace);
+            $app_tags = $this->core->request->get_json_decode($this->api_service."/{$namespace}/{$this->api_user}/apps",['langs'=>$lang]);
+            if($this->core->request->error) {
+                $this->addError($this->core->request->errorMsg);
+                $this->core->request->reset();
+                return false;
             }
-            $parts = explode(';',$code);
-            if(count($parts)<3) return $code;
-            $locFile = "{$parts[0]};{$parts[1]}";
-            if(!$this->readLocalizeData($locFile,$lang,$namespace)) return $code;
-            return $this->data[$locFile][$lang][$code]??$code;
+            return $app_tags['data'];
         }
 
         /**
@@ -5378,7 +5456,40 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function setCode(string $code, string $value, string $lang='',$namespace='')
+        function getTag(string $code, string $lang='',$namespace='')
+        {
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            if(!$lang) $lang=$this->api_lang;
+
+            //detect namespace value in tag.
+            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
+                list($namespace,$code) = explode(',',$code,2);
+                $namespace = str_replace('$namespace:','',$namespace);
+            }
+
+            //set $locFile
+            $parts = explode(';',$code);
+            if(count($parts)<2) return $code;
+            $locFile = "{$parts[0]};{$parts[1]}";
+            if(!$this->readLocalizationData($locFile,$lang,$namespace)) return $code;
+            if(count($parts)<3) return $this->data[$locFile][$lang]??$code;
+            return $this->data[$locFile][$lang][$code]??$code;
+        }
+
+        /**
+         * @deprecated  Use getTag
+         */
+        function getCode(string $code, string $lang='',$namespace='') {return $this->getTag($code,$lang,$namespace);}
+
+
+        /**
+         * Get a Localization code from a localization file
+         * @param string $code
+         * @param string $lang
+         * @param string $namespace [optional]
+         * @return mixed|string
+         */
+        function setTag(string $code, string $value, string $lang='',$namespace='')
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
@@ -5393,6 +5504,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->data[$locFile][$lang][$code] = $value;
             return true;
         }
+        /**
+         * @deprecated  Use getTag
+         */
+        function setCode(string $code, string $value, string $lang='',$namespace='') {return $this->setTag($code,$value,$lang,$namespace);}
+
 
         /**
          * Reset Cache for localizations. If $loc_file is not sent it will delete the whole namespace
@@ -5424,7 +5540,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          * @param string $lang
          * @param string $namespace
          */
-        public function readLocalizeData(string $locFile,string $lang='',$namespace='') {
+        public function readLocalizationData(string $locFile,string $lang='',$namespace='') {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
             if(isset($this->data[$locFile][$lang])) return true;
