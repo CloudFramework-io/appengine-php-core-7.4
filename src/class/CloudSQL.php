@@ -1180,7 +1180,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
                 $tmp['indexes'] = $this->getDataFromQuery('SHOW INDEX FROM %s;',array($table));
                 $tmp['SQL'] = $this->getDataFromQuery('SHOW CREATE TABLE %s;',array($table))[0];
                 $tmp['TABLE_SCHEMA'] = $this->getDataFromQuery('SELECT * FROM information_schema.TABLES WHERE TABLE_NAME = "%s"',array($table))[0];
-                $tmp['triggers'] = $this->getDataFromQuery('SHOW TRIGGERS IN %s LIKE "%s";',array($this->_dbdatabase,$table));
+                $tmp['triggers'] = $this->getDataFromQuery('SHOW TRIGGERS IN `%s` LIKE "%s";',array($this->_dbdatabase,$table));
                 $tmp['TRIGGERS'] = [];
                 $tmp['INDEXES'] = [];
                 if($tmp['triggers']) foreach ($tmp['triggers'] as $trigger) {
