@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.22242';
+        var $_version = 'v74.23051';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5450,30 +5450,63 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Get a Localization code from a localization file
-         * @param string $code
+         * Return localizations taking $text with tags included
+         * @param string $text
          * @param string $lang
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function getTag(string $code, string $lang='',$namespace='')
+        function changeTextWithTags(string &$text, string $lang='',$namespace='')
         {
+            $pattern = '/({[^;}]+;[^;}]+;[^}]+})/';
+            preg_match_all($pattern, $text, $matches, PREG_SET_ORDER);
+            foreach ($matches as $match) {
+                $text = str_replace($match[0], $this->getTag($match[1],$lang,$namespace), $text);
+            }
+        }
+
+        /**
+         * Apply localizations over $array with tags included
+         * @param array $array
+         * @param string $lang
+         * @param string $namespace [optional]
+         */
+        function changeArrayWithTags(array & $array, string $lang='',$namespace='')
+        {
+            foreach ($array as $i=>$item) {
+                if(is_string($item)) $array[$i] = $this->getTag($item,$lang,$namespace);
+                elseif(is_array($item)) $this->changeArrayWithTags($array[$i],$lang,$namespace);
+            }
+        }
+
+        /**
+         * Get a Localization code from a localization file
+         * @param string $tag the tag to translate with the pattern [{][$namepace:<namespace>,]<app_id>;<cat_id>;<tag_id>[;<subtag_id>][}]
+         * @param string $lang
+         * @param string $namespace [optional]
+         * @return mixed|string
+         */
+        function getTag(string $tag, string $lang='', $namespace='')
+        {
+            if(!strpos($tag,';')) return $tag;
+            //delete {, } chars
+            $tag = preg_replace('/({|})/','',$tag);
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
 
             //detect namespace value in tag.
-            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
-                list($namespace,$code) = explode(',',$code,2);
+            if(strpos($tag,'$namespace:')===0 && strpos($tag,',')) {
+                list($namespace,$tag) = explode(',',$tag,2);
                 $namespace = str_replace('$namespace:','',$namespace);
             }
 
             //set $locFile
-            $parts = explode(';',$code);
-            if(count($parts)<2) return $code;
+            $parts = explode(';',$tag);
+            if(count($parts)<2) return $tag;
             $locFile = "{$parts[0]};{$parts[1]}";
-            if(!$this->readLocalizationData($locFile,$lang,$namespace)) return $code;
-            if(count($parts)<3) return $this->data[$locFile][$lang]??$code;
-            return $this->data[$locFile][$lang][$code]??$code;
+            if(!$this->readLocalizationData($locFile,$lang,$namespace)) return $tag;
+            if(count($parts)<3) return $this->data[$locFile][$lang]??$tag;
+            return $this->data[$locFile][$lang][$tag]??$tag;
         }
 
         /**
@@ -5484,24 +5517,24 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         /**
          * Get a Localization code from a localization file
-         * @param string $code
+         * @param string $tag
          * @param string $lang
          * @param string $namespace [optional]
          * @return mixed|string
          */
-        function setTag(string $code, string $value, string $lang='',$namespace='')
+        function setTag(string $tag, string $value, string $lang='', $namespace='')
         {
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
 
             // make compatible tags with $namespace
-            if(strpos($code,'$namespace:')===0 && strpos($code,',')) {
-                list($namespace,$code) = explode(',',$code,2);
+            if(strpos($tag,'$namespace:')===0 && strpos($tag,',')) {
+                list($namespace,$tag) = explode(',',$tag,2);
             }
-            $parts = explode(';',$code);
+            $parts = explode(';',$tag);
             if(count($parts)<3) return false;
             $locFile = "{$parts[0]};{$parts[1]}";
-            $this->data[$locFile][$lang][$code] = $value;
+            $this->data[$locFile][$lang][$tag] = $value;
             return true;
         }
         /**
