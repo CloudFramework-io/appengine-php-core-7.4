@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.23051';
+        var $_version = 'v74.23061';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5396,12 +5396,12 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     {
         protected $core;
         var $data = [];
-        var $wapploca = [];
-        var $files_readed = [];
+        var $reset = false;
+        var $reset_files = [];
+        var $cacheExpiration = -1;
         private $init = false;
         var $error = false;
         var $errorMsg = [];
-        var $cache = true;
 
         var $api_service = null;
         var $api_namespace = 'cloudframework';
@@ -5490,7 +5490,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         {
             if(!strpos($tag,';')) return $tag;
             //delete {, } chars
-            $tag = preg_replace('/({|})/','',$tag);
+            $tag = preg_replace('/({|})/','',trim($tag));
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             if(!$lang) $lang=$this->api_lang;
 
@@ -5544,11 +5544,22 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
         /**
-         * Reset Cache for localizations. If $loc_file is not sent it will delete the whole namespace
-         * @param string $loc_file
-         * @param string $namespace
+         * Reset Cache for localizations. Every call to localizations will call API at least once
          */
-        public function resetLocalizationsCache(string $loc_file='',$namespace='') {
+        public function resetLocalizationsCache() {
+            $this->reset = true;
+            $this->reset_files = [];
+            $this->localize_files = null;
+            $this->data = [];
+        }
+
+        /**
+         * Delete cache Data in $namespace
+         * @param string $loc_file  optional. Specifical the loc_file (ex: '<app_id>;<cat_id>')
+         * @param string $namespace optional. Default $this->api_namespace
+         */
+        public function deleteLocalizationsCache(string $loc_file='',$namespace='') {
+            $this->resetLocalizationsCache();
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
             $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace)?:[];
             foreach ($this->localize_files as $key=>$foo) {
@@ -5578,7 +5589,16 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(!$lang) $lang=$this->api_lang;
             if(isset($this->data[$locFile][$lang])) return true;
 
-            if($this->localize_files===null) $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace)?:[];
+            //read from cache files cached
+            if($this->localize_files===null) $this->localize_files = $this->core->cache->get('LOCALIZE_FILES_'.$namespace,$this->cacheExpiration)?:[];
+
+            //reset $this->localize_files[$namespace.$locFile.$lang] IF $this->reset force api read at least once
+            if($this->reset && !isset($this->reset_files[$namespace.$locFile.$lang])) {
+                $this->localize_files[$namespace.$locFile.$lang] = null;
+                $this->reset_files[$namespace.$locFile.$lang] = true;
+            }
+
+            //read from api if $this->localize_files[$namespace.$locFile.$lang] is null
             if(($this->localize_files[$namespace.$locFile.$lang]??null)===null) {
                 if($this->api_service) {
                     $this->core->logs->add('Reading Localizations from API: '.$this->api_service."/{$namespace}/{$this->api_user}/apps/{$locFile}?langs={$lang}",'localization_call');
