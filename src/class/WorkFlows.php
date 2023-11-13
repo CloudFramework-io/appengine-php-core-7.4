@@ -580,15 +580,15 @@ class WorkFlows
         $entity['DefaultFromName']=$template['publish_from_name'];
         $entity['PublishedDate']=$template['published_at'];
         $entity['DateInsertion']=$template['created_at'];
-        $entity['DateUpdating']=substr($template['updated_at'],0,19);
+        $entity['DateUpdating']=substr($template['updated_at']??'',0,19);
         $entity['Type']='Mandrill';
-        $entity['TemplateHTML']=utf8_encode($template['publish_code']);
-        $entity['TemplateTXT']=utf8_encode($template['publish_text']);
+        $entity['TemplateHTML']=utf8_encode($template['publish_code']??'');
+        $entity['TemplateTXT']=utf8_encode($template['publish_text']??'');
         $entity['TemplateURL']="https://mandrillapp.com/templates/code?id=".urlencode($template['slug']);
         $entity['TemplateVariables']=[];
 
         //region extract Variables
-        $code = utf8_encode($template['publish_code']);
+        $code = utf8_encode($template['publish_code']??'');
         do {
 
             $found = null;
