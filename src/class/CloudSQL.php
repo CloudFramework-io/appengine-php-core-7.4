@@ -1168,6 +1168,7 @@ if (!defined ("_MYSQLI_CLASS_") ) {
 
         /**
          * Return the CloudFrameWork-io Model from a DB table
+         * @deprecated
          * @param $table
          * @return array where array['model'] is the JSON model if array['table_exists]===true
          */
@@ -1279,6 +1280,11 @@ if (!defined ("_MYSQLI_CLASS_") ) {
             return $fields;
         }
 
+        /**
+         * @deprecated
+         * @param $table
+         * @return array
+         */
         function getInterfaceModelFromTable($table) {
 
             $cfo = [

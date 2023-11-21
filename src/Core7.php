@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.23061';
+        var $_version = 'v74.23211';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5332,6 +5332,37 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function getLang()
         {
             return $this->data['User']['UserLang']??'en';
+        }
+
+        /**
+         * Get de TimeZone of the user. UTC by default
+         * @return string
+         */
+        function getTimeZone()
+        {
+            return $this->data['User']['UserTimeZone']??'UTC';
+        }
+
+        /**
+         * Get datetime Y-m-d H:i:s converted to User TimeZone
+         * @return string
+         */
+        function getDateTime(string $time_zone='',string $date_time='')
+        {
+            if(!$time_zone) $time_zone = $this->getTimeZone();
+            $user_time_zone = $this->getTimeZone();
+            try {
+                if(!$date_time)
+                    $date = (new DateTime('now', new DateTimeZone($time_zone)));
+                else
+                    $date = (new DateTime($date_time, new DateTimeZone($time_zone)));
+                if($user_time_zone != $time_zone) {
+                    $date->setTimezone(new DateTimeZone($user_time_zone));
+                }
+                return $date->format('Y-m-d H:i:s');
+            }catch (Exception $e) {
+                return "Error to convert datetime from zone [{$time_zone}] to UserTimeZone [{$user_time_zone}] ".$date_time;
+            }
         }
 
         /**
