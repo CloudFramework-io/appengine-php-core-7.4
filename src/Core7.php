@@ -5438,6 +5438,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $api_namespace = 'cloudframework';
         var $api_user = 'user-unknown';
         var $api_lang = 'en';
+        var $api_creation_lang = 'en';
+        var $api_creation_to_convert_langs = ['es'];
         var $localize_files = null;
 
         function __construct(Core7 &$core)
@@ -5459,6 +5461,55 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             $this->api_user = ($user)?:($this->core->user->id?:'user-unknown');
         }
 
+        /**
+         * Get the current default lang for localizations
+         * @return string
+         */
+        public function getDefaultLang() {
+            return $this->api_lang;
+        }
+
+        /**
+         * Get the current default lang for tags creation
+         * @return string
+         */
+        public function getDefaultCreationLang() {
+            return $this->api_lang;
+        }
+
+
+        /**
+         * Set default lang for localizations
+         * @param string $lang
+         */
+        public function setDefaultLang(string $lang) {
+            $this->api_lang = $lang;
+        }
+
+        /**
+         * Set default lang for tags creation
+         * @param string $lang
+         */
+        public function setDefaultCreationLang(string $lang) {
+            $this->api_creation_lang = $lang;
+        }
+
+        /**
+         * Set default langs to convert on tags creation
+         * @param array $langs
+         */
+        public function setDefaultCreationToConvertLangs(array $langs) {
+            $this->api_creation_to_convert_langs = $langs;
+        }
+
+
+        /**
+         * Set default namespace for localizations
+         * @param string $namespace
+         */
+        public function setDefaultNamespace(string $namespace) {
+            $this->api_namespace = $namespace;
+        }
 
         /**
          * Get a Localization code from a localization file
@@ -5509,6 +5560,38 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 elseif(is_array($item)) $this->changeArrayWithTags($array[$i],$lang,$namespace);
             }
         }
+
+
+        /**
+         * Get a Localization code from a localization file
+         * @param string $tag the tag to translate with the pattern [{][$namepace:<namespace>,]<app_id>;<cat_id>;<tag_id>[;<subtag_id>][}]
+         * @param string $lang
+         * @param string $namespace [optional]
+         * @return mixed|string
+         */
+        function createTag(string $tag, string $value, string $lang='', $namespace='',$translete_to=[])
+        {
+            if(!strpos($tag,';')) return $tag;
+            //delete {, } chars
+            $tag = preg_replace('/({|})/','',trim($tag));
+            if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
+            if(!$lang) $lang=$this->api_lang;
+
+            //detect namespace value in tag.
+            if(strpos($tag,'$namespace:')===0 && strpos($tag,',')) {
+                list($namespace,$tag) = explode(',',$tag,2);
+                $namespace = str_replace('$namespace:','',$namespace);
+            }
+
+            //set $locFile
+            $parts = explode(';',$tag);
+            if(count($parts)<2) return $tag;
+            $locFile = "{$parts[0]};{$parts[1]}";
+            if(!$this->readLocalizationData($locFile,$lang,$namespace)) return $tag;
+            if(count($parts)<3) return $this->data[$locFile][$lang]??$tag;
+            return $this->data[$locFile][$lang][$tag]??$tag;
+        }
+
 
         /**
          * Get a Localization code from a localization file
