@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.23211';
+        var $_version = 'v74.24031';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5602,7 +5602,8 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
          */
         function getTag(string $tag, string $lang='', $namespace='')
         {
-            if(!strpos($tag,';')) return $tag;
+
+            if( !preg_match('/^[^;]+;[^;]+;[^;]+/',$tag))  return $tag;
             //delete {, } chars
             $tag = preg_replace('/({|})/','',trim($tag));
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
@@ -5612,6 +5613,10 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
             if(strpos($tag,'$namespace:')===0 && strpos($tag,',')) {
                 list($namespace,$tag) = explode(',',$tag,2);
                 $namespace = str_replace('$namespace:','',$namespace);
+            }
+            // return tags with chars not valid
+            if(preg_match('/[^A-Z0-9a-z;_-]/',$tag) || !preg_match('/^[^;]+;[^;]+;[^;]+/',$tag)) {
+                return $tag;
             }
 
             //set $locFile
