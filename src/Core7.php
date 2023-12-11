@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.24031';
+        var $_version = 'v74.24111';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -5438,8 +5438,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         var $api_namespace = 'cloudframework';
         var $api_user = 'user-unknown';
         var $api_lang = 'en';
-        var $api_creation_lang = 'en';
-        var $api_creation_to_convert_langs = ['es'];
+        var $api_creation_credentials = [];
         var $localize_files = null;
 
         function __construct(Core7 &$core)
@@ -5487,11 +5486,11 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         }
 
         /**
-         * Set default lang for tags creation
-         * @param string $lang
+         * Set credentials to create tags in the ERP
+         * @param array $lang
          */
-        public function setDefaultCreationLang(string $lang) {
-            $this->api_creation_lang = $lang;
+        public function setCreationCredentials(array $credentials) {
+            $this->api_creation_credentials = $credentials;
         }
 
         /**
@@ -5565,31 +5564,32 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         /**
          * Get a Localization code from a localization file
          * @param string $tag the tag to translate with the pattern [{][$namepace:<namespace>,]<app_id>;<cat_id>;<tag_id>[;<subtag_id>][}]
-         * @param string $lang
+         * @param array $values
+         * @param bool $with_subtags
          * @param string $namespace [optional]
-         * @return mixed|string
+         * @return array|void
          */
-        function createTag(string $tag, string $value, string $lang='', $namespace='',$translete_to=[])
+        function createTags(string $tag, array $values, $with_subtags=false,$namespace='')
         {
-            if(!strpos($tag,';')) return $tag;
-            //delete {, } chars
-            $tag = preg_replace('/({|})/','',trim($tag));
+
+            if(!$this->api_service) return $this->addError("Mising api_service. Use initLocalizationService()");
+            $parts = explode(';',trim($tag));
+            if(count($parts)!=3) return $this->addError("Wrong \$tag paramater. Use it with format [App;Cat;Tag]");
             if(!$namespace) $namespace=$this->api_namespace?:'cloudframework';
-            if(!$lang) $lang=$this->api_lang;
-
-            //detect namespace value in tag.
-            if(strpos($tag,'$namespace:')===0 && strpos($tag,',')) {
-                list($namespace,$tag) = explode(',',$tag,2);
-                $namespace = str_replace('$namespace:','',$namespace);
+            if($with_subtags) {
+                $values = ['subtags'=>$values];
+            } else {
+                $values = ['langs'=>$values];
             }
-
-            //set $locFile
-            $parts = explode(';',$tag);
-            if(count($parts)<2) return $tag;
-            $locFile = "{$parts[0]};{$parts[1]}";
-            if(!$this->readLocalizationData($locFile,$lang,$namespace)) return $tag;
-            if(count($parts)<3) return $this->data[$locFile][$lang]??$tag;
-            return $this->data[$locFile][$lang][$tag]??$tag;
+            $url = $this->api_service."/{$namespace}/{$this->api_user}/apps/{$tag}?with_subtags=".(($with_subtags)?1:0);
+            $this->core->logs->add('Creating Localizations from API: '.$this->api_service."/{$namespace}/{$this->api_user}/apps/{$tag}",'localization_create_tag');
+            $localizations = $this->core->request->post_json_decode($url,$values,$this->api_creation_credentials,true);
+            if($this->core->request->error) {
+                $this->addError($this->core->request->errorMsg);
+                $this->core->request->reset();
+                return $localizations;
+            }
+            return $localizations['data'];
         }
 
 
