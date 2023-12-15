@@ -5228,6 +5228,28 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
         }
 
+        /**
+         * Update UserData in cache and in the Token of the user
+         * @return true|null
+         */
+        function updateERPUserDataInCache()
+        {
+            if(!$this->core->user->token) return($this->addError('WRONG_TOKEN_FORMAT','The user does not have any token'));
+            $tokenParts = explode('__',$this->core->user->token);
+            if(count($tokenParts) != 3
+                || !($namespace=$tokenParts[0])
+                || !($user_token=$tokenParts[1])
+                || !($key=$tokenParts[2]) )
+                return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
+            //endregion
+            if($cache_data = $this->core->cache->get($namespace.'_'.$user_token)) {
+                $cache_data['data']['User'] = $this->data['User'];
+                $this->core->cache->set($namespace.'_'.$user_token,$cache_data);
+                $this->core->security->updateDSToken($this->token, $this->core->user->data['User'] );
+            }
+            return true;
+        }
+
 
         /**
          * Return if the user is Authenticated
