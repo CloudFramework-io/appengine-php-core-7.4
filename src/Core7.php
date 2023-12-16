@@ -156,7 +156,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
     final class Core7
     {
         // Version of the Core7 CloudFrameWork
-        var $_version = 'v74.24151';
+        var $_version = 'v74.24161';
         /** @var CorePerformance $__p */
         var  $__p;
         /** @var CoreIs $is */
@@ -4703,6 +4703,25 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
 
 
         /**
+         * Check if the URL passed exists
+         * @param string $url
+         * @return boolean
+         */
+        function urlExists(string $url)
+        {
+            $exists = true;
+            if(strpos($url,'http')!==0) $exists = false;
+            else {
+                $file_headers = @get_headers($url);
+                if(!$file_headers || strpos($file_headers[0]??'', '404') || strpos($file_headers[0]??'', '403')) {
+                    $exists = false;
+                }
+            }
+            return $exists;
+        }
+
+
+        /**
          * Returns a specific Header received in a API call
          * @param $str
          * @return mixed|string
@@ -5242,6 +5261,7 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
                 || !($key=$tokenParts[2]) )
                 return($this->addError('WRONG_TOKEN_FORMAT','The structure of the token is not right'));
             //endregion
+
             if($cache_data = $this->core->cache->get($namespace.'_'.$user_token)) {
                 $cache_data['data']['User'] = $this->data['User'];
                 $this->core->cache->set($namespace.'_'.$user_token,$cache_data);
@@ -5354,6 +5374,15 @@ if (!defined("_CLOUDFRAMEWORK_CORE_CLASSES_")) {
         function getLang()
         {
             return $this->data['User']['UserLang']??'en';
+        }
+
+        /**
+         * Get a user lang. 'en' default
+         * @return string
+         */
+        function isPortalUser()
+        {
+            return ($this->data['User']['PortalUser']??null)?true:false;
         }
 
         /**
